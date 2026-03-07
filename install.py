@@ -166,7 +166,7 @@ pip(" ".join([
     "uvicorn[standard]==0.29.0",
     "opencv-python==4.9.0.80",
     "numpy==1.26.4",
-    "Pillow==10.3.0",
+    "Pillow>=11.0.0",
     "insightface==0.7.3",
     "mediapipe==0.10.14",
     "python-multipart==0.0.9",
