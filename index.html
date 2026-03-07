@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMD Adapt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   FACEMORPH KIOSK — Character Select Interface
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:      #060608;
+  --deep:    #0a0a10;
+  --panel:   #0e0e18;
+  --border:  #18182a;
+  --border2: #252540;
+  --text:    #dde0f0;
+  --muted:   #48486a;
+  --accent:  #00e5ff;
+  --hot:     #ff2266;
+  --gold:    #ffd040;
+  --gc: 0 0 20px rgba(0,229,255,.5), 0 0 50px rgba(0,229,255,.15);
+  --gh: 0 0 20px rgba(255,34,102,.5), 0 0 50px rgba(255,34,102,.15);
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* scanlines */
+body::after {
+  content:''; position:fixed; inset:0; z-index:900; pointer-events:none;
+  background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);
+}
+
+/* ── LAYOUT ──────────────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-rows: 56px 1fr 220px;
+  height: 100vh;
+}
+
+/* ── HEADER ──────────────────────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  background: var(--deep);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+}
+header::after {
+  content:''; position:absolute; bottom:-1px; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
+  animation: hline 4s ease-in-out infinite;
+}
+@keyframes hline { 0%,100%{opacity:.2} 50%{opacity:.9} }
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px; letter-spacing: 5px;
+  color: var(--accent);
+  text-shadow: var(--gc);
+}
+.logo em { color: var(--hot); font-style:normal; text-shadow: var(--gh); }
+
+.hdr-right {
+  display: flex; align-items: center; gap: 16px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--muted);
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted); transition: all .3s;
+}
+.live-dot.on { background: #22ff66; box-shadow: 0 0 8px #22ff66; animation: blink 1.8s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── VIDEO AREA ──────────────────────────────────────────────────────── */
+.video-wrap {
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+#feed {
+  width:100%; height:100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Corner brackets */
+.brkt {
+  position: absolute; width: 32px; height: 32px;
+  pointer-events: none; z-index: 5;
+}
+.brkt::before,.brkt::after {
+  content:''; position:absolute; background:var(--accent);
+  box-shadow: 0 0 5px var(--accent);
+}
+.brkt::before { width:2px; height:100%; }
+.brkt::after  { width:100%; height:2px; }
+.brkt.tl { top:14px; left:14px; }
+.brkt.tr { top:14px; right:14px; transform:scaleX(-1); }
+.brkt.bl { bottom:14px; left:14px; transform:scaleY(-1); }
+.brkt.br { bottom:14px; right:14px; transform:scale(-1); }
+
+/* Current character HUD */
+.char-hud {
+  position: absolute; top:22px; left:50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 10;
+  transition: opacity .4s;
+  opacity: 0;
+}
+.char-hud.show { opacity: 1; }
+.hud-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px; letter-spacing: 6px;
+  color: #fff;
+  text-shadow: 0 0 30px var(--char-color, var(--accent)),
+               0 0 60px var(--char-color, var(--accent));
+}
+.hud-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 3px;
+  color: var(--char-color, var(--accent));
+  margin-top: 2px;
+}
+
+/* Quick mode pills (top-right of video) */
+.mode-pills {
+  position: absolute; top: 18px; right: 20px;
+  display: flex; gap: 6px; z-index: 10;
+}
+.pill {
+  padding: 4px 12px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  background: rgba(0,0,0,.55);
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  color: var(--muted); cursor: pointer;
+  transition: all .2s; backdrop-filter: blur(6px);
+}
+.pill:hover { border-color: var(--accent); color: var(--accent); }
+.pill.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,229,255,.1);
+  box-shadow: var(--gc);
+}
+
+/* ── CHARACTER SELECT BAR ────────────────────────────────────────────── */
+.char-bar {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.bar-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 3px;
+  color: var(--muted); text-transform: uppercase;
+}
+.bar-hint {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px; color: var(--muted);
+}
+
+/* Character cards row */
+.chars-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+}
+.chars-row::-webkit-scrollbar { display:none; }
+
+.char-card {
+  flex-shrink: 0;
+  width: 138px;
+  border-radius: 8px;
+  border: 2px solid var(--border2);
+  background: var(--deep);
+  cursor: pointer;
+  transition: all .22s cubic-bezier(.2,.8,.3,1);
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.char-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg,
+    rgba(255,255,255,.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+.char-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--c, var(--accent));
+  box-shadow: 0 8px 32px rgba(0,0,0,.6),
+              0 0 20px var(--c, rgba(0,229,255,.3));
+}
+.char-card.active {
+  border-color: var(--c, var(--accent));
+  background: color-mix(in srgb, var(--c, var(--accent)) 8%, var(--deep));
+  box-shadow: 0 0 0 1px var(--c, var(--accent)),
+              0 0 30px var(--c, rgba(0,229,255,.25)),
+              inset 0 0 20px rgba(0,0,0,.4);
+  transform: translateY(-2px);
+}
+
+/* Inner card layout */
+.card-emoji {
+  font-size: 36px;
+  text-align: center;
+  padding: 14px 8px 6px;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px var(--c, rgba(0,229,255,.5)));
+  transition: filter .3s;
+}
+.char-card.active .card-emoji {
+  filter: drop-shadow(0 0 16px var(--c, rgba(0,229,255,.9)));
+}
+.card-body {
+  padding: 4px 10px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.card-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px; letter-spacing: 2px;
+  color: var(--text);
+  transition: color .2s;
+}
+.char-card.active .card-name { color: var(--c, var(--accent)); }
+.card-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 7.5px; letter-spacing: .5px;
+  color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Active indicator bar at bottom */
+.card-bar {
+  height: 3px;
+  background: var(--border);
+  margin-top: auto;
+  transition: background .2s;
+}
+.char-card.active .card-bar {
+  background: var(--c, var(--accent));
+  box-shadow: 0 0 8px var(--c, var(--accent));
+}
+
+/* Numbered key hint */
+.card-key {
+  position: absolute; top: 7px; right: 8px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; color: var(--muted);
+  background: rgba(0,0,0,.5);
+  padding: 1px 5px; border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.char-card.active .card-key { color: var(--c, var(--accent)); border-color: var(--c, var(--accent)); }
+
+/* ── FACE SWAP OVERLAY PANEL ─────────────────────────────────────────── */
+/* Slides up over the char bar when face-swap mode is active */
+.faceswap-panel {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 220px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+  transform: translateY(100%);
+  transition: transform .35s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column;
+}
+.faceswap-panel.open { transform: translateY(0); }
+
+.fs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fs-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 3px; color: var(--muted);
+}
+.fs-close {
+  background: none; border: 1px solid var(--border2);
+  color: var(--muted); border-radius: 4px;
+  padding: 3px 10px; cursor: pointer;
+  font-family: 'Space Mono', monospace; font-size: 9px;
+  transition: all .2s;
+}
+.fs-close:hover { border-color: var(--hot); color: var(--hot); }
+
+.fs-faces {
+  flex:1; display:flex; gap:8px;
+  padding: 10px 20px;
+  overflow-x: auto; scrollbar-width: none;
+  align-items: center;
+}
+.fs-faces::-webkit-scrollbar { display:none; }
+
+.face-card {
+  flex-shrink: 0;
+  width: 80px; height: 110px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border2);
+  background: var(--deep);
+  cursor: pointer;
+  overflow: hidden; position: relative;
+  transition: all .2s;
+}
+.face-card:hover { transform:translateY(-3px); border-color: var(--hot); }
+.face-card.active { border-color: var(--hot); box-shadow: var(--gh); }
+.face-card img { width:100%; height:100%; object-fit:cover; }
+.face-card .flabel {
+  position:absolute; bottom:0; left:0; right:0;
+  padding: 3px 4px;
+  background: linear-gradient(transparent, rgba(0,0,0,.85));
+  font-family:'Space Mono',monospace;
+  font-size: 7px; text-align:center; color: var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.face-card.active .flabel { color: var(--hot); }
+
+.fs-empty {
+  color: var(--muted); font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  text-align: center; padding: 20px;
+  line-height: 1.8;
+}
+
+.fs-upload-btn {
+  width: 80px; height: 110px; flex-shrink:0;
+  border: 1.5px dashed var(--border2);
+  border-radius: 6px; background: transparent;
+  cursor: pointer; color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; text-align:center;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:5px;
+  transition: all .2s;
+}
+.fs-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+.fs-upload-btn .plus { font-size: 22px; }
+
+/* ── UPLOAD MODAL ────────────────────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset:0; z-index: 200;
+  background: rgba(0,0,0,.88);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition: opacity .3s;
+}
+.modal-bg.open { opacity:1; pointer-events:all; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 28px; width: 360px;
+  transform: scale(.95);
+  transition: transform .3s;
+}
+.modal-bg.open .modal { transform: scale(1); }
+.modal h2 {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:24px; letter-spacing:4px;
+  color:var(--accent); margin-bottom:18px;
+  text-shadow: var(--gc);
+}
+.modal input, .modal select {
+  width:100%; padding:10px 12px;
+  background:var(--deep); border: 1px solid var(--border2);
+  border-radius:5px; color:var(--text);
+  font-family:'Space Mono',monospace; font-size:12px;
+  margin-bottom:10px; outline:none;
+  transition: border-color .2s;
+}
+.modal input:focus, .modal select:focus { border-color:var(--accent); }
+
+.drop-z {
+  border: 2px dashed var(--border2); border-radius:8px;
+  padding: 20px; text-align:center; cursor:pointer;
+  transition: all .2s; margin-bottom:12px; position:relative;
+}
+.drop-z:hover,.drop-z.drag { border-color:var(--accent); background:rgba(0,229,255,.05); }
+.drop-z input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; margin:0; }
+.drop-z .dz-ico { font-size:26px; margin-bottom:5px; }
+.drop-z .dz-txt { font-size:10px; color:var(--muted); font-family:'Space Mono',monospace; }
+#prev-img { width:100%; max-height:130px; object-fit:cover; border-radius:5px; display:none; margin-bottom:10px; }
+
+.modal-btns { display:flex; gap:10px; margin-top:6px; }
+.btn-ok {
+  flex:1; padding:11px;
+  background:var(--accent); color:#000;
+  border:none; border-radius:5px;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:15px; letter-spacing:2px;
+  cursor:pointer; transition:opacity .2s;
+}
+.btn-ok:hover { opacity:.85; }
+.btn-cancel {
+  padding:11px 16px;
+  background:transparent; color:var(--muted);
+  border:1px solid var(--border2); border-radius:5px;
+  font-family:'Space Mono',monospace; font-size:11px;
+  cursor:pointer; transition:all .2s;
+}
+.btn-cancel:hover { color:var(--text); border-color:var(--muted); }
+
+/* ── TOAST ───────────────────────────────────────────────────────────── */
+#toast {
+  position:fixed; bottom:240px; left:50%;
+  transform:translateX(-50%) translateY(12px);
+  background:var(--panel); border:1px solid var(--accent);
+  color:var(--accent); font-family:'Space Mono',monospace;
+  font-size:11px; letter-spacing:1px; padding:9px 22px;
+  border-radius:30px; box-shadow:var(--gc);
+  z-index:300; pointer-events:none;
+  opacity:0; transition:all .3s;
+}
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+#toast.err  { border-color:var(--hot); color:var(--hot); box-shadow:var(--gh); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">AMD<em>ADAPT</em></div>
+    <div class="hdr-right">
+      <div class="live-dot" id="liveDot"></div>
+      <span id="camTxt">CONNECTING</span>
+      <span style="color:var(--border2)">│</span>
+      <span id="modeTxt" style="color:var(--accent)">LIVE</span>
+    </div>
+  </header>
+
+  <!-- ── Video ───────────────────────────────────────────────────────────── -->
+  <div class="video-wrap">
+    <img id="feed" src="/video_feed" alt="Live feed">
+
+    <!-- Brackets -->
+    <div class="brkt tl"></div>
+    <div class="brkt tr"></div>
+    <div class="brkt bl"></div>
+    <div class="brkt br"></div>
+
+    <!-- Character HUD -->
+    <div class="char-hud" id="charHud">
+      <div class="hud-name" id="hudName">NA'VI</div>
+      <div class="hud-sub"  id="hudSub">AVATAR · PANDORA</div>
+    </div>
+
+    <!-- Mode pills (top right) -->
+    <div class="mode-pills">
+      <div class="pill active" data-mode="character" onclick="setTopMode('character')">CHARACTER</div>
+      <div class="pill"        data-mode="minecraft" onclick="setTopMode('minecraft')">MINECRAFT</div>
+      <div class="pill"        data-mode="cyberpunk" onclick="setTopMode('cyberpunk')">CYBERPUNK</div>
+      <div class="pill"        data-mode="faceswap"  onclick="openFaceSwap()">FACE SWAP ↑</div>
+      <div class="pill"        data-mode="passthrough" onclick="setTopMode('passthrough')">LIVE</div>
+    </div>
+  </div>
+
+  <!-- ── Character Select Bar ────────────────────────────────────────────── -->
+  <div class="char-bar">
+    <div class="bar-header">
+      <span class="bar-title">Choose Your Character</span>
+      <span class="bar-hint">Keys 1–6 to switch · ESC = live view</span>
+    </div>
+    <div class="chars-row" id="charsRow">
+      <!-- populated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Face Swap Panel ────────────────────────────────────────────────────── -->
+<div class="faceswap-panel" id="fsPanel">
+  <div class="fs-header">
+    <span class="fs-title">Face Swap Library — pick a face</span>
+    <button class="fs-close" onclick="closeFaceSwap()">✕ CLOSE</button>
+  </div>
+  <div class="fs-faces" id="fsFaces">
+    <div class="fs-empty">Loading faces...</div>
+  </div>
+</div>
+
+<!-- ── Upload Modal ───────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>Add Face</h2>
+    <div class="drop-z" id="dropZ">
+      <input type="file" id="fileIn" accept="image/*" onchange="previewF(this)">
+      <div id="dzCont">
+        <div class="dz-ico">📤</div>
+        <div class="dz-txt">Drop photo here or click to browse<br>Use a clear front-facing image</div>
+      </div>
+      <img id="prev-img" alt="preview">
+    </div>
+    <input type="text" id="faceLabel" placeholder="Name (e.g. Lisa Su, Keanu Reeves)">
+    <select id="faceCat">
+      <option value="celebrity">Celebrity</option>
+      <option value="fantasy">Fantasy / Character</option>
+      <option value="custom">Custom</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-ok" onclick="uploadFace()">UPLOAD</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   FaceMorph Kiosk — UI Controller
+   ════════════════════════════════════════════════════════════════════════ */
+
+let currentMode  = 'character';
+let currentChar  = 'navi';
+let currentFace  = null;
+let fsCatalog    = [];
+let characters   = [];
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadCharacters();
+  await loadFaces();
+  pollStatus();
+  setInterval(pollStatus, 3000);
+  // Start in character mode with Na'vi
+  selectChar('navi', false);
+});
+
+// ── Character loading ─────────────────────────────────────────────────────
+async function loadCharacters() {
+  try {
+    const r = await fetch('/characters');
+    const d = await r.json();
+    characters = d.characters;
+    renderCharBar();
+  } catch {
+    renderCharBar();  // still render with defaults
+  }
+}
+
+function renderCharBar() {
+  const row = document.getElementById('charsRow');
+  if (!characters.length) {
+    // Fallback hardcoded list
+    characters = [
+      {key:'navi',     label:"Na'vi",    subtitle:'Avatar · Pandora',    emoji:'🔵', color:'#00d4ff'},
+      {key:'hulk',     label:'Hulk',     subtitle:'Gamma · Avengers',    emoji:'💚', color:'#22dd44'},
+      {key:'thanos',   label:'Thanos',   subtitle:'Infinity · Mad Titan',emoji:'💜', color:'#9b30ff'},
+      {key:'predator', label:'Predator', subtitle:'Thermal · Cloaked',   emoji:'👁️', color:'#ff6600'},
+      {key:'ghost',    label:'Ghost',    subtitle:'Spectral · Ethereal', emoji:'👻', color:'#aaddff'},
+      {key:'groot',    label:'Groot',    subtitle:'Guardians · Flora',   emoji:'🌿', color:'#8B5E3C'},
+    ];
+  }
+
+  row.innerHTML = characters.map((c, i) => `
+    <div class="char-card" id="card-${c.key}" data-key="${c.key}"
+         style="--c: ${c.color}"
+         onclick="selectChar('${c.key}')">
+      <span class="card-key">${i+1}</span>
+      <div class="card-emoji">${c.emoji}</div>
+      <div class="card-body">
+        <div class="card-name">${c.label}</div>
+        <div class="card-sub">${c.subtitle}</div>
+      </div>
+      <div class="card-bar"></div>
+    </div>
+  `).join('');
+}
+
+// ── Select character ──────────────────────────────────────────────────────
+async function selectChar(key, sendToServer=true) {
+  currentChar = key;
+  currentMode = 'character';
+
+  // Update card highlights
+  document.querySelectorAll('.char-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.key === key);
+  });
+
+  // Update pills
+  document.querySelectorAll('.pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.mode === 'character');
+  });
+
+  // Show HUD
+  const char = characters.find(c => c.key === key);
+  if (char) {
+    const hud = document.getElementById('charHud');
+    const nm  = document.getElementById('hudName');
+    const sb  = document.getElementById('hudSub');
+    hud.style.setProperty('--char-color', char.color);
+    nm.textContent = char.label.toUpperCase();
+    sb.textContent = char.subtitle.toUpperCase();
+    hud.classList.add('show');
+    setTimeout(() => hud.classList.remove('show'), 3000);
+  }
+
+  document.getElementById('modeTxt').textContent = char?.label?.toUpperCase() || 'CHARACTER';
+
+  if (sendToServer) {
+    const fd = new FormData();
+    fd.append('mode', 'character');
+    fd.append('character', key);
+    try { await fetch('/set_mode', {method:'POST', body:fd}); }
+    catch { toast('Server error', true); }
+  }
+}
+
+// ── Top mode pills ────────────────────────────────────────────────────────
+async function setTopMode(mode) {
+  if (mode === 'faceswap') { openFaceSwap(); return; }
+  currentMode = mode;
+
+  document.querySelectorAll('.pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.mode === mode)
+  );
+
+  // Deactivate all char cards if not in character mode
+  if (mode !== 'character') {
+    document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active'));
+  } else {
+    // Re-select current char
+    document.querySelectorAll('.char-card').forEach(c =>
+      c.classList.toggle('active', c.dataset.key === currentChar)
+    );
+  }
+
+  const labels = {passthrough:'LIVE', character:'CHARACTER', minecraft:'MINECRAFT',
+                  cyberpunk:'CYBERPUNK', faceswap:'FACE SWAP'};
+  document.getElementById('modeTxt').textContent = labels[mode] || mode.toUpperCase();
+
+  const fd = new FormData();
+  fd.append('mode', mode);
+  if (mode === 'character') fd.append('character', currentChar);
+  try { await fetch('/set_mode', {method:'POST', body:fd}); }
+  catch { toast('Error', true); }
+}
+
+// ── Face swap panel ───────────────────────────────────────────────────────
+function openFaceSwap() {
+  document.getElementById('fsPanel').classList.add('open');
+  renderFsPanel();
+}
+function closeFaceSwap() {
+  document.getElementById('fsPanel').classList.remove('open');
+}
+
+async function loadFaces() {
+  try {
+    const r = await fetch('/catalog');
+    const d = await r.json();
+    fsCatalog = d.faces;
+  } catch {}
+}
+
+function renderFsPanel() {
+  const container = document.getElementById('fsFaces');
+  if (!fsCatalog.length) {
+    container.innerHTML = `
+      <div class="fs-empty">
+        No faces loaded yet.<br>
+        Drop JPGs into <code style="color:var(--accent)">faces/celebrity/</code><br>
+        or use the upload button →
+      </div>`;
+    // Still add upload button
+    const btn = document.createElement('button');
+    btn.className = 'fs-upload-btn';
+    btn.onclick = openModal;
+    btn.innerHTML = '<span class="plus">＋</span><span>Add Face</span>';
+    container.appendChild(btn);
+    return;
+  }
+
+  let html = '';
+  fsCatalog.forEach(f => {
+    const active = f.key === currentFace ? ' active' : '';
+    const thumb  = `/face_thumb?key=${encodeURIComponent(f.key)}`;
+    html += `
+      <div class="face-card${active}" data-key="${f.key}"
+           onclick="pickFace('${f.key}')">
+        <img src="${thumb}" alt="${f.label}"
+             onerror="this.style.display='none'">
+        <div class="flabel">${f.label}</div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+
+  // Upload button at end
+  const btn = document.createElement('button');
+  btn.className = 'fs-upload-btn';
+  btn.onclick = openModal;
+  btn.innerHTML = '<span class="plus">＋</span><span>Add Face</span>';
+  container.appendChild(btn);
+}
+
+async function pickFace(key) {
+  currentFace = key;
+  currentMode = 'faceswap';
+
+  document.querySelectorAll('.face-card').forEach(c =>
+    c.classList.toggle('active', c.dataset.key === key)
+  );
+  document.querySelectorAll('.pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.mode === 'faceswap')
+  );
+
+  const entry = fsCatalog.find(f => f.key === key);
+  document.getElementById('modeTxt').textContent =
+    entry ? entry.label.toUpperCase() : 'FACE SWAP';
+
+  const fd = new FormData();
+  fd.append('mode', 'faceswap');
+  fd.append('face_key', key);
+  try {
+    await fetch('/set_mode', {method:'POST', body:fd});
+    toast(`✓ ${entry?.label || 'Face'} activated`);
+  } catch { toast('Error', true); }
+}
+
+// ── Status poll ───────────────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+    const dot = document.getElementById('liveDot');
+    const txt = document.getElementById('camTxt');
+    if (d.camera) {
+      dot.classList.add('on');
+      txt.textContent = 'CAMERA LIVE';
+    } else {
+      dot.classList.remove('on');
+      txt.textContent = 'NO CAMERA';
+    }
+  } catch {}
+}
+
+// ── Upload modal ──────────────────────────────────────────────────────────
+function openModal()  { document.getElementById('modalBg').classList.add('open'); }
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('open');
+  document.getElementById('fileIn').value = '';
+  document.getElementById('faceLabel').value = '';
+  document.getElementById('prev-img').style.display = 'none';
+  document.getElementById('dzCont').style.display = 'block';
+}
+
+function previewF(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('prev-img');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('dzCont').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  const lbl = document.getElementById('faceLabel');
+  if (!lbl.value)
+    lbl.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' ');
+}
+
+async function uploadFace() {
+  const file  = document.getElementById('fileIn').files[0];
+  const label = document.getElementById('faceLabel').value.trim();
+  const cat   = document.getElementById('faceCat').value;
+  if (!file)  { toast('Select a photo first', true); return; }
+  if (!label) { toast('Enter a name', true); return; }
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('label', label);
+  fd.append('category', cat);
+
+  try {
+    const r = await fetch('/upload_face', {method:'POST', body:fd});
+    const d = await r.json();
+    if (d.status === 'ok') {
+      toast(`✓ ${label} added`);
+      closeModal();
+      await loadFaces();
+      renderFsPanel();
+    } else { toast('Upload failed', true); }
+  } catch { toast('Upload error', true); }
+}
+
+// Drag/drop on upload zone
+const dz = document.getElementById('dropZ');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  if (e.dataTransfer.files.length) {
+    document.getElementById('fileIn').files = e.dataTransfer.files;
+    previewF(document.getElementById('fileIn'));
+  }
+});
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const num = parseInt(e.key);
+  if (num >= 1 && num <= 6 && characters[num-1]) {
+    selectChar(characters[num-1].key);
+  }
+  if (e.key === 'Escape') {
+    closeModal();
+    closeFaceSwap();
+    setTopMode('passthrough');
+  }
+  if (e.key === 'f' || e.key === 'F') openFaceSwap();
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.className = '', 2600);
+}
+</script>
+</body>
+</html>
