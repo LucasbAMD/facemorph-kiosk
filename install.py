@@ -168,7 +168,7 @@ pip(" ".join([
     "numpy>=2.0.0",
     "Pillow>=11.0.0",
     "insightface==0.7.3",
-    "mediapipe>=0.10.30",
+    "mediapipe>=0.10.30,<0.11",
     "python-multipart==0.0.9",
     "aiofiles==23.2.1",
     "requests==2.31.0",
