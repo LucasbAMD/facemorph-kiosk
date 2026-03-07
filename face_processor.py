@@ -173,12 +173,22 @@ class FaceProcessor:
 
     def _init_mediapipe(self):
         try:
-            self.segmenter = mp.solutions.selfie_segmentation.SelfieSegmentation(model_selection=1)
+            # Support both old (0.10.14) and new (0.10.30+) mediapipe APIs
+            if hasattr(mp, 'solutions'):
+                seg_module  = mp.solutions.selfie_segmentation
+                pose_module = mp.solutions.pose
+                fm_module   = mp.solutions.face_mesh
+            else:
+                # Newer mediapipe moved to tasks API — fall back gracefully
+                print("[WARN] mediapipe.solutions not available — body transforms will use fallback")
+                return
+
+            self.segmenter = seg_module.SelfieSegmentation(model_selection=1)
             print("[OK] Body segmentation loaded")
         except Exception as e:
             print(f"[ERROR] Segmenter: {e}")
         try:
-            self.pose = mp.solutions.pose.Pose(
+            self.pose = pose_module.Pose(
                 static_image_mode=False, model_complexity=1,
                 smooth_landmarks=True, enable_segmentation=False,
                 min_detection_confidence=0.4, min_tracking_confidence=0.4,
@@ -187,7 +197,7 @@ class FaceProcessor:
         except Exception as e:
             print(f"[ERROR] Pose: {e}")
         try:
-            self.face_mesh = mp.solutions.face_mesh.FaceMesh(
+            self.face_mesh = fm_module.FaceMesh(
                 max_num_faces=4, refine_landmarks=True,
                 min_detection_confidence=0.4, min_tracking_confidence=0.4,
             )
