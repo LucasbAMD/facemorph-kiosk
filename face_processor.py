@@ -40,7 +40,8 @@ def _detect_providers():
     try:
         import onnxruntime as ort
         available = ort.get_available_providers()
-        for p in ["ROCMExecutionProvider", "MIGraphXExecutionProvider",
+        for p in ["DmlExecutionProvider",
+                  "ROCMExecutionProvider", "MIGraphXExecutionProvider",
                   "CUDAExecutionProvider", "CPUExecutionProvider"]:
             if p in available:
                 print(f"[OK] ONNX provider: {p}")

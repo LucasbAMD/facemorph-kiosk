@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 """
-install.py — FaceMorph Kiosk one-shot installer
+install.py — AMD Adapt Kiosk one-shot installer
 Run this ONCE on a fresh machine:
 
     python install.py
 
-It will:
-  1. Check Python version
-  2. Auto-detect AMD ROCm / NVIDIA CUDA / CPU
-  3. Create a virtual environment
-  4. Install all Python packages with the right GPU backend
-  5. Verify ONNX can see the GPU
-  6. Print next steps
+Auto-detects your OS and GPU:
+  Windows 11  → DirectML (AMD/NVIDIA/Intel GPU acceleration)
+  Linux       → ROCm (AMD) or CUDA (NVIDIA) or CPU fallback
 
 After install, every future start is just:
     python start.py
@@ -25,12 +21,12 @@ from pathlib import Path
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
 def c(code, txt): return f"\033[{code}m{txt}\033[0m" if sys.platform != "win32" else txt
-ok   = lambda t: print(c("32", f"  [OK]  {t}"))
-info = lambda t: print(c("36", f"  [..]  {t}"))
-warn = lambda t: print(c("33", f"  [!!]  {t}"))
-err  = lambda t: print(c("31", f"  [ERR] {t}"))
+ok   = lambda t: print(c("32",   f"  [OK]  {t}"))
+info = lambda t: print(c("36",   f"  [..]  {t}"))
+warn = lambda t: print(c("33",   f"  [!!]  {t}"))
+err  = lambda t: print(c("31",   f"  [ERR] {t}"))
 hdr  = lambda t: print(c("1;36", f"\n── {t} " + "─" * max(0, 50 - len(t))))
-bold = lambda t: print(c("1", t))
+bold = lambda t: print(c("1",    t))
 
 def run(cmd, **kwargs):
     return subprocess.run(cmd, shell=True, check=False, **kwargs)
@@ -57,7 +53,7 @@ VENV_PIP = VENV_DIR / ("Scripts/pip.exe"    if IS_WIN else "bin/pip")
 # ═════════════════════════════════════════════════════════════════════════════
 print()
 bold("═" * 56)
-bold("   🎭  FaceMorph Kiosk — Installer")
+bold("   🎭  AMD Adapt Kiosk — Installer")
 bold("═" * 56)
 
 # ── Step 1: Python version ────────────────────────────────────────────────────
@@ -68,48 +64,48 @@ if major < 3 or minor < 10:
     sys.exit(1)
 ok(f"Python {major}.{minor} ✓")
 
-# ── Step 2: GPU detection ─────────────────────────────────────────────────────
-hdr("Step 2  GPU Detection")
+# ── Step 2: OS + GPU detection ────────────────────────────────────────────────
+hdr("Step 2  OS + GPU Detection")
 gpu_mode = "cpu"
+pt_index = None
 
-# AMD ROCm
-rocm_found = (
-    run("rocm-smi --version", capture_output=True).returncode == 0 or
-    Path("/dev/kfd").exists() or
-    Path("/opt/rocm").exists()
-)
-if rocm_found:
-    ok("AMD GPU / ROCm detected  →  W7900 mode 🔥")
-    gpu_mode = "rocm"
-
-    # Detect ROCm version
-    r = run("rocm-smi --version", capture_output=True, text=True)
-    rocm_ver = "6.0"
-    if r.returncode == 0:
-        for token in r.stdout.split():
-            if token.count(".") == 1:
-                try:
-                    float(token)
-                    rocm_ver = token
-                    break
-                except ValueError:
-                    pass
-    ok(f"ROCm version: {rocm_ver}")
-
-    if   rocm_ver.startswith("6.2"): pt_index = "rocm6.2"
-    elif rocm_ver.startswith("6.1"): pt_index = "rocm6.1"
-    else:                             pt_index = "rocm6.0"
-
-# NVIDIA CUDA
-elif run("nvidia-smi", capture_output=True).returncode == 0:
-    r = run("nvidia-smi --query-gpu=name --format=csv,noheader",
-            capture_output=True, text=True)
-    ok(f"NVIDIA GPU detected: {r.stdout.strip()}")
-    gpu_mode = "cuda"
-
+if IS_WIN:
+    ok("Windows detected → using DirectML (AMD/NVIDIA/Intel GPU acceleration)")
+    gpu_mode = "directml"
 else:
-    warn("No GPU detected — using CPU (Threadripper handles it fine)")
-    gpu_mode = "cpu"
+    # Linux — check ROCm first, then CUDA, then CPU
+    rocm_found = (
+        run("rocm-smi --version", capture_output=True).returncode == 0 or
+        Path("/dev/kfd").exists() or
+        Path("/opt/rocm").exists()
+    )
+    if rocm_found:
+        ok("Linux + AMD ROCm detected")
+        gpu_mode = "rocm"
+
+        r = run("rocm-smi --version", capture_output=True, text=True)
+        rocm_ver = "6.0"
+        if r.returncode == 0:
+            for token in r.stdout.split():
+                if token.count(".") == 1:
+                    try:
+                        float(token); rocm_ver = token; break
+                    except ValueError:
+                        pass
+        ok(f"ROCm version: {rocm_ver}")
+        if   rocm_ver.startswith("6.2"): pt_index = "rocm6.2"
+        elif rocm_ver.startswith("6.1"): pt_index = "rocm6.1"
+        else:                             pt_index = "rocm6.0"
+
+    elif run("nvidia-smi", capture_output=True).returncode == 0:
+        r = run("nvidia-smi --query-gpu=name --format=csv,noheader",
+                capture_output=True, text=True)
+        ok(f"Linux + NVIDIA CUDA detected: {r.stdout.strip()}")
+        gpu_mode = "cuda"
+
+    else:
+        warn("No GPU detected — CPU mode (still works well on Threadripper)")
+        gpu_mode = "cpu"
 
 print(f"     GPU mode: {c('1', gpu_mode.upper())}")
 
@@ -124,20 +120,26 @@ run(f'"{VENV_PIP}" install --upgrade pip --quiet')
 # ── Step 4: GPU compute stack ─────────────────────────────────────────────────
 hdr("Step 4  GPU Compute Stack")
 
-if gpu_mode == "rocm":
-    info(f"Installing PyTorch for ROCm ({pt_index})  — ~2.5 GB, be patient...")
-    pip(f"torch torchvision",
-        f"--index-url https://download.pytorch.org/whl/{pt_index}")
+if gpu_mode == "directml":
+    info("Installing PyTorch (CPU base) + onnxruntime-directml for Windows GPU...")
+    pip("torch torchvision",
+        "--index-url https://download.pytorch.org/whl/cpu")
+    run(f'"{VENV_PIP}" uninstall -y onnxruntime onnxruntime-gpu --quiet')
+    pip("onnxruntime-directml")
+    ok("DirectML stack installed (AMD W7900 GPU acceleration active)")
 
+elif gpu_mode == "rocm":
+    info(f"Installing PyTorch for ROCm ({pt_index}) — ~2.5 GB, this will take a few minutes...")
+    pip("torch torchvision",
+        f"--index-url https://download.pytorch.org/whl/{pt_index}")
     info("Installing onnxruntime-rocm...")
-    run(f'"{VENV_PIP}" uninstall -y onnxruntime onnxruntime-gpu 2>/dev/null || true',
-        shell=True)
+    run(f'"{VENV_PIP}" uninstall -y onnxruntime onnxruntime-gpu --quiet')
     r = run(f'"{VENV_PIP}" install onnxruntime-rocm --quiet')
     if r.returncode != 0:
         r2 = run(f'"{VENV_PIP}" install onnxruntime-rocm '
                  f'--index-url https://download.pytorch.org/whl/{pt_index} --quiet')
         if r2.returncode != 0:
-            warn("onnxruntime-rocm unavailable on PyPI — using CPU ONNX as fallback")
+            warn("onnxruntime-rocm not found on PyPI — falling back to CPU ONNX")
             pip("onnxruntime")
     ok("ROCm stack installed")
 
@@ -179,37 +181,13 @@ for d in ["faces/celebrity", "faces/fantasy", "faces/custom", "models", "static"
     Path(d).mkdir(parents=True, exist_ok=True)
 ok("Directories ready")
 
-# ── Step 7: Write start.py launcher ──────────────────────────────────────────
-hdr("Step 7  Creating start.py Launcher")
-start_script = f'''#!/usr/bin/env python3
-"""
-start.py — Launch FaceMorph Kiosk
-Run:  python start.py
-Then open:  http://localhost:8000
-"""
-import subprocess, sys, os, webbrowser, threading, time
-from pathlib import Path
-
-VENV_PY = Path(__file__).parent / "venv" / ("Scripts/python.exe" if sys.platform=="win32" else "bin/python")
-
-def open_browser():
-    time.sleep(2.5)
-    webbrowser.open("http://localhost:8000")
-
-print("\\n🎭  FaceMorph Kiosk — Starting...")
-print("   Open http://localhost:8000 in your browser\\n")
-threading.Thread(target=open_browser, daemon=True).start()
-subprocess.run([str(VENV_PY), "main.py"])
-'''
-Path("start.py").write_text(start_script)
-ok("start.py created")
-
-# ── Step 8: GPU verification ──────────────────────────────────────────────────
-hdr("Step 8  GPU Verification")
+# ── Step 7: GPU verification ──────────────────────────────────────────────────
+hdr("Step 7  GPU Verification")
 verify = subprocess.run(
     [str(VENV_PY), "-c",
      "import onnxruntime as o; p=o.get_available_providers(); "
-     "print('ROCm ACTIVE' if 'ROCMExecutionProvider' in p else "
+     "print('DML ACTIVE'  if 'DmlExecutionProvider'  in p else "
+     "'ROCm ACTIVE' if 'ROCMExecutionProvider' in p else "
      "'CUDA ACTIVE' if 'CUDAExecutionProvider' in p else 'CPU ONLY'); print(p)"],
     capture_output=True, text=True
 )
@@ -232,21 +210,24 @@ NEXT STEPS:
 ──────────────────────────────────────────────────────
 1. ADD FACE PHOTOS (for Face Swap mode):
    Drop JPG/PNG files into:
-     faces/celebrity/   ← Lisa_Su.jpg, Matthew_McConaughey.jpg
-     faces/fantasy/     ← Thanos.jpg, etc.
+     faces/celebrity/   e.g. Lisa_Su.jpg
+     faces/fantasy/     e.g. Thanos.jpg
    Use clear, front-facing photos.
 
-2. DOWNLOAD FACE SWAP MODEL (optional, for Face Swap mode):
-   wget -P models/ \\
-     https://huggingface.co/deepinsight/inswapper/resolve/main/inswapper_128.onnx
-   (Na'vi, Hulk, Thanos, Predator, Ghost, Groot work WITHOUT this)
+2. DOWNLOAD FACE SWAP MODEL (optional):
+   Windows (PowerShell):
+     Invoke-WebRequest -Uri https://huggingface.co/deepinsight/inswapper/resolve/main/inswapper_128.onnx -OutFile models\\inswapper_128.onnx
+   Linux:
+     wget -P models/ https://huggingface.co/deepinsight/inswapper/resolve/main/inswapper_128.onnx
+
+   Na'vi, Hulk, Thanos, Predator, Ghost, Groot work WITHOUT this model.
 
 3. START THE KIOSK:
    python start.py
-   → Browser opens automatically at http://localhost:8000
+   Browser opens automatically at http://localhost:8000
 
 KEYBOARD SHORTCUTS:
-  1–6   Pick character (Na'vi / Hulk / Thanos / Predator / Ghost / Groot)
+  1-6   Pick character
   F     Open Face Swap panel
   ESC   Return to live view
 ──────────────────────────────────────────────────────
