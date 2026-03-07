@@ -118,7 +118,7 @@ def _black_placeholder(w=1280, h=720):
 async def index():
     html_path = Path("index.html")
     if html_path.exists():
-        return HTMLResponse(html_path.read_text())
+        return HTMLResponse(html_path.read_text(encoding='utf-8'))
     return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
 
 
