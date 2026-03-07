@@ -1,27 +1,27 @@
 """
-face_processor.py — FaceSwap Kiosk
-Modes:
-  passthrough  — raw webcam
-  character    — 6 full-body preset characters (segmentation + pose + style)
-  faceswap     — InsightFace celebrity swap
-  minecraft    — pixelated blocks
-  cyberpunk    — neon edge glow
-
-Character presets (full body, works at 10+ feet):
-  navi      — Avatar Na'vi: blue skin, bioluminescent markings
-  hulk      — Hulk: gamma-green rage, muscle glow, vein lines
-  thanos    — Thanos: deep purple, Infinity Stone glow dots
-  predator  — Predator: thermal/infrared cloaking inversion
-  ghost     — Ghost: ethereal white-blue spectre, desaturated + aura
-  groot     — Groot: earthy bark-brown, nature glow markings
+face_processor.py — AMD Adapt Kiosk
+Legit character transforms:
+  - Minecraft: Steve skin texture warped onto face via facial landmarks (no model needed)
+  - All others: Real InsightFace face swap using character reference photos
+  - rembg background removal + character backgrounds
+  - Falls back gracefully if model/photos not available
 """
 
 import cv2
 import numpy as np
 import threading
+import time
+import base64
 from pathlib import Path
 
-# ── Optional imports ──────────────────────────────────────────────────────────
+# ── rembg ─────────────────────────────────────────────────────────────────────
+try:
+    from rembg import remove, new_session
+    REMBG_AVAILABLE = True
+except ImportError:
+    REMBG_AVAILABLE = False
+
+# ── InsightFace ───────────────────────────────────────────────────────────────
 try:
     import insightface
     from insightface.app import FaceAnalysis
@@ -29,20 +29,13 @@ try:
 except ImportError:
     INSIGHTFACE_AVAILABLE = False
 
-try:
-    import mediapipe as mp
-    MEDIAPIPE_AVAILABLE = True
-except ImportError:
-    MEDIAPIPE_AVAILABLE = False
-
-# ── ONNX provider auto-detection (ROCm → CUDA → CPU) ─────────────────────────
+# ── ONNX providers ────────────────────────────────────────────────────────────
 def _detect_providers():
     try:
         import onnxruntime as ort
         available = ort.get_available_providers()
-        for p in ["DmlExecutionProvider",
-                  "ROCMExecutionProvider", "MIGraphXExecutionProvider",
-                  "CUDAExecutionProvider", "CPUExecutionProvider"]:
+        for p in ["DmlExecutionProvider","ROCMExecutionProvider",
+                  "MIGraphXExecutionProvider","CUDAExecutionProvider","CPUExecutionProvider"]:
             if p in available:
                 print(f"[OK] ONNX provider: {p}")
                 return [p, "CPUExecutionProvider"]
@@ -53,529 +46,513 @@ def _detect_providers():
 ONNX_PROVIDERS = _detect_providers()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Character Definitions
+# Minecraft Steve face texture (64x64 skin, face region 8x8 at offset 8,8)
+# We encode a minimal Steve face as raw pixel data
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Steve's face colors (BGR)
+STEVE_SKIN   = (110, 150, 190)   # tan/brown skin
+STEVE_HAIR   = ( 60,  80, 105)   # dark brown hair
+STEVE_EYE_W  = (220, 220, 220)   # eye white
+STEVE_PUPIL  = ( 30,  30, 150)   # blue iris/pupil
+STEVE_MOUTH  = ( 40,  60, 100)   # mouth dark
+STEVE_BEARD  = ( 60,  50,  40)   # beard dark
+
+# 8x8 Steve face grid (each cell = 1 "block pixel")
+# S=skin, H=hair, W=eye-white, P=pupil, M=mouth, B=beard/shadow, X=dark
+STEVE_FACE_8x8 = [
+    "HHHHHHHH",  # row 0 - hair
+    "HHHHHHHH",  # row 1 - hair
+    "SSWWSWWS",  # row 2 - eyes row (W=white around eye)
+    "SSPPSPPSS"[:8],  # row 3 - pupils (truncated)
+    "SSSSSSSS",  # row 4 - nose area
+    "SBBBBSSS"[:8],  # row 5 - mouth top
+    "SBMMMBSS"[:8],  # row 6 - mouth
+    "SSSSSSSS",  # row 7 - chin
+]
+
+def build_steve_texture(size=256):
+    """Build a clean Steve face texture at given size."""
+    cell = size // 8
+    tex = np.zeros((size, size, 3), dtype=np.uint8)
+
+    color_map = {
+        'H': STEVE_HAIR,
+        'S': STEVE_SKIN,
+        'W': STEVE_EYE_W,
+        'P': STEVE_PUPIL,
+        'M': STEVE_MOUTH,
+        'B': STEVE_BEARD,
+        'X': (20, 20, 20),
+    }
+
+    for row_i, row_str in enumerate(STEVE_FACE_8x8):
+        for col_i, ch in enumerate(row_str[:8]):
+            color = color_map.get(ch, STEVE_SKIN)
+            y1, y2 = row_i * cell, (row_i + 1) * cell
+            x1, x2 = col_i * cell, (col_i + 1) * cell
+            tex[y1:y2, x1:x2] = color
+
+    # Hard pixelated look — no antialiasing
+    return tex
+
+STEVE_TEXTURE = build_steve_texture(512)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Character definitions — each has a default reference photo filename to look for
 # ══════════════════════════════════════════════════════════════════════════════
 CHARACTERS = {
-    "navi": {
-        "label":    "Na'vi",
-        "subtitle": "Avatar · Pandora",
-        "emoji":    "🔵",
-        "color":    "#00d4ff",
-        "hue":      103,   # blue-teal
-        "sat_boost": 90,
-        "val_scale": 0.88,
-        "glow_primary":   (255, 240,  80),   # cyan  (BGR)
-        "glow_secondary": (180, 255, 255),
-        "rim_color":      (220, 200,  10),   # cyan rim
-    },
-    "hulk": {
-        "label":    "Hulk",
-        "subtitle": "Gamma · Avengers",
-        "emoji":    "💚",
-        "color":    "#22dd44",
-        "hue":      62,    # gamma green
-        "sat_boost": 110,
-        "val_scale": 0.92,
-        "glow_primary":   ( 50, 255,  80),   # bright green
-        "glow_secondary": (150, 255, 150),
-        "rim_color":      ( 30, 200,  30),
-    },
-    "thanos": {
-        "label":    "Thanos",
-        "subtitle": "Infinity · Mad Titan",
-        "emoji":    "💜",
-        "color":    "#9b30ff",
-        "hue":      145,   # deep purple (HSV 0-179)
-        "sat_boost": 80,
-        "val_scale": 0.75,
-        "glow_primary":   (200,  60, 255),   # gold → orange (Infinity stones)
-        "glow_secondary": (100,  80, 255),
-        "rim_color":      (180,  40, 200),
-    },
-    "predator": {
-        "label":    "Predator",
-        "subtitle": "Thermal · Cloaked",
-        "emoji":    "👁️",
-        "color":    "#ff6600",
-        "hue":      None,  # special: thermal inversion, no hue shift
-        "sat_boost": 0,
-        "val_scale": 1.0,
-        "glow_primary":   (  0, 120, 255),   # orange-red
-        "glow_secondary": (  0,  60, 180),
-        "rim_color":      (  0,  80, 200),
-    },
-    "ghost": {
-        "label":    "Ghost",
-        "subtitle": "Spectral · Ethereal",
-        "emoji":    "👻",
-        "color":    "#aaddff",
-        "hue":      105,   # pale blue-white
-        "sat_boost": -40,  # desaturate
-        "val_scale": 1.15, # brighten
-        "glow_primary":   (255, 240, 200),   # white-blue
-        "glow_secondary": (255, 255, 255),
-        "rim_color":      (255, 220, 180),
-    },
-    "groot": {
-        "label":    "Groot",
-        "subtitle": "Guardians · Flora",
-        "emoji":    "🌿",
-        "color":    "#8B5E3C",
-        "hue":      18,    # warm bark brown
-        "sat_boost": 50,
-        "val_scale": 0.80,
-        "glow_primary":   ( 60, 200,  80),   # forest green
-        "glow_secondary": (100, 180, 120),
-        "rim_color":      ( 40, 160,  40),
-    },
+    "navi":     {"label":"Na'vi",   "subtitle":"Avatar · Pandora",     "emoji":"🔵","color":"#00d4ff","ref":"Avatar_Navi.jpg"},
+    "hulk":     {"label":"Hulk",    "subtitle":"Gamma · Avengers",     "emoji":"💚","color":"#22dd44","ref":"Hulk.jpg"},
+    "thanos":   {"label":"Thanos",  "subtitle":"Infinity · Mad Titan", "emoji":"💜","color":"#9b30ff","ref":"Thanos.jpg"},
+    "predator": {"label":"Predator","subtitle":"Thermal · Cloaked",    "emoji":"👁️","color":"#ff6600","ref":"Predator.jpg"},
+    "ghost":    {"label":"Ghost",   "subtitle":"Spectral · Ethereal",  "emoji":"👻","color":"#aaddff","ref":"Ghost.jpg"},
+    "groot":    {"label":"Groot",   "subtitle":"Guardians · Flora",    "emoji":"🌿","color":"#8B5E3C","ref":"Groot.jpg"},
 }
+CHARACTER_ORDER = ["navi","hulk","thanos","predator","ghost","groot"]
+MINECRAFT_KEY   = "minecraft"
 
-# Ordered list for UI
-CHARACTER_ORDER = ["navi", "hulk", "thanos", "predator", "ghost", "groot"]
+# ══════════════════════════════════════════════════════════════════════════════
+# Background generators
+# ══════════════════════════════════════════════════════════════════════════════
+def make_pandora_bg(h, w):
+    bg = np.zeros((h, w, 3), dtype=np.uint8)
+    bg[:, :] = (15, 20, 10)
+    rng = np.random.default_rng(42)
+    for _ in range(300):
+        x = int(rng.integers(0, w));  y = int(rng.integers(0, h))
+        r = int(rng.integers(2, 8));  brightness = int(rng.integers(120, 255))
+        hue = int(rng.integers(85, 115))
+        col = cv2.cvtColor(np.array([[[hue, 200, brightness]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0].tolist()
+        cv2.circle(bg, (x,y), r, col, -1)
+        cv2.circle(bg, (x,y), r*3, [c//4 for c in col], -1)
+    for x in range(0, w, w//6):
+        shaft = np.zeros((h, w, 3), dtype=np.uint8)
+        cv2.line(shaft, (x+rng.integers(-30,30), 0), (x, h), (20,40,15), 18)
+        bg = cv2.add(bg, shaft)
+    return cv2.GaussianBlur(bg, (25, 25), 0)
 
+def make_minecraft_bg(h, w):
+    bg = np.zeros((h, w, 3), dtype=np.uint8)
+    sky_h = int(h * 0.55)
+    for y in range(sky_h):
+        t = y / sky_h
+        bg[y, :] = (int(135+t*40), int(180+t*20), int(235+t*10))
+    bg[sky_h:sky_h+int(h*0.07), :] = (34, 139, 34)
+    bg[sky_h+int(h*0.07):, :] = (67, 96, 134)
+    bs = 20
+    small = cv2.resize(bg, (w//bs, h//bs), interpolation=cv2.INTER_LINEAR)
+    bg = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+    for cx in [w//5, w//2, 4*w//5]:
+        cv2.ellipse(bg,(cx,int(sky_h*0.3)),(60,25),0,0,360,(240,240,240),-1)
+        cv2.ellipse(bg,(cx-30,int(sky_h*0.33)),(40,18),0,0,360,(240,240,240),-1)
+        cv2.ellipse(bg,(cx+30,int(sky_h*0.33)),(40,18),0,0,360,(240,240,240),-1)
+    return bg
 
+def make_space_bg(h, w, tint=(80,20,80)):
+    bg = np.zeros((h,w,3), dtype=np.uint8)
+    bg[:] = [t//6 for t in tint]
+    rng = np.random.default_rng(7)
+    for _ in range(400):
+        x,y = int(rng.integers(0,w)), int(rng.integers(0,h))
+        b = int(rng.integers(80,255))
+        cv2.circle(bg,(x,y),1,(b,b,b),-1)
+    return bg
+
+def make_forest_bg(h, w):
+    bg = np.zeros((h,w,3), dtype=np.uint8)
+    bg[:int(h*0.4),:] = (30,80,20)
+    bg[int(h*0.4):,:] = (10,40,10)
+    rng = np.random.default_rng(3)
+    for _ in range(20):
+        x = int(rng.integers(0,w)); h2 = int(rng.uniform(h*0.3,h*0.9))
+        r = int(rng.integers(12,35))
+        cv2.line(bg,(x,h),(x,h2),(30,60,80),r//3)
+        cv2.circle(bg,(x,h2),r,(20,100,30),-1)
+    return cv2.GaussianBlur(bg,(31,31),0)
+
+def make_thermal_bg(h, w):
+    bg = np.zeros((h,w,3), dtype=np.uint8)
+    bg[:] = (0,0,20)
+    return bg
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Background segmenter (rembg threaded)
+# ══════════════════════════════════════════════════════════════════════════════
+class BackgroundSegmenter:
+    def __init__(self):
+        self._mask = None; self._frame = None
+        self._lock = threading.Lock(); self._running = True
+        self.ready = False; self.session = None
+        if REMBG_AVAILABLE:
+            threading.Thread(target=self._init_and_run, daemon=True).start()
+
+    def _init_and_run(self):
+        try:
+            print("[..] Loading rembg (first run downloads ~170 MB)...")
+            self.session = new_session("u2net_human_seg")
+            self.ready = True
+            print("[OK] rembg ready — clean segmentation active")
+            self._loop()
+        except Exception as e:
+            print(f"[ERROR] rembg init: {e}")
+
+    def _loop(self):
+        while self._running:
+            with self._lock:
+                frame = self._frame
+            if frame is not None and self.session:
+                try:
+                    mask = remove(frame, session=self.session,
+                                  only_mask=True, post_process_mask=True)
+                    mask = cv2.GaussianBlur(mask, (21,21), 0)
+                    with self._lock:
+                        self._mask = mask
+                except Exception:
+                    pass
+            time.sleep(0.07)
+
+    def update(self, frame):
+        with self._lock:
+            self._frame = frame
+
+    def get_mask(self, shape):
+        with self._lock:
+            mask = self._mask
+        if mask is None:
+            return None
+        h, w = shape[:2]
+        if mask.shape[:2] != (h, w):
+            mask = cv2.resize(mask, (w, h))
+        return mask.astype(np.float32) / 255.0
+
+    def stop(self):
+        self._running = False
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Main processor
+# ══════════════════════════════════════════════════════════════════════════════
 class FaceProcessor:
-    def __init__(self, faces_dir: str = "faces"):
+    def __init__(self, faces_dir="faces"):
         self.faces_dir = Path(faces_dir)
         self.current_mode      = "passthrough"
-        self.current_character = "navi"
+        self.current_character = "hulk"
         self.current_face_key  = None
         self._lock = threading.Lock()
 
-        self.face_catalog: dict = {}
+        self.face_catalog  = {}
+        self.char_refs     = {}   # char_key → face img array (loaded lazily)
+        self._bg_cache     = {}
+
         self._load_face_catalog()
+        self._load_char_refs()
 
         self.face_app = None
         self.swapper  = None
         if INSIGHTFACE_AVAILABLE:
             self._init_insightface()
 
-        self.segmenter = None
-        self.pose      = None
-        self.face_mesh = None
-        if MEDIAPIPE_AVAILABLE:
-            self._init_mediapipe()
+        self.seg = BackgroundSegmenter()
 
-    # ── Init ──────────────────────────────────────────────────────────────────
+        # OpenCV face detector
+        self.face_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    # ── Init helpers ──────────────────────────────────────────────────────────
 
     def _init_insightface(self):
         try:
             self.face_app = FaceAnalysis(name="buffalo_l", providers=ONNX_PROVIDERS)
-            self.face_app.prepare(ctx_id=0, det_size=(640, 640))
+            self.face_app.prepare(ctx_id=0, det_size=(640,640))
             mp_ = Path("models/inswapper_128.onnx")
             if mp_.exists():
                 self.swapper = insightface.model_zoo.get_model(str(mp_), providers=ONNX_PROVIDERS)
-                print("[OK] InsightFace swapper loaded")
+                print("[OK] InsightFace swapper ready")
             else:
-                print("[WARN] models/inswapper_128.onnx not found")
+                print("[WARN] models/inswapper_128.onnx not found — face swap unavailable")
         except Exception as e:
             print(f"[ERROR] InsightFace: {e}")
 
-    def _init_mediapipe(self):
-        try:
-            # Support both old (0.10.14) and new (0.10.30+) mediapipe APIs
-            if hasattr(mp, 'solutions'):
-                seg_module  = mp.solutions.selfie_segmentation
-                pose_module = mp.solutions.pose
-                fm_module   = mp.solutions.face_mesh
-            else:
-                # Newer mediapipe moved to tasks API — fall back gracefully
-                print("[WARN] mediapipe.solutions not available — body transforms will use fallback")
-                return
-
-            self.segmenter = seg_module.SelfieSegmentation(model_selection=1)
-            print("[OK] Body segmentation loaded")
-        except Exception as e:
-            print(f"[ERROR] Segmenter: {e}")
-        try:
-            self.pose = pose_module.Pose(
-                static_image_mode=False, model_complexity=1,
-                smooth_landmarks=True, enable_segmentation=False,
-                min_detection_confidence=0.4, min_tracking_confidence=0.4,
-            )
-            print("[OK] Pose loaded")
-        except Exception as e:
-            print(f"[ERROR] Pose: {e}")
-        try:
-            self.face_mesh = fm_module.FaceMesh(
-                max_num_faces=4, refine_landmarks=True,
-                min_detection_confidence=0.4, min_tracking_confidence=0.4,
-            )
-            print("[OK] Face mesh loaded")
-        except Exception as e:
-            print(f"[ERROR] FaceMesh: {e}")
-
-    # ── Catalog ───────────────────────────────────────────────────────────────
-
     def _load_face_catalog(self):
-        supported = {".jpg", ".jpeg", ".png", ".webp"}
+        supported = {".jpg",".jpeg",".png",".webp"}
         if not self.faces_dir.exists():
-            self.faces_dir.mkdir(parents=True)
-            return
+            self.faces_dir.mkdir(parents=True); return
         for cat_dir in self.faces_dir.iterdir():
-            if not cat_dir.is_dir():
-                continue
+            if not cat_dir.is_dir(): continue
             for p in cat_dir.iterdir():
-                if p.suffix.lower() not in supported:
-                    continue
+                if p.suffix.lower() not in supported: continue
                 img = cv2.imread(str(p))
-                if img is None:
-                    continue
+                if img is None: continue
                 key = f"{cat_dir.name}/{p.stem}"
                 self.face_catalog[key] = {
-                    "label":    p.stem.replace("_", " ").replace("-", " ").title(),
+                    "label": p.stem.replace("_"," ").title(),
                     "category": cat_dir.name.title(),
-                    "img":      img,
-                    "path":     str(p),
+                    "img": img, "path": str(p),
                 }
         print(f"[OK] Loaded {len(self.face_catalog)} face(s)")
+
+    def _load_char_refs(self):
+        """Load character reference photos from faces/fantasy/ by filename."""
+        for char_key, cfg in CHARACTERS.items():
+            ref_name = cfg["ref"]
+            # Check fantasy/ and celebrity/ folders
+            for cat in ["fantasy","celebrity","custom"]:
+                p = self.faces_dir / cat / ref_name
+                if p.exists():
+                    img = cv2.imread(str(p))
+                    if img is not None:
+                        self.char_refs[char_key] = img
+                        print(f"[OK] Character ref loaded: {char_key} → {p}")
+                        break
 
     def reload_catalog(self):
         with self._lock:
             self.face_catalog.clear()
+            self.char_refs.clear()
             self._load_face_catalog()
+            self._load_char_refs()
 
     def get_catalog(self):
-        return [{"key": k, "label": v["label"], "category": v["category"]}
-                for k, v in self.face_catalog.items()]
+        return [{"key":k,"label":v["label"],"category":v["category"]}
+                for k,v in self.face_catalog.items()]
 
     def get_characters(self):
-        return [
-            {"key": k,
-             "label":    CHARACTERS[k]["label"],
-             "subtitle": CHARACTERS[k]["subtitle"],
-             "emoji":    CHARACTERS[k]["emoji"],
-             "color":    CHARACTERS[k]["color"]}
-            for k in CHARACTER_ORDER
-        ]
+        result = []
+        for k in CHARACTER_ORDER:
+            cfg = CHARACTERS[k]
+            has_ref = k in self.char_refs
+            swap_ready = has_ref and self.swapper is not None
+            result.append({
+                "key": k,
+                "label": cfg["label"],
+                "subtitle": cfg["subtitle"],
+                "emoji": cfg["emoji"],
+                "color": cfg["color"],
+                "swap_ready": swap_ready,
+                "ref_photo": cfg["ref"],
+            })
+        return result
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def set_mode(self, mode: str, face_key: str = None, character: str = None):
+    def set_mode(self, mode, face_key=None, character=None):
         with self._lock:
             self.current_mode = mode
-            if face_key:
-                self.current_face_key = face_key
-            if character and character in CHARACTERS:
+            if face_key:  self.current_face_key  = face_key
+            if character and (character in CHARACTERS or character == MINECRAFT_KEY):
                 self.current_character = character
 
-    def process_frame(self, frame: np.ndarray) -> np.ndarray:
-        if frame is None:
-            return frame
+    def process_frame(self, frame):
+        if frame is None: return frame
+        self.seg.update(frame)
         with self._lock:
-            mode      = self.current_mode
-            face_key  = self.current_face_key
-            char_key  = self.current_character
+            mode     = self.current_mode
+            face_key = self.current_face_key
+            char_key = self.current_character
         try:
-            if   mode == "character":              return self._apply_character(frame, char_key)
-            elif mode == "minecraft":              return self._apply_minecraft(frame)
-            elif mode == "cyberpunk":              return self._apply_cyberpunk(frame)
-            elif mode == "faceswap" and face_key:  return self._apply_faceswap(frame, face_key)
-            else:                                  return frame
+            if   mode == "character":  return self._apply_character(frame, char_key)
+            elif mode == "minecraft":  return self._apply_minecraft(frame)
+            elif mode == "cyberpunk":  return self._apply_cyberpunk(frame)
+            elif mode == "faceswap" and face_key:
+                return self._do_face_swap(frame, self.face_catalog.get(face_key,{}).get("img"))
+            return frame
         except Exception as e:
-            print(f"[ERROR] process_frame ({mode}): {e}")
+            print(f"[ERROR] process_frame: {e}")
             return frame
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # Full-Body Character Transform
-    # ══════════════════════════════════════════════════════════════════════════
+    # ── Character dispatch ────────────────────────────────────────────────────
 
-    def _apply_character(self, frame: np.ndarray, char_key: str) -> np.ndarray:
-        cfg = CHARACTERS.get(char_key, CHARACTERS["navi"])
-        h, w = frame.shape[:2]
-        rgb  = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    def _apply_character(self, frame, char_key):
+        """
+        If we have a reference photo + swap model: do a real face swap.
+        Otherwise: fall back to color transform (still decent).
+        """
+        ref_img = self.char_refs.get(char_key)
 
-        # ── 1. Body segmentation mask ─────────────────────────────────────
-        body_mask = self._get_body_mask(rgb, h, w)
-        if body_mask is None:
-            return self._color_shift_fallback(frame, cfg)
+        if ref_img is not None and self.swapper is not None and self.face_app is not None:
+            # Real face swap — user literally gets the character's face
+            result = self._do_face_swap(frame, ref_img)
+        else:
+            # Fallback: color transform (shows what's needed)
+            result = self._color_fallback(frame, char_key)
+            if ref_img is None and self.swapper is None:
+                self._overlay_missing_msg(result,
+                    f"Add faces/fantasy/{CHARACTERS[char_key]['ref']} + inswapper_128.onnx")
+            elif ref_img is None:
+                self._overlay_missing_msg(result,
+                    f"Add faces/fantasy/{CHARACTERS[char_key]['ref']}")
+            elif self.swapper is None:
+                self._overlay_missing_msg(result,
+                    "Download models/inswapper_128.onnx to enable")
 
-        # ── 2. Special-case: Predator uses thermal inversion ──────────────
+        # Always add the character background behind the person
+        mask = self.seg.get_mask(frame.shape)
+        if mask is not None:
+            bg = self._get_bg(char_key, frame.shape[0], frame.shape[1])
+            result = self._composite(result, frame, mask, bg)
+            result = self._rim_glow(result, mask, self._char_glow_color(char_key))
+
+        return result
+
+    def _color_fallback(self, frame, char_key):
+        """Dramatic color transform when no face swap available."""
+        params = {
+            "navi":     (103, 160, 0.85),
+            "hulk":     (65,  180, 0.90),
+            "thanos":   (145, 130, 0.72),
+            "predator": None,
+            "ghost":    (105,   0, 1.10),
+            "groot":    (18,  100, 0.78),
+        }
         if char_key == "predator":
-            return self._apply_predator(frame, body_mask, rgb)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            thermal = cv2.applyColorMap(cv2.bitwise_not(gray), cv2.COLORMAP_JET)
+            return thermal
+        p = params.get(char_key, (103, 160, 0.85))
+        return self._shift_hue(frame, p[0], p[1], p[2])
 
-        # ── 3. Special-case: Ghost uses ethereal transparency ─────────────
-        if char_key == "ghost":
-            return self._apply_ghost(frame, body_mask, rgb, cfg)
+    def _char_glow_color(self, char_key):
+        colors = {
+            "navi": (255,200,30), "hulk": (30,220,50),
+            "thanos": (200,50,255), "predator": (0,80,255),
+            "ghost": (255,245,220), "groot": (40,180,40),
+        }
+        return colors.get(char_key, (255,255,255))
 
-        # ── 4. Standard: hue-shift the body ──────────────────────────────
-        shifted = self._color_shift(frame, cfg)
-        mask3   = np.stack([(body_mask / 255.0).astype(np.float32)] * 3, axis=2)
-        result  = (shifted.astype(np.float32) * mask3 +
-                   frame.astype(np.float32)   * (1.0 - mask3)).astype(np.uint8)
+    def _overlay_missing_msg(self, frame, msg):
+        h = frame.shape[0]
+        cv2.rectangle(frame, (0, h-50), (frame.shape[1], h), (0,0,0), -1)
+        cv2.putText(frame, msg, (10, h-15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0,255,180), 1, cv2.LINE_AA)
 
-        # ── 5. Pose markings ──────────────────────────────────────────────
-        if self.pose:
-            pose_res = self.pose.process(rgb)
-            if pose_res.pose_landmarks:
-                self._draw_markings(result, pose_res.pose_landmarks, w, h, cfg, char_key)
+    # ── Real face swap ────────────────────────────────────────────────────────
 
-        # ── 6. Face mesh markings ─────────────────────────────────────────
-        if self.face_mesh:
-            fm = self.face_mesh.process(rgb)
-            if fm.multi_face_landmarks:
-                for fl in fm.multi_face_landmarks:
-                    self._draw_face_markings(result, fl, w, h, cfg, char_key)
+    def _do_face_swap(self, frame, ref_img):
+        """Swap all detected faces in frame with the reference face."""
+        if ref_img is None or not self.face_app or not self.swapper:
+            return frame
+        try:
+            ref_faces = self.face_app.get(ref_img)
+            if not ref_faces:
+                return frame
+            live_faces = self.face_app.get(frame)
+            if not live_faces:
+                return frame
+            result = frame.copy()
+            for lf in live_faces:
+                result = self.swapper.get(result, lf, ref_faces[0], paste_back=True)
+            return result
+        except Exception as e:
+            print(f"[WARN] Face swap: {e}")
+            return frame
 
-        # ── 7. Rim light ──────────────────────────────────────────────────
-        result = self._add_rim(result, body_mask, cfg["rim_color"])
-
-        return result
-
-    # ── Segmentation helper ────────────────────────────────────────────────
-
-    def _get_body_mask(self, rgb, h, w):
-        if not self.segmenter:
-            return None
-        seg = self.segmenter.process(rgb)
-        if seg.segmentation_mask is None:
-            return None
-        _, binary = cv2.threshold(seg.segmentation_mask, 0.55, 255, cv2.THRESH_BINARY)
-        binary = cv2.GaussianBlur(binary.astype(np.uint8), (15, 15), 0)
-        _, mask = cv2.threshold(binary, 127, 255, cv2.THRESH_BINARY)
-        return mask
-
-    # ── Color shift ────────────────────────────────────────────────────────
-
-    def _color_shift(self, frame: np.ndarray, cfg: dict) -> np.ndarray:
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.int16)
-        hsv[:, :, 0] = cfg["hue"]
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1] + cfg["sat_boost"], 0, 255)
-        hsv[:, :, 2] = np.clip(
-            (hsv[:, :, 2].astype(np.float32) * cfg["val_scale"]).astype(np.int16),
-            20, 255
-        )
-        return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
-
-    def _color_shift_fallback(self, frame, cfg):
-        """Whole-frame shift when no segmentation."""
-        if cfg["hue"] is None:
-            return self._thermal_invert(frame)
-        return self._color_shift(frame, cfg)
-
-    # ── Special character effects ──────────────────────────────────────────
-
-    def _apply_predator(self, frame, body_mask, rgb):
-        """Thermal imaging + scan-line grid + heat glow."""
-        # Thermal colour map: invert luminance, map to COLORMAP_JET
-        gray    = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        inverted = cv2.bitwise_not(gray)
-        thermal = cv2.applyColorMap(inverted, cv2.COLORMAP_JET)
-
-        # Apply thermal only to person
-        mask3  = np.stack([(body_mask / 255.0).astype(np.float32)] * 3, axis=2)
-        result = (thermal.astype(np.float32) * mask3 +
-                  frame.astype(np.float32)   * (1.0 - mask3)).astype(np.uint8)
-
-        # Overlay scan grid on body region
-        h, w = frame.shape[:2]
-        grid = result.copy()
-        for y in range(0, h, 8):
-            cv2.line(grid, (0, y), (w, y), (0, 40, 0), 1)
-        result = cv2.addWeighted(result, 0.85, grid, 0.15, 0)
-
-        # Orange rim glow
-        result = self._add_rim(result, body_mask, (0, 80, 220))
-        return result
-
-    def _apply_ghost(self, frame, body_mask, rgb, cfg):
-        """Pale, semi-transparent spectral appearance."""
-        # Desaturate + brighten person body
-        shifted = self._color_shift(frame, cfg)
-
-        # Make the ghost body translucent by blending 60/40 with frame
-        mask3   = np.stack([(body_mask / 255.0).astype(np.float32)] * 3, axis=2)
-        body_t  = (shifted.astype(np.float32) * 0.6 +
-                   frame.astype(np.float32)   * 0.4).astype(np.uint8)
-        result  = (body_t.astype(np.float32) * mask3 +
-                   frame.astype(np.float32)  * (1.0 - mask3)).astype(np.uint8)
-
-        # Soft white aura around entire body
-        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (25, 25))
-        aura_mask = cv2.dilate(body_mask, k, iterations=2)
-        aura_blur = cv2.GaussianBlur(aura_mask, (31, 31), 0)
-        aura = np.zeros_like(frame)
-        for c, frac in zip([0, 1, 2], [0.9, 0.85, 0.7]):  # white-blue
-            aura[:, :, c] = (aura_blur.astype(np.float32) * frac).astype(np.uint8)
-        result = cv2.add(result, aura // 3)
-
-        # Pose markings in white
-        if self.pose:
-            pr = self.pose.process(rgb)
-            if pr.pose_landmarks:
-                self._draw_markings(result, pr.pose_landmarks,
-                                    frame.shape[1], frame.shape[0], cfg, "ghost")
-        return result
-
-    # ── Markings ────────────────────────────────────────────────────────────
-
-    def _draw_markings(self, frame, pose_lm, w, h, cfg, char_key):
-        """Draw bioluminescent / character-specific body markings."""
-        lms = pose_lm.landmark
-        gp  = cfg["glow_primary"]
-        gs  = cfg["glow_secondary"]
-
-        def pt(idx):
-            lm = lms[idx]
-            return (int(lm.x * w), int(lm.y * h)), lm.visibility
-
-        # Core skeleton connections
-        connections = [
-            (11, 12), (11, 23), (12, 24), (23, 24),  # torso box
-            (11, 13), (12, 14), (13, 15), (14, 16),  # arms
-            (23, 25), (24, 26),                       # upper legs
-        ]
-
-        line_width = 2 if char_key in ("ghost", "groot") else 3
-
-        for (a, b) in connections:
-            pa, va = pt(a)
-            pb, vb = pt(b)
-            if va < 0.35 or vb < 0.35:
-                continue
-            cv2.line(frame, pa, pb, gs,            line_width + 2, cv2.LINE_AA)
-            cv2.line(frame, pa, pb, gp,            line_width,     cv2.LINE_AA)
-
-        # Joint dots
-        for idx in [11, 12, 13, 14, 15, 16, 23, 24, 25, 26]:
-            p, vis = pt(idx)
-            if vis < 0.35:
-                continue
-            cv2.circle(frame, p, 5,  gs, -1, cv2.LINE_AA)
-            cv2.circle(frame, p, 9,  gp,  1, cv2.LINE_AA)
-
-        # Character-specific extras
-        if char_key == "thanos":
-            # Infinity stones glow — 6 dots across knuckles / joints
-            stone_colors_bgr = [
-                (  0,   0, 200),  # Space (blue)
-                ( 30,  80, 255),  # Reality (red-orange)
-                (  0, 180, 255),  # Power (purple→orange)
-                (  0, 220, 255),  # Mind (yellow)
-                ( 40, 255, 100),  # Time (green)
-                (200, 100, 255),  # Soul (orange)
-            ]
-            stone_indices = [15, 16, 13, 14, 11, 12]
-            for idx, color in zip(stone_indices, stone_colors_bgr):
-                p, vis = pt(idx)
-                if vis < 0.3: continue
-                cv2.circle(frame, p, 8,  color,  -1, cv2.LINE_AA)
-                cv2.circle(frame, p, 12, color,   1, cv2.LINE_AA)
-
-        if char_key == "hulk":
-            # Vein lines along forearms (elbow→wrist)
-            for (elbow, wrist) in [(13, 15), (14, 16)]:
-                pe, ve = pt(elbow)
-                pw, vw = pt(wrist)
-                if ve < 0.35 or vw < 0.35: continue
-                # Two parallel offset veins
-                dx = pw[0] - pe[0]; dy = pw[1] - pe[1]
-                norm = max(1, int((dx**2 + dy**2)**0.5))
-                ox, oy = int(-dy/norm * 6), int(dx/norm * 6)
-                cv2.line(frame,
-                    (pe[0]+ox, pe[1]+oy), (pw[0]+ox, pw[1]+oy),
-                    (80, 255, 100), 1, cv2.LINE_AA)
-                cv2.line(frame,
-                    (pe[0]-ox, pe[1]-oy), (pw[0]-ox, pw[1]-oy),
-                    (80, 255, 100), 1, cv2.LINE_AA)
-
-    def _draw_face_markings(self, frame, face_lm, w, h, cfg, char_key):
-        """Character-specific face markings."""
-        lms = face_lm.landmark
-        gp  = cfg["glow_primary"]
-
-        def pt(idx):
-            lm = lms[idx]
-            return (int(lm.x * w), int(lm.y * h))
-
-        if char_key in ("navi", "groot"):
-            # Diagonal cheek stripes
-            for (a, b) in [(234,93),(127,162),(454,323),(356,389)]:
-                cv2.line(frame, pt(a), pt(b), (220,255,180), 2, cv2.LINE_AA)
-                cv2.line(frame, pt(a), pt(b), gp,            1, cv2.LINE_AA)
-            # Forehead dots
-            for idx in [10, 151, 9, 8]:
-                cv2.circle(frame, pt(idx), 3, gp, -1, cv2.LINE_AA)
-
-        elif char_key == "hulk":
-            # Brow furrow lines
-            for (a, b) in [(70,63),(336,296)]:
-                cv2.line(frame, pt(a), pt(b), gp, 2, cv2.LINE_AA)
-
-        elif char_key == "thanos":
-            # Chin crease lines
-            for (a, b) in [(172,136),(397,365)]:
-                cv2.line(frame, pt(a), pt(b), (180,100,255), 2, cv2.LINE_AA)
-            # Jaw ridges
-            for idx in [172, 136, 150, 397, 365, 379]:
-                cv2.circle(frame, pt(idx), 3, (160,80,220), -1, cv2.LINE_AA)
-
-        elif char_key == "ghost":
-            # Eye hollow glow
-            for eye in [[33,160,158,133,153,145], [362,387,385,263,373,374]]:
-                poly = np.array([pt(i) for i in eye], dtype=np.int32)
-                cv2.polylines(frame, [poly], True, (255,255,255), 1, cv2.LINE_AA)
-
-        # Nose bridge (all characters)
-        for (a, b) in zip([168, 6, 197], [6, 197, 195]):
-            cv2.line(frame, pt(a), pt(b), gp, 1, cv2.LINE_AA)
-
-    # ── Rim light ──────────────────────────────────────────────────────────
-
-    def _add_rim(self, frame, mask, color_bgr):
-        k       = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9,9))
-        dilated = cv2.dilate(mask, k, iterations=1)
-        edge    = cv2.subtract(dilated, mask)
-        edge_b  = cv2.GaussianBlur(edge, (11,11), 0).astype(np.float32) / 255.0
-        rim     = np.zeros_like(frame, dtype=np.float32)
-        for c, val in enumerate(color_bgr):
-            rim[:, :, c] = edge_b * val
-        return np.clip(frame.astype(np.float32) + rim, 0, 255).astype(np.uint8)
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # Other Modes
-    # ══════════════════════════════════════════════════════════════════════════
+    # ── Minecraft Steve ───────────────────────────────────────────────────────
 
     def _apply_minecraft(self, frame):
+        """
+        Minecraft transform:
+        1. Detect face(s) with OpenCV
+        2. Warp Steve texture onto each face region
+        3. Pixelate entire frame with MC palette
+        4. MC background behind person
+        """
         h, w = frame.shape[:2]
-        bs = 16
-        s = cv2.resize(frame, (w//bs, h//bs), interpolation=cv2.INTER_LINEAR)
-        p = cv2.resize(s, (w, h), interpolation=cv2.INTER_NEAREST)
-        g = p.copy()
-        for x in range(0, w, bs): cv2.line(g, (x,0), (x,h), (0,0,0), 1)
-        for y in range(0, h, bs): cv2.line(g, (0,y), (w,y), (0,0,0), 1)
-        return cv2.addWeighted(p, 0.85, g, 0.15, 0)
+        result = frame.copy()
+
+        # Pixelate whole frame first (large blocks)
+        bs = 20
+        small = cv2.resize(frame, (w//bs, h//bs), interpolation=cv2.INTER_LINEAR)
+        pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+        # MC palette quantisation (fast approximate)
+        pixelated = self._mc_colorize(pixelated)
+        # Grid lines
+        for x in range(0, w, bs): cv2.line(pixelated,(x,0),(x,h),(0,0,0),1)
+        for y in range(0, h, bs): cv2.line(pixelated,(0,y),(w,y),(0,0,0),1)
+        result = pixelated
+
+        # Warp Steve face texture over detected faces
+        gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(50,50))
+        for (fx, fy, fw, fh) in faces:
+            # Add some margin and go square
+            pad = int(fw * 0.1)
+            x1 = max(0, fx - pad);  y1 = max(0, fy - pad)
+            x2 = min(w, fx+fw+pad); y2 = min(h, fy+fh+pad)
+            face_w = x2 - x1;       face_h = y2 - y1
+            # Resize Steve texture to face size, keep pixelated
+            block = max(4, face_w // 8)
+            steve_small = cv2.resize(STEVE_TEXTURE, (8,8), interpolation=cv2.INTER_NEAREST)
+            steve_face  = cv2.resize(steve_small, (face_w, face_h),
+                                     interpolation=cv2.INTER_NEAREST)
+            result[y1:y2, x1:x2] = steve_face
+
+        # Background swap
+        mask = self.seg.get_mask(frame.shape)
+        if mask is not None:
+            # Blocky mask
+            mk = (mask*255).astype(np.uint8)
+            mk_small = cv2.resize(mk,(w//bs,h//bs),interpolation=cv2.INTER_NEAREST)
+            mk_block  = cv2.resize(mk_small,(w,h),interpolation=cv2.INTER_NEAREST).astype(np.float32)/255.0
+            bg = self._get_bg("minecraft", h, w)
+            result = self._composite(result, frame, mk_block, bg)
+
+        return result
+
+    def _mc_colorize(self, img):
+        """Fast MC palette — just desaturate slightly and boost contrast."""
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hsv[:,:,1] = np.clip(hsv[:,:,1].astype(np.int16) - 20, 0, 255).astype(np.uint8)
+        hsv[:,:,2] = np.clip(((hsv[:,:,2].astype(np.float32)-128)*1.3+128), 0, 255).astype(np.uint8)
+        return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+    # ── Cyberpunk ─────────────────────────────────────────────────────────────
 
     def _apply_cyberpunk(self, frame):
         gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 80, 200)
         neon  = np.zeros_like(frame)
-        neon[:,:,0] = edges
-        neon[:,:,2] = edges
+        neon[:,:,0] = edges; neon[:,:,2] = edges
         neon[:,:,1] = (edges*0.5).astype(np.uint8)
-        dark   = cv2.convertScaleAbs(frame, alpha=0.4, beta=0)
+        dark   = cv2.convertScaleAbs(frame, alpha=0.35, beta=0)
         result = cv2.add(dark, neon)
         result[:,:,1] = np.clip(result[:,:,1].astype(np.int32)+20, 0, 255).astype(np.uint8)
         return result
 
-    def _apply_faceswap(self, frame, face_key):
-        if not INSIGHTFACE_AVAILABLE or not self.face_app or not self.swapper:
-            return self._faceswap_fallback(frame, face_key)
-        entry = self.face_catalog.get(face_key)
-        if not entry: return frame
-        tf = self.face_app.get(entry["img"])
-        if not tf: return frame
-        lf = self.face_app.get(frame)
-        if not lf: return frame
-        result = frame.copy()
-        for f in lf:
-            result = self.swapper.get(result, f, tf[0], paste_back=True)
-        return result
+    # ── Background / composite helpers ───────────────────────────────────────
 
-    def _faceswap_fallback(self, frame, face_key):
-        entry = self.face_catalog.get(face_key)
-        if not entry: return frame
-        h, w = frame.shape[:2]
-        cv2.putText(frame, f"[{entry['label']}]", (20, h-20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,180), 2)
-        return frame
+    def _get_bg(self, char_key, h, w):
+        key = f"{char_key}_{h}_{w}"
+        if key not in self._bg_cache:
+            if   char_key == "navi":               bg = make_pandora_bg(h, w)
+            elif char_key == "minecraft":          bg = make_minecraft_bg(h, w)
+            elif char_key in ("thanos","ghost"):   bg = make_space_bg(h, w)
+            elif char_key == "groot":              bg = make_forest_bg(h, w)
+            elif char_key == "predator":           bg = make_thermal_bg(h, w)
+            else:                                  bg = np.zeros((h,w,3), dtype=np.uint8)
+            self._bg_cache[key] = bg
+        return self._bg_cache[key]
+
+    def _composite(self, transformed, original, mask_f, bg=None):
+        m = np.stack([mask_f]*3, axis=2)
+        if bg is not None:
+            return np.clip(transformed.astype(np.float32)*m +
+                           bg.astype(np.float32)*(1-m), 0, 255).astype(np.uint8)
+        return np.clip(transformed.astype(np.float32)*m +
+                       original.astype(np.float32)*(1-m), 0, 255).astype(np.uint8)
+
+    def _rim_glow(self, frame, mask_f, color_bgr, width=3):
+        m8 = (mask_f*255).astype(np.uint8)
+        k  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9,9))
+        edge = cv2.subtract(cv2.dilate(m8,k,iterations=width), m8)
+        edge_b = cv2.GaussianBlur(edge,(11,11),0).astype(np.float32)/255.0
+        rim = np.zeros_like(frame, dtype=np.float32)
+        for c, val in enumerate(color_bgr):
+            rim[:,:,c] = edge_b * val
+        return np.clip(frame.astype(np.float32)+rim, 0, 255).astype(np.uint8)
+
+    def _shift_hue(self, frame, hue, sat_floor=120, val_scale=0.9):
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.int16)
+        hsv[:,:,0] = hue
+        hsv[:,:,1] = np.clip(hsv[:,:,1]+(255-hsv[:,:,1])*0.6, sat_floor, 255)
+        hsv[:,:,2] = np.clip((hsv[:,:,2]*val_scale), 20, 255)
+        return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
