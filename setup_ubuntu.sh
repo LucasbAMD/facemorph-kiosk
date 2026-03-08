@@ -3,8 +3,7 @@
 # Ubuntu 22.04 or 24.04 · AMD GPU (W7900 recommended for AI generation)
 # Run as normal user (not root) — uses sudo internally where needed
 
-set -e
-
+# Note: intentionally NOT using set -e so one step failure doesn't kill the rest
 echo ""
 echo "======================================================"
 echo "  AMD ADAPT KIOSK — Ubuntu Setup"
@@ -84,8 +83,17 @@ echo "── Step 3: Kiosk Python dependencies ──"
 cd "$SCRIPT_DIR"
 
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
+    python3 -m venv venv 2>/dev/null || {
+        echo "[..] venv failed, installing python3-venv..."
+        sudo apt install -y python3-venv
+        python3 -m venv venv
+    }
     echo "[OK] venv created"
+fi
+
+if [ ! -f "venv/bin/activate" ]; then
+    echo "[ERR] venv/bin/activate missing — run: sudo apt install python3-venv && python3 -m venv venv"
+    exit 1
 fi
 
 source venv/bin/activate
