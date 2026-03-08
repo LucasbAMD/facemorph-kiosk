@@ -3,857 +3,558 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AMD Adapt</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<title>AMD ADAPT KIOSK</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&family=Space+Mono&display=swap" rel="stylesheet">
 <style>
-/* ══════════════════════════════════════════════════════════════════════
-   FACEMORPH KIOSK — Character Select Interface
-   ══════════════════════════════════════════════════════════════════════ */
-:root {
-  --bg:      #060608;
-  --deep:    #0a0a10;
-  --panel:   #0e0e18;
-  --border:  #18182a;
-  --border2: #252540;
-  --text:    #dde0f0;
-  --muted:   #48486a;
-  --accent:  #00e5ff;
-  --hot:     #ff2266;
-  --gold:    #ffd040;
-  --gc: 0 0 20px rgba(0,229,255,.5), 0 0 50px rgba(0,229,255,.15);
-  --gh: 0 0 20px rgba(255,34,102,.5), 0 0 50px rgba(255,34,102,.15);
-}
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --cyan:#00d4ff;--pink:#ff0080;--dark:#050a0f;--card:#0d1b26;
+    --border:#1a3a4a;--text:#c8e8f0;
+  }
+  body{background:var(--dark);color:var(--text);font-family:'Rajdhani',sans-serif;
+       height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
 
-*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  /* ── HEADER ── */
+  #header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 20px;background:rgba(0,0,0,0.6);border-bottom:1px solid var(--border);
+    z-index:100;flex-shrink:0
+  }
+  #logo{font-family:'Bebas Neue';font-size:2rem;letter-spacing:3px}
+  #logo span{color:var(--cyan)}
+  #logo b{color:var(--pink)}
+  #hdr-right{display:flex;align-items:center;gap:16px}
+  #cam-status{display:flex;align-items:center;gap:6px;font-family:'Space Mono';font-size:.7rem}
+  .dot{width:8px;height:8px;border-radius:50%;background:#333}
+  .dot.live{background:#00ff88;box-shadow:0 0 8px #00ff88}
+  #mode-label{font-family:'Bebas Neue';font-size:1.2rem;color:var(--cyan);letter-spacing:2px}
 
-html, body {
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Rajdhani', sans-serif;
-  overflow: hidden;
-  user-select: none;
-}
+  /* ── MODE PILLS ── */
+  #mode-bar{display:flex;gap:8px;align-items:center}
+  .pill{
+    padding:5px 14px;border-radius:20px;border:1px solid var(--border);
+    font-family:'Space Mono';font-size:.65rem;letter-spacing:1px;cursor:pointer;
+    background:transparent;color:#6a9ab0;transition:.2s;text-transform:uppercase
+  }
+  .pill:hover{border-color:var(--cyan);color:var(--cyan)}
+  .pill.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.12)}
 
-/* scanlines */
-body::after {
-  content:''; position:fixed; inset:0; z-index:900; pointer-events:none;
-  background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);
-}
+  /* ── VIDEO AREA ── */
+  #video-wrap{
+    flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;
+    background:#000
+  }
+  #video-feed{width:100%;height:100%;object-fit:cover}
 
-/* ── LAYOUT ──────────────────────────────────────────────────────────── */
-.app {
-  display: grid;
-  grid-template-rows: 56px 1fr 220px;
-  height: 100vh;
-}
+  /* Corner brackets */
+  .corner{position:absolute;width:28px;height:28px;border-color:var(--cyan);border-style:solid;opacity:.7}
+  .corner.tl{top:12px;left:12px;border-width:2px 0 0 2px}
+  .corner.tr{top:12px;right:12px;border-width:2px 2px 0 0}
+  .corner.bl{bottom:12px;left:12px;border-width:0 0 2px 2px}
+  .corner.br{bottom:12px;right:12px;border-width:0 2px 2px 0}
 
-/* ── HEADER ──────────────────────────────────────────────────────────── */
-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px;
-  background: var(--deep);
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  z-index: 10;
-}
-header::after {
-  content:''; position:absolute; bottom:-1px; left:0; right:0; height:1px;
-  background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%);
-  animation: hline 4s ease-in-out infinite;
-}
-@keyframes hline { 0%,100%{opacity:.2} 50%{opacity:.9} }
+  /* Character name overlay */
+  #char-label{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    text-align:center;padding:14px 30px 8px;pointer-events:none;
+    display:none
+  }
+  #char-name{font-family:'Bebas Neue';font-size:3rem;letter-spacing:4px;
+              text-shadow:0 0 30px currentColor;line-height:1}
+  #char-sub{font-family:'Space Mono';font-size:.6rem;letter-spacing:3px;
+             opacity:.7;margin-top:2px}
 
-.logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px; letter-spacing: 5px;
-  color: var(--accent);
-  text-shadow: var(--gc);
-}
-.logo em { color: var(--hot); font-style:normal; text-shadow: var(--gh); }
+  /* ── GENERATE BUTTON ── */
+  #gen-btn{
+    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+    background:linear-gradient(135deg,var(--pink),var(--cyan));
+    border:none;border-radius:8px;padding:14px 48px;
+    font-family:'Bebas Neue';font-size:1.8rem;letter-spacing:3px;color:#000;
+    cursor:pointer;transition:.15s;box-shadow:0 0 30px rgba(0,212,255,.4);
+    display:none;z-index:50
+  }
+  #gen-btn:hover{transform:translateX(-50%) scale(1.05);box-shadow:0 0 50px rgba(255,0,128,.6)}
+  #gen-btn:active{transform:translateX(-50%) scale(0.97)}
+  #gen-btn:disabled{opacity:.5;cursor:default}
 
-.hdr-right {
-  display: flex; align-items: center; gap: 16px;
-  font-family: 'Space Mono', monospace;
-  font-size: 10px; color: var(--muted);
-}
-.live-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--muted); transition: all .3s;
-}
-.live-dot.on { background: #22ff66; box-shadow: 0 0 8px #22ff66; animation: blink 1.8s infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  /* ── AI RESULT OVERLAY ── */
+  #result-overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;background:rgba(0,0,0,.92);
+    z-index:200;opacity:0;pointer-events:none;transition:opacity .4s
+  }
+  #result-overlay.show{opacity:1;pointer-events:all}
+  #result-img{
+    max-width:90%;max-height:75vh;border-radius:8px;
+    border:2px solid var(--cyan);box-shadow:0 0 60px rgba(0,212,255,.5)
+  }
+  #result-actions{display:flex;gap:16px;margin-top:20px}
+  .result-btn{
+    padding:10px 32px;border-radius:6px;font-family:'Bebas Neue';font-size:1.3rem;
+    letter-spacing:2px;cursor:pointer;border:2px solid;transition:.15s
+  }
+  #btn-back{border-color:var(--border);color:var(--text);background:transparent}
+  #btn-back:hover{border-color:var(--cyan);color:var(--cyan)}
+  #btn-save{border-color:var(--cyan);color:#000;background:var(--cyan)}
+  #btn-save:hover{background:var(--pink);border-color:var(--pink)}
 
-/* ── VIDEO AREA ──────────────────────────────────────────────────────── */
-.video-wrap {
-  position: relative;
-  background: #000;
-  overflow: hidden;
-}
-#feed {
-  width:100%; height:100%;
-  object-fit: cover;
-  display: block;
-}
+  /* ── GENERATING OVERLAY ── */
+  #gen-overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;background:rgba(0,0,0,.8);
+    z-index:190;opacity:0;pointer-events:none;transition:opacity .3s
+  }
+  #gen-overlay.show{opacity:1;pointer-events:all}
+  #gen-spinner{
+    width:80px;height:80px;border-radius:50%;
+    border:4px solid var(--border);border-top-color:var(--cyan);
+    animation:spin 1s linear infinite;margin-bottom:20px
+  }
+  #gen-text{font-family:'Bebas Neue';font-size:2rem;letter-spacing:3px;color:var(--cyan)}
+  #gen-sub{font-family:'Space Mono';font-size:.7rem;color:#6a9ab0;margin-top:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
-/* Corner brackets */
-.brkt {
-  position: absolute; width: 32px; height: 32px;
-  pointer-events: none; z-index: 5;
-}
-.brkt::before,.brkt::after {
-  content:''; position:absolute; background:var(--accent);
-  box-shadow: 0 0 5px var(--accent);
-}
-.brkt::before { width:2px; height:100%; }
-.brkt::after  { width:100%; height:2px; }
-.brkt.tl { top:14px; left:14px; }
-.brkt.tr { top:14px; right:14px; transform:scaleX(-1); }
-.brkt.bl { bottom:14px; left:14px; transform:scaleY(-1); }
-.brkt.br { bottom:14px; right:14px; transform:scale(-1); }
+  /* ── CHARACTER BAR ── */
+  #char-bar{
+    flex-shrink:0;height:200px;background:rgba(0,0,0,.85);
+    border-top:1px solid var(--border);padding:14px 20px;
+    display:flex;flex-direction:column;gap:8px
+  }
+  #bar-label{
+    font-family:'Space Mono';font-size:.6rem;letter-spacing:3px;
+    color:#3a6a7a;display:flex;justify-content:space-between
+  }
+  #char-cards{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+  #char-cards::-webkit-scrollbar{height:2px}
+  #char-cards::-webkit-scrollbar-thumb{background:var(--border)}
 
-/* Current character HUD */
-.char-hud {
-  position: absolute; top:22px; left:50%;
-  transform: translateX(-50%);
-  text-align: center;
-  pointer-events: none;
-  z-index: 10;
-  transition: opacity .4s;
-  opacity: 0;
-}
-.char-hud.show { opacity: 1; }
-.hud-name {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 36px; letter-spacing: 6px;
-  color: #fff;
-  text-shadow: 0 0 30px var(--char-color, var(--accent)),
-               0 0 60px var(--char-color, var(--accent));
-}
-.hud-sub {
-  font-family: 'Space Mono', monospace;
-  font-size: 9px; letter-spacing: 3px;
-  color: var(--char-color, var(--accent));
-  margin-top: 2px;
-}
+  .char-card{
+    flex-shrink:0;width:130px;border:1px solid var(--border);border-radius:10px;
+    padding:12px 10px;cursor:pointer;transition:.2s;background:var(--card);
+    position:relative;text-align:center
+  }
+  .char-card:hover{border-color:var(--cyan);background:rgba(0,212,255,.06)}
+  .char-card.active{border-width:2px}
+  .char-card .num{
+    position:absolute;top:6px;right:8px;font-family:'Space Mono';
+    font-size:.6rem;color:#3a6a7a
+  }
+  .char-card .emoji{font-size:2rem;display:block;margin-bottom:6px}
+  .char-card .cname{font-family:'Bebas Neue';font-size:1.1rem;letter-spacing:1px}
+  .char-card .csub{font-size:.6rem;color:#6a9ab0;margin-top:2px;
+                    font-family:'Space Mono';white-space:nowrap;overflow:hidden}
 
-/* Quick mode pills (top-right of video) */
-.mode-pills {
-  position: absolute; top: 18px; right: 20px;
-  display: flex; gap: 6px; z-index: 10;
-}
-.pill {
-  padding: 4px 12px;
-  border: 1px solid var(--border2);
-  border-radius: 20px;
-  background: rgba(0,0,0,.55);
-  font-family: 'Space Mono', monospace;
-  font-size: 9px; letter-spacing: 1px;
-  color: var(--muted); cursor: pointer;
-  transition: all .2s; backdrop-filter: blur(6px);
-}
-.pill:hover { border-color: var(--accent); color: var(--accent); }
-.pill.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(0,229,255,.1);
-  box-shadow: var(--gc);
-}
+  /* ── TOAST ── */
+  #toast{
+    position:fixed;bottom:220px;left:50%;transform:translateX(-50%);
+    background:rgba(0,212,255,.15);border:1px solid var(--cyan);
+    padding:10px 24px;border-radius:6px;font-family:'Space Mono';font-size:.75rem;
+    color:var(--cyan);opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;
+    letter-spacing:1px
+  }
+  #toast.show{opacity:1}
 
-/* ── CHARACTER SELECT BAR ────────────────────────────────────────────── */
-.char-bar {
-  background: var(--panel);
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+  /* ── AI BADGE ── */
+  #ai-badge{
+    position:absolute;top:14px;right:14px;
+    background:linear-gradient(135deg,rgba(255,0,128,.3),rgba(0,212,255,.3));
+    border:1px solid var(--cyan);border-radius:20px;padding:4px 12px;
+    font-family:'Space Mono';font-size:.6rem;letter-spacing:1px;color:var(--cyan);
+    display:none
+  }
 
-.bar-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 20px 6px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.bar-title {
-  font-family: 'Space Mono', monospace;
-  font-size: 9px; letter-spacing: 3px;
-  color: var(--muted); text-transform: uppercase;
-}
-.bar-hint {
-  font-family: 'Space Mono', monospace;
-  font-size: 8px; color: var(--muted);
-}
-
-/* Character cards row */
-.chars-row {
-  display: flex;
-  gap: 10px;
-  padding: 12px 20px 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: 1;
-}
-.chars-row::-webkit-scrollbar { display:none; }
-
-.char-card {
-  flex-shrink: 0;
-  width: 138px;
-  border-radius: 8px;
-  border: 2px solid var(--border2);
-  background: var(--deep);
-  cursor: pointer;
-  transition: all .22s cubic-bezier(.2,.8,.3,1);
-  position: relative;
-  overflow: hidden;
-  display: flex; flex-direction: column;
-}
-.char-card::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg,
-    rgba(255,255,255,.04) 0%, transparent 60%);
-  pointer-events: none;
-}
-.char-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--c, var(--accent));
-  box-shadow: 0 8px 32px rgba(0,0,0,.6),
-              0 0 20px var(--c, rgba(0,229,255,.3));
-}
-.char-card.active {
-  border-color: var(--c, var(--accent));
-  background: color-mix(in srgb, var(--c, var(--accent)) 8%, var(--deep));
-  box-shadow: 0 0 0 1px var(--c, var(--accent)),
-              0 0 30px var(--c, rgba(0,229,255,.25)),
-              inset 0 0 20px rgba(0,0,0,.4);
-  transform: translateY(-2px);
-}
-
-/* Inner card layout */
-.card-emoji {
-  font-size: 36px;
-  text-align: center;
-  padding: 14px 8px 6px;
-  line-height: 1;
-  filter: drop-shadow(0 0 8px var(--c, rgba(0,229,255,.5)));
-  transition: filter .3s;
-}
-.char-card.active .card-emoji {
-  filter: drop-shadow(0 0 16px var(--c, rgba(0,229,255,.9)));
-}
-.card-body {
-  padding: 4px 10px 10px;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.card-name {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 20px; letter-spacing: 2px;
-  color: var(--text);
-  transition: color .2s;
-}
-.char-card.active .card-name { color: var(--c, var(--accent)); }
-.card-sub {
-  font-family: 'Space Mono', monospace;
-  font-size: 7.5px; letter-spacing: .5px;
-  color: var(--muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-/* Active indicator bar at bottom */
-.card-bar {
-  height: 3px;
-  background: var(--border);
-  margin-top: auto;
-  transition: background .2s;
-}
-.char-card.active .card-bar {
-  background: var(--c, var(--accent));
-  box-shadow: 0 0 8px var(--c, var(--accent));
-}
-
-/* Numbered key hint */
-.card-key {
-  position: absolute; top: 7px; right: 8px;
-  font-family: 'Space Mono', monospace;
-  font-size: 9px; color: var(--muted);
-  background: rgba(0,0,0,.5);
-  padding: 1px 5px; border-radius: 3px;
-  border: 1px solid var(--border);
-}
-.char-card.active .card-key { color: var(--c, var(--accent)); border-color: var(--c, var(--accent)); }
-
-/* ── FACE SWAP OVERLAY PANEL ─────────────────────────────────────────── */
-/* Slides up over the char bar when face-swap mode is active */
-.faceswap-panel {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: 220px;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
-  z-index: 50;
-  transform: translateY(100%);
-  transition: transform .35s cubic-bezier(.4,0,.2,1);
-  display: flex; flex-direction: column;
-}
-.faceswap-panel.open { transform: translateY(0); }
-
-.fs-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 20px 8px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.fs-title {
-  font-family: 'Space Mono', monospace;
-  font-size: 9px; letter-spacing: 3px; color: var(--muted);
-}
-.fs-close {
-  background: none; border: 1px solid var(--border2);
-  color: var(--muted); border-radius: 4px;
-  padding: 3px 10px; cursor: pointer;
-  font-family: 'Space Mono', monospace; font-size: 9px;
-  transition: all .2s;
-}
-.fs-close:hover { border-color: var(--hot); color: var(--hot); }
-
-.fs-faces {
-  flex:1; display:flex; gap:8px;
-  padding: 10px 20px;
-  overflow-x: auto; scrollbar-width: none;
-  align-items: center;
-}
-.fs-faces::-webkit-scrollbar { display:none; }
-
-.face-card {
-  flex-shrink: 0;
-  width: 80px; height: 110px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border2);
-  background: var(--deep);
-  cursor: pointer;
-  overflow: hidden; position: relative;
-  transition: all .2s;
-}
-.face-card:hover { transform:translateY(-3px); border-color: var(--hot); }
-.face-card.active { border-color: var(--hot); box-shadow: var(--gh); }
-.face-card img { width:100%; height:100%; object-fit:cover; }
-.face-card .flabel {
-  position:absolute; bottom:0; left:0; right:0;
-  padding: 3px 4px;
-  background: linear-gradient(transparent, rgba(0,0,0,.85));
-  font-family:'Space Mono',monospace;
-  font-size: 7px; text-align:center; color: var(--text);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.face-card.active .flabel { color: var(--hot); }
-
-.fs-empty {
-  color: var(--muted); font-size: 11px;
-  font-family: 'Space Mono', monospace;
-  text-align: center; padding: 20px;
-  line-height: 1.8;
-}
-
-.fs-upload-btn {
-  width: 80px; height: 110px; flex-shrink:0;
-  border: 1.5px dashed var(--border2);
-  border-radius: 6px; background: transparent;
-  cursor: pointer; color: var(--muted);
-  font-family: 'Space Mono', monospace;
-  font-size: 9px; text-align:center;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center; gap:5px;
-  transition: all .2s;
-}
-.fs-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
-.fs-upload-btn .plus { font-size: 22px; }
-
-/* ── UPLOAD MODAL ────────────────────────────────────────────────────── */
-.modal-bg {
-  position: fixed; inset:0; z-index: 200;
-  background: rgba(0,0,0,.88);
-  display:flex; align-items:center; justify-content:center;
-  opacity:0; pointer-events:none; transition: opacity .3s;
-}
-.modal-bg.open { opacity:1; pointer-events:all; }
-.modal {
-  background: var(--panel);
-  border: 1px solid var(--border2);
-  border-radius: 12px;
-  padding: 28px; width: 360px;
-  transform: scale(.95);
-  transition: transform .3s;
-}
-.modal-bg.open .modal { transform: scale(1); }
-.modal h2 {
-  font-family:'Bebas Neue',sans-serif;
-  font-size:24px; letter-spacing:4px;
-  color:var(--accent); margin-bottom:18px;
-  text-shadow: var(--gc);
-}
-.modal input, .modal select {
-  width:100%; padding:10px 12px;
-  background:var(--deep); border: 1px solid var(--border2);
-  border-radius:5px; color:var(--text);
-  font-family:'Space Mono',monospace; font-size:12px;
-  margin-bottom:10px; outline:none;
-  transition: border-color .2s;
-}
-.modal input:focus, .modal select:focus { border-color:var(--accent); }
-
-.drop-z {
-  border: 2px dashed var(--border2); border-radius:8px;
-  padding: 20px; text-align:center; cursor:pointer;
-  transition: all .2s; margin-bottom:12px; position:relative;
-}
-.drop-z:hover,.drop-z.drag { border-color:var(--accent); background:rgba(0,229,255,.05); }
-.drop-z input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; margin:0; }
-.drop-z .dz-ico { font-size:26px; margin-bottom:5px; }
-.drop-z .dz-txt { font-size:10px; color:var(--muted); font-family:'Space Mono',monospace; }
-#prev-img { width:100%; max-height:130px; object-fit:cover; border-radius:5px; display:none; margin-bottom:10px; }
-
-.modal-btns { display:flex; gap:10px; margin-top:6px; }
-.btn-ok {
-  flex:1; padding:11px;
-  background:var(--accent); color:#000;
-  border:none; border-radius:5px;
-  font-family:'Bebas Neue',sans-serif;
-  font-size:15px; letter-spacing:2px;
-  cursor:pointer; transition:opacity .2s;
-}
-.btn-ok:hover { opacity:.85; }
-.btn-cancel {
-  padding:11px 16px;
-  background:transparent; color:var(--muted);
-  border:1px solid var(--border2); border-radius:5px;
-  font-family:'Space Mono',monospace; font-size:11px;
-  cursor:pointer; transition:all .2s;
-}
-.btn-cancel:hover { color:var(--text); border-color:var(--muted); }
-
-/* ── TOAST ───────────────────────────────────────────────────────────── */
-#toast {
-  position:fixed; bottom:240px; left:50%;
-  transform:translateX(-50%) translateY(12px);
-  background:var(--panel); border:1px solid var(--accent);
-  color:var(--accent); font-family:'Space Mono',monospace;
-  font-size:11px; letter-spacing:1px; padding:9px 22px;
-  border-radius:30px; box-shadow:var(--gc);
-  z-index:300; pointer-events:none;
-  opacity:0; transition:all .3s;
-}
-#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-#toast.err  { border-color:var(--hot); color:var(--hot); box-shadow:var(--gh); }
+  /* face swap panel */
+  #swap-panel{
+    position:fixed;bottom:0;left:0;right:0;height:220px;
+    background:rgba(5,15,25,.97);border-top:1px solid var(--border);
+    z-index:400;transform:translateY(100%);transition:.3s ease
+  }
+  #swap-panel.open{transform:translateY(0)}
+  #swap-inner{padding:16px 20px;height:100%;display:flex;flex-direction:column;gap:10px}
+  #swap-header{display:flex;justify-content:space-between;align-items:center}
+  #swap-title{font-family:'Space Mono';font-size:.7rem;letter-spacing:2px;color:#6a9ab0}
+  #swap-close{background:none;border:1px solid var(--border);color:var(--text);
+               padding:4px 12px;border-radius:4px;cursor:pointer;font-size:.7rem}
+  #swap-faces{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+  .face-card{
+    flex-shrink:0;width:90px;border:2px solid var(--border);border-radius:8px;
+    overflow:hidden;cursor:pointer;transition:.2s
+  }
+  .face-card:hover{border-color:var(--cyan)}
+  .face-card.active{border-color:var(--pink)}
+  .face-card img{width:100%;height:70px;object-fit:cover;display:block}
+  .face-card .flabel{font-size:.6rem;padding:4px;text-align:center;
+                      font-family:'Space Mono';white-space:nowrap;overflow:hidden}
+  .add-face{
+    flex-shrink:0;width:90px;height:100px;border:2px dashed var(--border);
+    border-radius:8px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;cursor:pointer;transition:.2s;font-size:.65rem;
+    color:#3a6a7a;gap:6px
+  }
+  .add-face:hover{border-color:var(--cyan);color:var(--cyan)}
 </style>
 </head>
 <body>
 
-<div class="app">
+<!-- HEADER -->
+<div id="header">
+  <div id="logo"><span>AMD</span><b>ADAPT</b></div>
+  <div id="mode-bar">
+    <button class="pill active" onclick="setMode('character')">CHARACTER</button>
+    <button class="pill" onclick="setMode('minecraft')">MINECRAFT</button>
+    <button class="pill" onclick="setMode('cyberpunk')">CYBERPUNK</button>
+    <button class="pill" onclick="toggleSwap()">FACE SWAP ↑</button>
+    <button class="pill" onclick="setMode('passthrough')">LIVE</button>
+  </div>
+  <div id="hdr-right">
+    <div id="cam-status"><div class="dot" id="cam-dot"></div><span id="cam-txt">CAMERA</span></div>
+    <div id="mode-label">NA'VI</div>
+  </div>
+</div>
 
-  <!-- ── Header ──────────────────────────────────────────────────────────── -->
-  <header>
-    <div class="logo">AMD<em>ADAPT</em></div>
-    <div class="hdr-right">
-      <div class="live-dot" id="liveDot"></div>
-      <span id="camTxt">CONNECTING</span>
-      <span style="color:var(--border2)">│</span>
-      <span id="modeTxt" style="color:var(--accent)">LIVE</span>
-    </div>
-  </header>
+<!-- VIDEO -->
+<div id="video-wrap">
+  <img id="video-feed" src="/video_feed">
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
 
-  <!-- ── Video ───────────────────────────────────────────────────────────── -->
-  <div class="video-wrap">
-    <img id="feed" src="/video_feed" alt="Live feed">
-
-    <!-- Brackets -->
-    <div class="brkt tl"></div>
-    <div class="brkt tr"></div>
-    <div class="brkt bl"></div>
-    <div class="brkt br"></div>
-
-    <!-- Character HUD -->
-    <div class="char-hud" id="charHud">
-      <div class="hud-name" id="hudName">NA'VI</div>
-      <div class="hud-sub"  id="hudSub">AVATAR · PANDORA</div>
-    </div>
-
-    <!-- Mode pills (top right) -->
-    <div class="mode-pills">
-      <div class="pill active" data-mode="character" onclick="setTopMode('character')">CHARACTER</div>
-      <div class="pill"        data-mode="minecraft" onclick="setTopMode('minecraft')">MINECRAFT</div>
-      <div class="pill"        data-mode="cyberpunk" onclick="setTopMode('cyberpunk')">CYBERPUNK</div>
-      <div class="pill"        data-mode="faceswap"  onclick="openFaceSwap()">FACE SWAP ↑</div>
-      <div class="pill"        data-mode="passthrough" onclick="setTopMode('passthrough')">LIVE</div>
-    </div>
+  <div id="char-label">
+    <div id="char-name">NA'VI</div>
+    <div id="char-sub">AVATAR · PANDORA</div>
   </div>
 
-  <!-- ── Character Select Bar ────────────────────────────────────────────── -->
-  <div class="char-bar">
-    <div class="bar-header">
-      <span class="bar-title">Choose Your Character</span>
-      <span class="bar-hint">Keys 1–6 to switch · ESC = live view</span>
-    </div>
-    <div class="chars-row" id="charsRow">
-      <!-- populated by JS -->
+  <div id="ai-badge">⚡ AI READY</div>
+
+  <!-- GENERATE BUTTON -->
+  <button id="gen-btn" onclick="generate()">⚡ TRANSFORM ME</button>
+
+  <!-- GENERATING spinner -->
+  <div id="gen-overlay">
+    <div id="gen-spinner"></div>
+    <div id="gen-text">GENERATING...</div>
+    <div id="gen-sub">AI is transforming you into the character</div>
+  </div>
+
+  <!-- AI RESULT reveal -->
+  <div id="result-overlay">
+    <img id="result-img" src="">
+    <div id="result-actions">
+      <button class="result-btn" id="btn-back" onclick="closeResult()">← TRY AGAIN</button>
+      <button class="result-btn" id="btn-save" onclick="saveResult()">💾 SAVE</button>
     </div>
   </div>
 </div>
 
-<!-- ── Face Swap Panel ────────────────────────────────────────────────────── -->
-<div class="faceswap-panel" id="fsPanel">
-  <div class="fs-header">
-    <span class="fs-title">Face Swap Library — pick a face</span>
-    <button class="fs-close" onclick="closeFaceSwap()">✕ CLOSE</button>
+<!-- CHARACTER BAR -->
+<div id="char-bar">
+  <div id="bar-label">
+    <span>CHOOSE YOUR CHARACTER</span>
+    <span>Keys 1–6 to switch · ESC = live view</span>
   </div>
-  <div class="fs-faces" id="fsFaces">
-    <div class="fs-empty">Loading faces...</div>
+  <div id="char-cards"></div>
+</div>
+
+<!-- FACE SWAP PANEL -->
+<div id="swap-panel">
+  <div id="swap-inner">
+    <div id="swap-header">
+      <div id="swap-title">FACE SWAP LIBRARY — pick a face</div>
+      <button id="swap-close" onclick="toggleSwap()">✕ CLOSE</button>
+    </div>
+    <div id="swap-faces"></div>
   </div>
 </div>
 
-<!-- ── Upload Modal ───────────────────────────────────────────────────────── -->
-<div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <h2>Add Face</h2>
-    <div class="drop-z" id="dropZ">
-      <input type="file" id="fileIn" accept="image/*" onchange="previewF(this)">
-      <div id="dzCont">
-        <div class="dz-ico">📤</div>
-        <div class="dz-txt">Drop photo here or click to browse<br>Use a clear front-facing image</div>
-      </div>
-      <img id="prev-img" alt="preview">
-    </div>
-    <input type="text" id="faceLabel" placeholder="Name (e.g. Lisa Su, Keanu Reeves)">
-    <select id="faceCat">
-      <option value="celebrity">Celebrity</option>
-      <option value="fantasy">Fantasy / Character</option>
-      <option value="custom">Custom</option>
-    </select>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-ok" onclick="uploadFace()">UPLOAD</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Toast ─────────────────────────────────────────────────────────────── -->
 <div id="toast"></div>
 
 <script>
-/* ════════════════════════════════════════════════════════════════════════
-   FaceMorph Kiosk — UI Controller
-   ════════════════════════════════════════════════════════════════════════ */
+// ── State ─────────────────────────────────────────────────────────────────────
+let characters = [];
+let currentChar = null;
+let currentMode = 'character';
+let aiReady = false;
+let polling = null;
 
-let currentMode  = 'character';
-let currentChar  = 'navi';
-let currentFace  = null;
-let fsCatalog    = [];
-let characters   = [];
-
-// ── Boot ──────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', async () => {
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
   await loadCharacters();
-  await loadFaces();
+  await loadCatalog();
   pollStatus();
-  setInterval(pollStatus, 3000);
-  // Start in character mode with Na'vi
-  selectChar('navi', false);
-});
+  // Select first character
+  if (characters.length) selectChar(characters[0].key);
+}
 
-// ── Character loading ─────────────────────────────────────────────────────
 async function loadCharacters() {
-  try {
-    const r = await fetch('/characters');
-    const d = await r.json();
-    characters = d.characters;
-    renderCharBar();
-  } catch {
-    renderCharBar();  // still render with defaults
-  }
+  const r = await fetch('/characters');
+  const d = await r.json();
+  characters = d.characters;
+  aiReady = characters.some(c => c.ai_ready);
+  renderCharCards();
+  updateAiBadge();
 }
 
-function renderCharBar() {
-  const row = document.getElementById('charsRow');
-  if (!characters.length) {
-    // Fallback hardcoded list
-    characters = [
-      {key:'navi',     label:"Na'vi",    subtitle:'Avatar · Pandora',    emoji:'🔵', color:'#00d4ff'},
-      {key:'hulk',     label:'Hulk',     subtitle:'Gamma · Avengers',    emoji:'💚', color:'#22dd44'},
-      {key:'thanos',   label:'Thanos',   subtitle:'Infinity · Mad Titan',emoji:'💜', color:'#9b30ff'},
-      {key:'predator', label:'Predator', subtitle:'Thermal · Cloaked',   emoji:'👁️', color:'#ff6600'},
-      {key:'ghost',    label:'Ghost',    subtitle:'Spectral · Ethereal', emoji:'👻', color:'#aaddff'},
-      {key:'groot',    label:'Groot',    subtitle:'Guardians · Flora',   emoji:'🌿', color:'#8B5E3C'},
-    ];
-  }
-
-  row.innerHTML = characters.map((c, i) => `
-    <div class="char-card" id="card-${c.key}" data-key="${c.key}"
-         style="--c: ${c.color}"
-         onclick="selectChar('${c.key}')">
-      <span class="card-key">${i+1}</span>
-      <div class="card-emoji">${c.emoji}</div>
-      <div class="card-body">
-        <div class="card-name">${c.label}</div>
-        <div class="card-sub">${c.subtitle}</div>
-      </div>
-      <div class="card-bar"></div>
-    </div>
-  `).join('');
-}
-
-// ── Select character ──────────────────────────────────────────────────────
-async function selectChar(key, sendToServer=true) {
-  currentChar = key;
-  currentMode = 'character';
-
-  // Update card highlights
-  document.querySelectorAll('.char-card').forEach(c => {
-    c.classList.toggle('active', c.dataset.key === key);
+function renderCharCards() {
+  const wrap = document.getElementById('char-cards');
+  wrap.innerHTML = '';
+  characters.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'char-card';
+    div.id = `card-${c.key}`;
+    div.style.setProperty('--c', c.color);
+    div.onclick = () => selectChar(c.key);
+    div.innerHTML = `
+      <span class="num">${i+1}</span>
+      <span class="emoji">${c.emoji}</span>
+      <div class="cname" style="color:${c.color}">${c.label}</div>
+      <div class="csub">${c.subtitle}</div>`;
+    wrap.appendChild(div);
   });
-
-  // Update pills
-  document.querySelectorAll('.pill').forEach(p => {
-    p.classList.toggle('active', p.dataset.mode === 'character');
-  });
-
-  // Show HUD
-  const char = characters.find(c => c.key === key);
-  if (char) {
-    const hud = document.getElementById('charHud');
-    const nm  = document.getElementById('hudName');
-    const sb  = document.getElementById('hudSub');
-    hud.style.setProperty('--char-color', char.color);
-    nm.textContent = char.label.toUpperCase();
-    sb.textContent = char.subtitle.toUpperCase();
-    hud.classList.add('show');
-    setTimeout(() => hud.classList.remove('show'), 3000);
-  }
-
-  document.getElementById('modeTxt').textContent = char?.label?.toUpperCase() || 'CHARACTER';
-
-  if (sendToServer) {
-    const fd = new FormData();
-    fd.append('mode', 'character');
-    fd.append('character', key);
-    try { await fetch('/set_mode', {method:'POST', body:fd}); }
-    catch { toast('Server error', true); }
-  }
 }
 
-// ── Top mode pills ────────────────────────────────────────────────────────
-async function setTopMode(mode) {
-  if (mode === 'faceswap') { openFaceSwap(); return; }
-  currentMode = mode;
-
-  document.querySelectorAll('.pill').forEach(p =>
-    p.classList.toggle('active', p.dataset.mode === mode)
-  );
-
-  // Deactivate all char cards if not in character mode
-  if (mode !== 'character') {
-    document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active'));
+function updateAiBadge() {
+  const badge = document.getElementById('ai-badge');
+  const btn   = document.getElementById('gen-btn');
+  if (aiReady && currentMode === 'character') {
+    badge.style.display = 'block';
+    btn.style.display = 'block';
   } else {
-    // Re-select current char
-    document.querySelectorAll('.char-card').forEach(c =>
-      c.classList.toggle('active', c.dataset.key === currentChar)
-    );
+    badge.style.display = 'none';
+    btn.style.display = currentMode === 'character' ? 'block' : 'none';
+    if (!aiReady && btn.style.display === 'block') {
+      btn.textContent = '⚡ TRANSFORM ME';
+      btn.title = 'Start ComfyUI for AI quality. See launch_comfy.py';
+    }
+  }
+}
+
+// ── Character selection ───────────────────────────────────────────────────────
+function selectChar(key) {
+  currentChar = key;
+  const cfg = characters.find(c => c.key === key);
+  if (!cfg) return;
+
+  // Update cards
+  document.querySelectorAll('.char-card').forEach(el => {
+    el.classList.remove('active');
+    el.style.borderColor = '';
+  });
+  const card = document.getElementById(`card-${key}`);
+  if (card) {
+    card.classList.add('active');
+    card.style.borderColor = cfg.color;
   }
 
-  const labels = {passthrough:'LIVE', character:'CHARACTER', minecraft:'MINECRAFT',
-                  cyberpunk:'CYBERPUNK', faceswap:'FACE SWAP'};
-  document.getElementById('modeTxt').textContent = labels[mode] || mode.toUpperCase();
+  // Update header label
+  document.getElementById('mode-label').textContent = cfg.label.toUpperCase();
+
+  // Update character overlay
+  document.getElementById('char-name').textContent = cfg.label.toUpperCase();
+  document.getElementById('char-name').style.color = cfg.color;
+  document.getElementById('char-sub').textContent  = cfg.subtitle.toUpperCase();
+  const lbl = document.getElementById('char-label');
+  lbl.style.display = currentMode === 'character' ? 'block' : 'none';
+
+  // Send to server
+  const fd = new FormData();
+  fd.append('mode', 'character');
+  fd.append('character', key);
+  fetch('/set_mode', {method:'POST', body:fd});
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+
+  const labels = {character:'CHARACTER',minecraft:'MINECRAFT',
+                  cyberpunk:'CYBERPUNK',faceswap:'FACE SWAP ↑',passthrough:'LIVE'};
+  document.querySelectorAll('.pill').forEach(p => {
+    const txt = p.textContent.trim();
+    if (txt === labels[mode]) p.classList.add('active');
+  });
 
   const fd = new FormData();
   fd.append('mode', mode);
-  if (mode === 'character') fd.append('character', currentChar);
-  try { await fetch('/set_mode', {method:'POST', body:fd}); }
-  catch { toast('Error', true); }
+  if (mode === 'character' && currentChar) fd.append('character', currentChar);
+  fetch('/set_mode', {method:'POST', body:fd});
+
+  // Show/hide UI elements
+  document.getElementById('char-label').style.display =
+    mode === 'character' ? 'block' : 'none';
+  document.getElementById('gen-btn').style.display =
+    mode === 'character' ? 'block' : 'none';
+  updateAiBadge();
 }
 
-// ── Face swap panel ───────────────────────────────────────────────────────
-function openFaceSwap() {
-  document.getElementById('fsPanel').classList.add('open');
-  renderFsPanel();
-}
-function closeFaceSwap() {
-  document.getElementById('fsPanel').classList.remove('open');
-}
+// ── AI Generation ─────────────────────────────────────────────────────────────
+async function generate() {
+  if (!currentChar) return;
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
 
-async function loadFaces() {
-  try {
-    const r = await fetch('/catalog');
-    const d = await r.json();
-    fsCatalog = d.faces;
-  } catch {}
-}
-
-function renderFsPanel() {
-  const container = document.getElementById('fsFaces');
-  if (!fsCatalog.length) {
-    container.innerHTML = `
-      <div class="fs-empty">
-        No faces loaded yet.<br>
-        Drop JPGs into <code style="color:var(--accent)">faces/celebrity/</code><br>
-        or use the upload button →
-      </div>`;
-    // Still add upload button
-    const btn = document.createElement('button');
-    btn.className = 'fs-upload-btn';
-    btn.onclick = openModal;
-    btn.innerHTML = '<span class="plus">＋</span><span>Add Face</span>';
-    container.appendChild(btn);
-    return;
-  }
-
-  let html = '';
-  fsCatalog.forEach(f => {
-    const active = f.key === currentFace ? ' active' : '';
-    const thumb  = `/face_thumb?key=${encodeURIComponent(f.key)}`;
-    html += `
-      <div class="face-card${active}" data-key="${f.key}"
-           onclick="pickFace('${f.key}')">
-        <img src="${thumb}" alt="${f.label}"
-             onerror="this.style.display='none'">
-        <div class="flabel">${f.label}</div>
-      </div>`;
-  });
-
-  container.innerHTML = html;
-
-  // Upload button at end
-  const btn = document.createElement('button');
-  btn.className = 'fs-upload-btn';
-  btn.onclick = openModal;
-  btn.innerHTML = '<span class="plus">＋</span><span>Add Face</span>';
-  container.appendChild(btn);
-}
-
-async function pickFace(key) {
-  currentFace = key;
-  currentMode = 'faceswap';
-
-  document.querySelectorAll('.face-card').forEach(c =>
-    c.classList.toggle('active', c.dataset.key === key)
-  );
-  document.querySelectorAll('.pill').forEach(p =>
-    p.classList.toggle('active', p.dataset.mode === 'faceswap')
-  );
-
-  const entry = fsCatalog.find(f => f.key === key);
-  document.getElementById('modeTxt').textContent =
-    entry ? entry.label.toUpperCase() : 'FACE SWAP';
+  // Show spinner
+  document.getElementById('gen-overlay').classList.add('show');
+  document.getElementById('gen-sub').textContent =
+    aiReady ? 'AI is transforming you — 2-3 seconds...'
+             : 'Processing transform...';
 
   const fd = new FormData();
-  fd.append('mode', 'faceswap');
-  fd.append('face_key', key);
+  fd.append('character', currentChar);
   try {
-    await fetch('/set_mode', {method:'POST', body:fd});
-    toast(`✓ ${entry?.label || 'Face'} activated`);
-  } catch { toast('Error', true); }
+    const r = await fetch('/generate', {method:'POST', body:fd});
+    const d = await r.json();
+    if (d.status === 'generating' || d.status === 'done') {
+      startPolling();
+    } else {
+      showGenError(d.message || 'Failed to start');
+    }
+  } catch(e) {
+    showGenError('Server error');
+  }
 }
 
-// ── Status poll ───────────────────────────────────────────────────────────
+function startPolling() {
+  if (polling) clearInterval(polling);
+  polling = setInterval(async () => {
+    try {
+      const r = await fetch('/generate_status');
+      const d = await r.json();
+      if (d.status === 'done' && d.image) {
+        clearInterval(polling); polling = null;
+        showResult(d.image);
+      } else if (d.status === 'error') {
+        clearInterval(polling); polling = null;
+        showGenError(d.message || 'Generation failed');
+      }
+    } catch(e) {}
+  }, 500);
+}
+
+function showResult(dataUrl) {
+  document.getElementById('gen-overlay').classList.remove('show');
+  document.getElementById('result-img').src = dataUrl;
+  document.getElementById('result-overlay').classList.add('show');
+  document.getElementById('gen-btn').disabled = false;
+}
+
+function showGenError(msg) {
+  document.getElementById('gen-overlay').classList.remove('show');
+  document.getElementById('gen-btn').disabled = false;
+  toast('Error: ' + msg, 4000);
+}
+
+function closeResult() {
+  document.getElementById('result-overlay').classList.remove('show');
+}
+
+function saveResult() {
+  const img = document.getElementById('result-img');
+  const a = document.createElement('a');
+  a.href = img.src;
+  a.download = `amd_adapt_${currentChar}_${Date.now()}.jpg`;
+  a.click();
+}
+
+// ── Face swap panel ───────────────────────────────────────────────────────────
+let swapOpen = false;
+function toggleSwap() {
+  swapOpen = !swapOpen;
+  document.getElementById('swap-panel').classList.toggle('open', swapOpen);
+}
+
+async function loadCatalog() {
+  const r = await fetch('/catalog');
+  const d = await r.json();
+  const wrap = document.getElementById('swap-faces');
+  wrap.innerHTML = '';
+  d.faces.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'face-card';
+    div.id = `face-${f.key.replace('/','-')}`;
+    div.onclick = () => selectFace(f.key, div);
+    div.innerHTML = `<img src="/face_thumb?key=${encodeURIComponent(f.key)}" loading="lazy">
+                     <div class="flabel">${f.label}</div>`;
+    wrap.appendChild(div);
+  });
+  // Add button
+  const add = document.createElement('div');
+  add.className = 'add-face';
+  add.innerHTML = '<span style="font-size:1.5rem">+</span><span>Add Face</span>';
+  add.onclick = () => document.getElementById('file-input').click();
+  wrap.appendChild(add);
+}
+
+function selectFace(key, el) {
+  document.querySelectorAll('.face-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  const fd = new FormData();
+  fd.append('mode','faceswap');
+  fd.append('face_key', key);
+  fetch('/set_mode',{method:'POST',body:fd});
+  setMode('faceswap');
+}
+
+// ── Status polling ────────────────────────────────────────────────────────────
 async function pollStatus() {
   try {
     const r = await fetch('/status');
     const d = await r.json();
-    const dot = document.getElementById('liveDot');
-    const txt = document.getElementById('camTxt');
-    if (d.camera) {
-      dot.classList.add('on');
-      txt.textContent = 'CAMERA LIVE';
-    } else {
-      dot.classList.remove('on');
-      txt.textContent = 'NO CAMERA';
+    const dot = document.getElementById('cam-dot');
+    dot.className = 'dot' + (d.camera ? ' live' : '');
+    document.getElementById('cam-txt').textContent =
+      d.camera ? 'CAMERA LIVE' : 'NO CAMERA';
+    if (d.ai_ready !== aiReady) {
+      aiReady = d.ai_ready;
+      updateAiBadge();
     }
-  } catch {}
+  } catch(e) {}
+  setTimeout(pollStatus, 2000);
 }
 
-// ── Upload modal ──────────────────────────────────────────────────────────
-function openModal()  { document.getElementById('modalBg').classList.add('open'); }
-function closeModal() {
-  document.getElementById('modalBg').classList.remove('open');
-  document.getElementById('fileIn').value = '';
-  document.getElementById('faceLabel').value = '';
-  document.getElementById('prev-img').style.display = 'none';
-  document.getElementById('dzCont').style.display = 'block';
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, dur=2000) {
+  const el = document.getElementById('toast');
+  el.textContent = '✓ ' + msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
 }
 
-function previewF(input) {
-  const file = input.files[0];
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 6 && characters[n-1]) {
+    setMode('character');
+    selectChar(characters[n-1].key);
+  }
+  if (e.key.toLowerCase() === 'f') toggleSwap();
+  if (e.key === 'Escape') { setMode('passthrough'); closeResult(); }
+  if (e.key === 'Enter' && currentMode === 'character') generate();
+});
+
+// ── File upload ───────────────────────────────────────────────────────────────
+const fileInput = document.createElement('input');
+fileInput.id = 'file-input';
+fileInput.type = 'file';
+fileInput.accept = 'image/*';
+fileInput.style.display = 'none';
+document.body.appendChild(fileInput);
+fileInput.addEventListener('change', async e => {
+  const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = document.getElementById('prev-img');
-    img.src = e.target.result;
-    img.style.display = 'block';
-    document.getElementById('dzCont').style.display = 'none';
-  };
-  reader.readAsDataURL(file);
-  const lbl = document.getElementById('faceLabel');
-  if (!lbl.value)
-    lbl.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' ');
-}
-
-async function uploadFace() {
-  const file  = document.getElementById('fileIn').files[0];
-  const label = document.getElementById('faceLabel').value.trim();
-  const cat   = document.getElementById('faceCat').value;
-  if (!file)  { toast('Select a photo first', true); return; }
-  if (!label) { toast('Enter a name', true); return; }
-
+  const label = file.name.replace(/\.[^.]+$/, '').replace(/_/g,' ');
   const fd = new FormData();
   fd.append('file', file);
   fd.append('label', label);
-  fd.append('category', cat);
-
-  try {
-    const r = await fetch('/upload_face', {method:'POST', body:fd});
-    const d = await r.json();
-    if (d.status === 'ok') {
-      toast(`✓ ${label} added`);
-      closeModal();
-      await loadFaces();
-      renderFsPanel();
-    } else { toast('Upload failed', true); }
-  } catch { toast('Upload error', true); }
-}
-
-// Drag/drop on upload zone
-const dz = document.getElementById('dropZ');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-dz.addEventListener('drop', e => {
-  e.preventDefault(); dz.classList.remove('drag');
-  if (e.dataTransfer.files.length) {
-    document.getElementById('fileIn').files = e.dataTransfer.files;
-    previewF(document.getElementById('fileIn'));
-  }
+  fd.append('category', 'custom');
+  await fetch('/upload_face',{method:'POST',body:fd});
+  await loadCatalog();
+  toast('Face added: ' + label);
+  fileInput.value = '';
 });
 
-// ── Keyboard shortcuts ────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-  const num = parseInt(e.key);
-  if (num >= 1 && num <= 6 && characters[num-1]) {
-    selectChar(characters[num-1].key);
-  }
-  if (e.key === 'Escape') {
-    closeModal();
-    closeFaceSwap();
-    setTopMode('passthrough');
-  }
-  if (e.key === 'f' || e.key === 'F') openFaceSwap();
-});
-
-// ── Toast ─────────────────────────────────────────────────────────────────
-function toast(msg, err=false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show' + (err ? ' err' : '');
-  clearTimeout(t._t);
-  t._t = setTimeout(() => t.className = '', 2600);
-}
+init();
 </script>
 </body>
 </html>
