@@ -17,6 +17,15 @@ import threading
 import time
 from pathlib import Path
 
+# ── onnxruntime compatibility patch ───────────────────────────────────────────
+# onnxruntime-directml 1.24+ removed set_default_logger_severity but rembg calls it
+try:
+    import onnxruntime as _ort
+    if not hasattr(_ort, 'set_default_logger_severity'):
+        _ort.set_default_logger_severity = lambda level: None
+except Exception:
+    pass
+
 # ── rembg ─────────────────────────────────────────────────────────────────────
 try:
     from rembg import remove, new_session
