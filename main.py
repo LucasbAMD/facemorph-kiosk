@@ -179,7 +179,7 @@ async def upload_face(
 @app.get("/face_thumb")
 async def face_thumb(key: str):
     """Serve face thumbnail from catalog."""
-    entry = processor.face_catalog.get(key)
+    entry = processor.catalog.get(key)
     if not entry:
         raise HTTPException(404, "Face not found")
     return FileResponse(entry["path"])
@@ -188,7 +188,7 @@ async def face_thumb(key: str):
 @app.post("/reload_catalog")
 async def reload_catalog():
     processor.reload_catalog()
-    return {"status": "ok", "count": len(processor.face_catalog)}
+    return {"status": "ok", "count": len(processor.catalog)}
 
 
 @app.get("/status")
@@ -197,9 +197,9 @@ async def status():
         has_frame = latest_frame is not None
     return {
         "camera": has_frame,
-        "mode": processor.current_mode,
-        "face_key": processor.current_face_key,
-        "face_count": len(processor.face_catalog),
+        "mode": processor.mode,
+        "face_key": processor.face_key,
+        "face_count": len(processor.catalog),
     }
 
 
