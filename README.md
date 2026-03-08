@@ -84,7 +84,6 @@ Built for: **AMD Threadripper 9995X + Radeon Pro W7900**
 | `setup_ubuntu.sh` | Full Ubuntu + ROCm + ComfyUI setup |
 | `install.py` | Windows live-mode setup |
 | `start.py` | Launch kiosk |
-| `launch_comfy.py` | Start ComfyUI from Python |
 | `main.py` | FastAPI backend |
 | `face_processor.py` | Live body transforms |
 | `comfy_bridge.py` | ComfyUI AI generation bridge |
