@@ -14,13 +14,15 @@ import numpy as np
 
 COMFY_URL = "http://127.0.0.1:8188"
 
+# denoise: lower = more pose preserved. 0.55-0.65 is the sweet spot for pose fidelity.
+# cnet_strength: higher = ControlNet edges dominate generation.
 CHARACTER_PROMPTS = {
-    "navi":     {"positive":"Na'vi Avatar alien, bioluminescent blue skin, glowing cyan face markings, large amber eyes, Pandora jungle, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon","denoise":0.75,"cnet_strength":0.80},
-    "hulk":     {"positive":"Incredible Hulk Marvel, massive green muscles, green skin, torn purple pants, angry, cinematic, photorealistic, 8k","negative":"normal skin, cartoon, ugly, blurry","denoise":0.78,"cnet_strength":0.75},
-    "thanos":   {"positive":"Thanos Marvel villain, purple wrinkled skin, gold armor, strong jaw, cosmic background, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon","denoise":0.76,"cnet_strength":0.75},
-    "predator": {"positive":"Predator alien warrior, mandibles, dreadlocks, thermal imaging view, jungle, cinematic, detailed, 8k","negative":"human, ugly, blurry, cartoon","denoise":0.72,"cnet_strength":0.70},
-    "ghost":    {"positive":"Ghost Marvel character, pale translucent body, white spectral aura, ethereal glow, dark background, cinematic, 8k","negative":"solid body, ugly, blurry, cartoon","denoise":0.70,"cnet_strength":0.70},
-    "groot":    {"positive":"Groot Guardians of the Galaxy, living tree humanoid, bark skin, wooden body, green leaves, forest, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon","denoise":0.76,"cnet_strength":0.75},
+    "navi":     {"positive":"Na'vi Avatar alien, bioluminescent blue skin, glowing cyan face markings, large amber eyes, Pandora jungle, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.60,"cnet_strength":0.95},
+    "hulk":     {"positive":"Incredible Hulk Marvel, massive green muscles, green skin, torn purple pants, angry, cinematic, photorealistic, 8k","negative":"normal skin, cartoon, ugly, blurry, extra limbs, wrong anatomy","denoise":0.62,"cnet_strength":0.95},
+    "thanos":   {"positive":"Thanos Marvel villain, purple wrinkled skin, gold armor, strong jaw, cosmic background, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.60,"cnet_strength":0.95},
+    "predator": {"positive":"Predator alien warrior, mandibles, dreadlocks, jungle, cinematic, detailed, 8k","negative":"human, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.58,"cnet_strength":0.95},
+    "ghost":    {"positive":"Ghost Marvel character, pale translucent body, white spectral aura, ethereal glow, dark background, cinematic, 8k","negative":"solid body, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.55,"cnet_strength":0.92},
+    "groot":    {"positive":"Groot Guardians of the Galaxy, living tree humanoid, bark skin, wooden body, green leaves, forest, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.60,"cnet_strength":0.95},
 }
 
 def _api(endpoint, data=None, method="GET"):
@@ -59,8 +61,11 @@ def _upload_frame(frame, filename="kiosk.png"):
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())["name"]
 
-def _make_canny(frame):
-    """Compute Canny edges locally and upload — no custom ComfyUI node needed."""
+def _make_canny(frame, selection_mask=None):
+    """
+    Compute Canny edges locally. If a selection mask is provided, zero out
+    background edges so ControlNet focuses only on the selected person's pose.
+    """
     max_dim = 768
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
@@ -68,8 +73,21 @@ def _make_canny(frame):
     nw      = int((w * scale) // 64) * 64
     resized = cv2.resize(frame, (nw, nh))
     gray    = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-    edges   = cv2.Canny(gray, 100, 200)
-    edges3  = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+
+    # Blur slightly to reduce noise before edge detection
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges   = cv2.Canny(blurred, 80, 160)
+
+    # Mask edges to person silhouette only — removes background clutter
+    if selection_mask is not None and not np.all(selection_mask >= 0.99):
+        mask_rs = cv2.resize(selection_mask, (nw, nh))
+        mask_bin = (mask_rs > 0.3).astype(np.uint8)
+        # Dilate slightly so we don't clip body edges
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+        mask_bin = cv2.dilate(mask_bin, k)
+        edges = cv2.bitwise_and(edges, edges, mask=mask_bin)
+
+    edges3 = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
     return _upload_frame(edges3, "kiosk_canny.png")
 
 def _apply_selection_mask(frame, mask):
@@ -98,7 +116,7 @@ def _build_workflow(char_key, image_name, canny_name):
         "6":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["positive"],"clip":["1",1]}},
         "7":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["negative"],"clip":["1",1]}},
         "8":  {"class_type":"ControlNetApply","inputs":{"conditioning":["6",0],"control_net":["2",0],"image":["4",0],"strength":cfg["cnet_strength"]}},
-        "9":  {"class_type":"KSampler","inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],"latent_image":["5",0],"seed":int(time.time())%2**32,"steps":4,"cfg":1.0,"sampler_name":"euler_ancestral","scheduler":"karras","denoise":cfg["denoise"]}},
+        "9":  {"class_type":"KSampler","inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],"latent_image":["5",0],"seed":int(time.time())%2**32,"steps":6,"cfg":1.0,"sampler_name":"euler_ancestral","scheduler":"karras","denoise":cfg["denoise"]}},
         "10": {"class_type":"VAEDecode","inputs":{"samples":["9",0],"vae":["1",2]}},
         "11": {"class_type":"SaveImage","inputs":{"images":["10",0],"filename_prefix":f"kiosk_{char_key}"}},
     }
@@ -111,7 +129,7 @@ def generate_character(frame, char_key, selection_mask=None, timeout=180):
         masked_frame = _apply_selection_mask(frame, selection_mask)
 
         img_name   = _upload_frame(masked_frame)
-        canny_name = _make_canny(masked_frame)
+        canny_name = _make_canny(masked_frame, selection_mask)
         workflow   = _build_workflow(char_key, img_name, canny_name)
         client_id  = uuid.uuid4().hex
         result     = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
