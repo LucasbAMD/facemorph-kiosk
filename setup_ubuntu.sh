@@ -67,7 +67,7 @@ fi
 pip install -q \
     "fastapi==0.111.0" \
     "uvicorn[standard]==0.29.0" \
-    "opencv-python>=4.9.0.80" \
+    "opencv-contrib-python>=4.9.0.80" \
     "numpy>=2.0.0" \
     "Pillow>=11.0.0" \
     "mediapipe>=0.10.30,<0.11" \
@@ -120,6 +120,7 @@ pip uninstall -y comfy-aimdo 2>/dev/null || true
 cd "$COMFY_DIR"
 grep -v "^torch\|^torchvision\|^torchaudio\|comfy.aimdo\|comfy-aimdo" requirements.txt > /tmp/comfy_req.txt
 pip install -q -r /tmp/comfy_req.txt
+pip install -q torchsde kornia spandrel
 cd "$SCRIPT_DIR"
 
 # Verify GPU visible
