@@ -86,34 +86,42 @@ def _upload_frame(frame, filename="kiosk.png"):
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())["name"]
 
-def _make_canny(frame, selection_mask=None):
+def _make_control_image(frame, selection_mask=None, skeleton=None):
     """
-    Compute Canny edges locally. If a selection mask is provided, zero out
-    background edges so ControlNet focuses only on the selected person's pose.
+    Build the ControlNet guidance image:
+    - If skeleton (MediaPipe pose) is available: use it — best pose fidelity
+    - Otherwise: fall back to Canny edges masked to person silhouette
     """
     max_dim = 768
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
     nw      = int((w * scale) // 64) * 64
-    resized = cv2.resize(frame, (nw, nh))
-    gray    = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
 
-    # Blur slightly to reduce noise before edge detection
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges   = cv2.Canny(blurred, 100, 200)
+    if skeleton is not None:
+        # Use pose skeleton — white lines on black, perfectly captures body pose
+        ctrl = cv2.resize(skeleton, (nw, nh))
+        return _upload_frame(ctrl, "kiosk_control.png")
 
-    # Mask edges to person silhouette only — removes background clutter
+    # Fallback: Canny edges
+    resized  = cv2.resize(frame, (nw, nh))
+    gray     = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+    blurred  = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges    = cv2.Canny(blurred, 100, 200)
+
     if selection_mask is not None and not np.all(selection_mask >= 0.99):
-        mask_rs = cv2.resize(selection_mask, (nw, nh))
+        mask_rs  = cv2.resize(selection_mask, (nw, nh))
         mask_bin = (mask_rs > 0.3).astype(np.uint8)
-        # Dilate slightly so we don't clip body edges
-        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+        k        = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
         mask_bin = cv2.dilate(mask_bin, k)
-        edges = cv2.bitwise_and(edges, edges, mask=mask_bin)
+        edges    = cv2.bitwise_and(edges, edges, mask=mask_bin)
 
     edges3 = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-    return _upload_frame(edges3, "kiosk_canny.png")
+    return _upload_frame(edges3, "kiosk_control.png")
+
+# Keep old name as alias
+def _make_canny(frame, selection_mask=None):
+    return _make_control_image(frame, selection_mask, None)
 
 def _apply_selection_mask(frame, mask):
     """
@@ -136,7 +144,7 @@ def _build_workflow(char_key, image_name, canny_name):
         "1":  {"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":"sd_xl_turbo_1.0_fp16.safetensors"}},
         "2":  {"class_type":"ControlNetLoader","inputs":{"control_net_name":"control-lora-canny-rank128.safetensors"}},
         "3":  {"class_type":"LoadImage","inputs":{"image":image_name}},
-        "4":  {"class_type":"LoadImage","inputs":{"image":canny_name}},
+        "4":  {"class_type":"LoadImage","inputs":{"image":control_name}},
         "5":  {"class_type":"VAEEncode","inputs":{"pixels":["3",0],"vae":["1",2]}},
         "6":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["positive"],"clip":["1",1]}},
         "7":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["negative"],"clip":["1",1]}},
@@ -176,11 +184,10 @@ def generate_character(frame, char_key, selection_mask=None, timeout=180):
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
-        # Blur background before sending to AI so model focuses on the person
-        # This prevents the AI from generating extra figures from background edges
-        prepped    = _blur_background(frame, selection_mask)
-        img_name   = _upload_frame(prepped)
-        canny_name = _make_canny(prepped, selection_mask)
+        # Blur background so model focuses on the person
+        prepped      = _blur_background(frame, selection_mask)
+        img_name     = _upload_frame(prepped)
+        control_name = _make_control_image(prepped, selection_mask, skeleton)
         workflow   = _build_workflow(char_key, img_name, canny_name)
         client_id  = uuid.uuid4().hex
         result     = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
