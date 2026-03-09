@@ -4,555 +4,514 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AMD ADAPT KIOSK</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&family=Space+Mono&display=swap" rel="stylesheet">
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  :root{
-    --cyan:#00d4ff;--pink:#ff0080;--dark:#050a0f;--card:#0d1b26;
-    --border:#1a3a4a;--text:#c8e8f0;
+  :root {
+    --amd-red: #ED1C24;
+    --amd-dark: #0a0a0a;
+    --amd-gray: #1a1a1a;
+    --amd-light: #2a2a2a;
+    --text: #f0f0f0;
+    --cyan: #00d4ff;
+    --dim: #555;
   }
-  body{background:var(--dark);color:var(--text);font-family:'Rajdhani',sans-serif;
-       height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
-
-  /* ── HEADER ── */
-  #header{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:10px 20px;background:rgba(0,0,0,0.6);border-bottom:1px solid var(--border);
-    z-index:100;flex-shrink:0
-  }
-  #logo{font-family:'Bebas Neue';font-size:2rem;letter-spacing:3px}
-  #logo span{color:var(--cyan)}
-  #logo b{color:var(--pink)}
-  #hdr-right{display:flex;align-items:center;gap:16px}
-  #cam-status{display:flex;align-items:center;gap:6px;font-family:'Space Mono';font-size:.7rem}
-  .dot{width:8px;height:8px;border-radius:50%;background:#333}
-  .dot.live{background:#00ff88;box-shadow:0 0 8px #00ff88}
-  #mode-label{font-family:'Bebas Neue';font-size:1.2rem;color:var(--cyan);letter-spacing:2px}
-
-  /* ── MODE PILLS ── */
-  #mode-bar{display:flex;gap:8px;align-items:center}
-  .pill{
-    padding:5px 14px;border-radius:20px;border:1px solid var(--border);
-    font-family:'Space Mono';font-size:.65rem;letter-spacing:1px;cursor:pointer;
-    background:transparent;color:#6a9ab0;transition:.2s;text-transform:uppercase
-  }
-  .pill:hover{border-color:var(--cyan);color:var(--cyan)}
-  .pill.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.12)}
-
-  /* ── VIDEO AREA ── */
-  #video-wrap{
-    flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;
-    background:#000
-  }
-  #video-feed{width:100%;height:100%;object-fit:cover}
-
-  /* Corner brackets */
-  .corner{position:absolute;width:28px;height:28px;border-color:var(--cyan);border-style:solid;opacity:.7}
-  .corner.tl{top:12px;left:12px;border-width:2px 0 0 2px}
-  .corner.tr{top:12px;right:12px;border-width:2px 2px 0 0}
-  .corner.bl{bottom:12px;left:12px;border-width:0 0 2px 2px}
-  .corner.br{bottom:12px;right:12px;border-width:0 2px 2px 0}
-
-  /* Character name overlay */
-  #char-label{
-    position:absolute;top:0;left:50%;transform:translateX(-50%);
-    text-align:center;padding:14px 30px 8px;pointer-events:none;
-    display:none
-  }
-  #char-name{font-family:'Bebas Neue';font-size:3rem;letter-spacing:4px;
-              text-shadow:0 0 30px currentColor;line-height:1}
-  #char-sub{font-family:'Space Mono';font-size:.6rem;letter-spacing:3px;
-             opacity:.7;margin-top:2px}
-
-  /* ── GENERATE BUTTON ── */
-  #gen-btn{
-    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
-    background:linear-gradient(135deg,var(--pink),var(--cyan));
-    border:none;border-radius:8px;padding:14px 48px;
-    font-family:'Bebas Neue';font-size:1.8rem;letter-spacing:3px;color:#000;
-    cursor:pointer;transition:.15s;box-shadow:0 0 30px rgba(0,212,255,.4);
-    display:none;z-index:50
-  }
-  #gen-btn:hover{transform:translateX(-50%) scale(1.05);box-shadow:0 0 50px rgba(255,0,128,.6)}
-  #gen-btn:active{transform:translateX(-50%) scale(0.97)}
-  #gen-btn:disabled{opacity:.5;cursor:default}
-
-  /* ── AI RESULT OVERLAY ── */
-  #result-overlay{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;background:rgba(0,0,0,.92);
-    z-index:200;opacity:0;pointer-events:none;transition:opacity .4s
-  }
-  #result-overlay.show{opacity:1;pointer-events:all}
-  #result-img{
-    max-width:90%;max-height:75vh;border-radius:8px;
-    border:2px solid var(--cyan);box-shadow:0 0 60px rgba(0,212,255,.5)
-  }
-  #result-actions{display:flex;gap:16px;margin-top:20px}
-  .result-btn{
-    padding:10px 32px;border-radius:6px;font-family:'Bebas Neue';font-size:1.3rem;
-    letter-spacing:2px;cursor:pointer;border:2px solid;transition:.15s
-  }
-  #btn-back{border-color:var(--border);color:var(--text);background:transparent}
-  #btn-back:hover{border-color:var(--cyan);color:var(--cyan)}
-  #btn-save{border-color:var(--cyan);color:#000;background:var(--cyan)}
-  #btn-save:hover{background:var(--pink);border-color:var(--pink)}
-
-  /* ── GENERATING OVERLAY ── */
-  #gen-overlay{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;background:rgba(0,0,0,.8);
-    z-index:190;opacity:0;pointer-events:none;transition:opacity .3s
-  }
-  #gen-overlay.show{opacity:1;pointer-events:all}
-  #gen-spinner{
-    width:80px;height:80px;border-radius:50%;
-    border:4px solid var(--border);border-top-color:var(--cyan);
-    animation:spin 1s linear infinite;margin-bottom:20px
-  }
-  #gen-text{font-family:'Bebas Neue';font-size:2rem;letter-spacing:3px;color:var(--cyan)}
-  #gen-sub{font-family:'Space Mono';font-size:.7rem;color:#6a9ab0;margin-top:8px}
-  @keyframes spin{to{transform:rotate(360deg)}}
-
-  /* ── CHARACTER BAR ── */
-  #char-bar{
-    flex-shrink:0;height:200px;background:rgba(0,0,0,.85);
-    border-top:1px solid var(--border);padding:14px 20px;
-    display:flex;flex-direction:column;gap:8px
-  }
-  #bar-label{
-    font-family:'Space Mono';font-size:.6rem;letter-spacing:3px;
-    color:#3a6a7a;display:flex;justify-content:space-between
-  }
-  #char-cards{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
-  #char-cards::-webkit-scrollbar{height:2px}
-  #char-cards::-webkit-scrollbar-thumb{background:var(--border)}
-
-  .char-card{
-    flex-shrink:0;width:130px;border:1px solid var(--border);border-radius:10px;
-    padding:12px 10px;cursor:pointer;transition:.2s;background:var(--card);
-    position:relative;text-align:center
-  }
-  .char-card:hover{border-color:var(--cyan);background:rgba(0,212,255,.06)}
-  .char-card.active{border-width:2px}
-  .char-card .num{
-    position:absolute;top:6px;right:8px;font-family:'Space Mono';
-    font-size:.6rem;color:#3a6a7a
-  }
-  .char-card .emoji{font-size:2rem;display:block;margin-bottom:6px}
-  .char-card .cname{font-family:'Bebas Neue';font-size:1.1rem;letter-spacing:1px}
-  .char-card .csub{font-size:.6rem;color:#6a9ab0;margin-top:2px;
-                    font-family:'Space Mono';white-space:nowrap;overflow:hidden}
-
-  /* ── TOAST ── */
-  #toast{
-    position:fixed;bottom:220px;left:50%;transform:translateX(-50%);
-    background:rgba(0,212,255,.15);border:1px solid var(--cyan);
-    padding:10px 24px;border-radius:6px;font-family:'Space Mono';font-size:.75rem;
-    color:var(--cyan);opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;
-    letter-spacing:1px
-  }
-  #toast.show{opacity:1}
-
-  /* ── AI BADGE ── */
-  #ai-badge{
-    position:absolute;top:14px;right:14px;
-    background:linear-gradient(135deg,rgba(255,0,128,.3),rgba(0,212,255,.3));
-    border:1px solid var(--cyan);border-radius:20px;padding:4px 12px;
-    font-family:'Space Mono';font-size:.6rem;letter-spacing:1px;color:var(--cyan);
-    display:none
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--amd-dark);
+    color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
   }
 
-  /* face swap panel */
-  #swap-panel{
-    position:fixed;bottom:0;left:0;right:0;height:220px;
-    background:rgba(5,15,25,.97);border-top:1px solid var(--border);
-    z-index:400;transform:translateY(100%);transition:.3s ease
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: #111;
+    border-bottom: 2px solid var(--amd-red);
+    flex-shrink: 0;
   }
-  #swap-panel.open{transform:translateY(0)}
-  #swap-inner{padding:16px 20px;height:100%;display:flex;flex-direction:column;gap:10px}
-  #swap-header{display:flex;justify-content:space-between;align-items:center}
-  #swap-title{font-family:'Space Mono';font-size:.7rem;letter-spacing:2px;color:#6a9ab0}
-  #swap-close{background:none;border:1px solid var(--border);color:var(--text);
-               padding:4px 12px;border-radius:4px;cursor:pointer;font-size:.7rem}
-  #swap-faces{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
-  .face-card{
-    flex-shrink:0;width:90px;border:2px solid var(--border);border-radius:8px;
-    overflow:hidden;cursor:pointer;transition:.2s
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-amd {
+    background: var(--amd-red);
+    color: white;
+    font-weight: 900;
+    font-size: 1.3rem;
+    padding: 4px 10px;
+    letter-spacing: 2px;
   }
-  .face-card:hover{border-color:var(--cyan)}
-  .face-card.active{border-color:var(--pink)}
-  .face-card img{width:100%;height:70px;object-fit:cover;display:block}
-  .face-card .flabel{font-size:.6rem;padding:4px;text-align:center;
-                      font-family:'Space Mono';white-space:nowrap;overflow:hidden}
-  .add-face{
-    flex-shrink:0;width:90px;height:100px;border:2px dashed var(--border);
-    border-radius:8px;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;cursor:pointer;transition:.2s;font-size:.65rem;
-    color:#3a6a7a;gap:6px
+  .logo-text { font-size: 1.1rem; font-weight: 300; letter-spacing: 4px; color: #ccc; }
+  #comfy-badge {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #222;
+    border: 1px solid var(--dim);
+    color: var(--dim);
   }
-  .add-face:hover{border-color:var(--cyan);color:var(--cyan)}
+  #comfy-badge.online { border-color: #22dd44; color: #22dd44; }
+
+  /* ── Main layout ── */
+  main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  /* ── Camera panel ── */
+  #cam-panel {
+    flex: 1;
+    position: relative;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: crosshair;
+  }
+  #feed {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* Selection hint overlay */
+  #select-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: var(--cyan);
+    font-size: 0.85rem;
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--cyan);
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #select-hint.hidden { opacity: 0; }
+
+  /* Selected count badge */
+  #selected-badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    background: var(--cyan);
+    color: #000;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    display: none;
+  }
+  #selected-badge.visible { display: block; }
+
+  /* Clear selection btn */
+  #clear-sel-btn {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    background: transparent;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: none;
+  }
+  #clear-sel-btn.visible { display: block; }
+
+  /* AI Result overlay */
+  #result-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    display: none;
+  }
+  #result-overlay.visible { display: flex; }
+  #result-img { max-height: 75vh; max-width: 90%; border-radius: 8px; }
+  #result-close {
+    background: var(--amd-red);
+    color: white;
+    border: none;
+    padding: 12px 36px;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  /* Generating spinner */
+  #gen-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  #gen-overlay.visible { display: flex; }
+  .spinner {
+    width: 52px; height: 52px;
+    border: 4px solid #333;
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #gen-msg { color: var(--cyan); font-size: 1rem; letter-spacing: 1px; }
+
+  /* ── Right sidebar ── */
+  aside {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--amd-gray);
+    border-left: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .section-title {
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+    padding: 14px 18px 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  /* Character grid */
+  #char-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+  .char-card {
+    background: var(--amd-light);
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 12px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .char-card:hover { border-color: #555; background: #333; }
+  .char-card.active { border-color: var(--cyan); background: rgba(0,212,255,0.08); }
+  .char-emoji { font-size: 1.6rem; margin-bottom: 4px; }
+  .char-name { font-size: 0.78rem; font-weight: 600; }
+  .char-sub  { font-size: 0.6rem; color: var(--dim); margin-top: 2px; }
+  .char-card.ai-ready .char-name::after {
+    content: " ✦";
+    color: var(--cyan);
+    font-size: 0.65rem;
+  }
+
+  /* Transform button */
+  #transform-section {
+    padding: 14px;
+    border-top: 1px solid #2a2a2a;
+    margin-top: auto;
+  }
+  #transform-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--amd-red);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    text-transform: uppercase;
+  }
+  #transform-btn:hover { opacity: 0.88; transform: scale(1.01); }
+  #transform-btn:active { transform: scale(0.98); }
+  #transform-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  #selection-status {
+    font-size: 0.72rem;
+    color: var(--cyan);
+    text-align: center;
+    padding: 8px 0 4px;
+    min-height: 22px;
+  }
+  #selection-status.all { color: var(--dim); }
+
+  /* Error toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #c0392b;
+    color: white;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    display: none;
+    z-index: 999;
+  }
+  #toast.visible { display: block; }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<div id="header">
-  <div id="logo"><span>AMD</span><b>ADAPT</b></div>
-  <div id="mode-bar">
-    <button class="pill active" onclick="setMode('character')">CHARACTER</button>
-    <button class="pill" onclick="setMode('minecraft')">MINECRAFT</button>
-    <button class="pill" onclick="setMode('cyberpunk')">CYBERPUNK</button>
-    <button class="pill" onclick="toggleSwap()">FACE SWAP ↑</button>
-    <button class="pill" onclick="setMode('passthrough')">LIVE</button>
+<header>
+  <div class="logo">
+    <span class="logo-amd">AMD</span>
+    <span class="logo-text">ADAPT KIOSK</span>
   </div>
-  <div id="hdr-right">
-    <div id="cam-status"><div class="dot" id="cam-dot"></div><span id="cam-txt">CAMERA</span></div>
-    <div id="mode-label">NA'VI</div>
-  </div>
-</div>
+  <div id="comfy-badge">AI ENGINE ●</div>
+</header>
 
-<!-- VIDEO -->
-<div id="video-wrap">
-  <img id="video-feed" src="/video_feed">
-  <div class="corner tl"></div>
-  <div class="corner tr"></div>
-  <div class="corner bl"></div>
-  <div class="corner br"></div>
+<main>
+  <!-- Camera feed -->
+  <div id="cam-panel">
+    <img id="feed" src="/video_feed" alt="Camera Feed">
 
-  <div id="char-label">
-    <div id="char-name">NA'VI</div>
-    <div id="char-sub">AVATAR · PANDORA</div>
-  </div>
+    <div id="selected-badge"></div>
+    <button id="clear-sel-btn" onclick="clearSelection()">✕ Clear Selection</button>
 
-  <div id="ai-badge">⚡ AI READY</div>
+    <div id="select-hint">Tap a person to select them for transformation</div>
 
-  <!-- GENERATE BUTTON -->
-  <button id="gen-btn" onclick="generate()">⚡ TRANSFORM ME</button>
+    <!-- Generating spinner -->
+    <div id="gen-overlay">
+      <div class="spinner"></div>
+      <div id="gen-msg">Transforming...</div>
+    </div>
 
-  <!-- GENERATING spinner -->
-  <div id="gen-overlay">
-    <div id="gen-spinner"></div>
-    <div id="gen-text">GENERATING...</div>
-    <div id="gen-sub">AI is transforming you into the character</div>
-  </div>
-
-  <!-- AI RESULT reveal -->
-  <div id="result-overlay">
-    <img id="result-img" src="">
-    <div id="result-actions">
-      <button class="result-btn" id="btn-back" onclick="closeResult()">← TRY AGAIN</button>
-      <button class="result-btn" id="btn-save" onclick="saveResult()">💾 SAVE</button>
+    <!-- AI result -->
+    <div id="result-overlay">
+      <img id="result-img" src="" alt="AI Result">
+      <button id="result-close" onclick="closeResult()">← Back to Camera</button>
     </div>
   </div>
-</div>
 
-<!-- CHARACTER BAR -->
-<div id="char-bar">
-  <div id="bar-label">
-    <span>CHOOSE YOUR CHARACTER</span>
-    <span>Keys 1–6 to switch · ESC = live view</span>
-  </div>
-  <div id="char-cards"></div>
-</div>
+  <!-- Sidebar -->
+  <aside>
+    <div class="section-title">Choose Character</div>
+    <div id="char-grid"><!-- populated by JS --></div>
 
-<!-- FACE SWAP PANEL -->
-<div id="swap-panel">
-  <div id="swap-inner">
-    <div id="swap-header">
-      <div id="swap-title">FACE SWAP LIBRARY — pick a face</div>
-      <button id="swap-close" onclick="toggleSwap()">✕ CLOSE</button>
+    <div id="transform-section">
+      <div id="selection-status" class="all">All people will be transformed</div>
+      <button id="transform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
     </div>
-    <div id="swap-faces"></div>
-  </div>
-</div>
+  </aside>
+</main>
 
 <div id="toast"></div>
 
 <script>
-// ── State ─────────────────────────────────────────────────────────────────────
-let characters = [];
-let currentChar = null;
-let currentMode = 'character';
-let aiReady = false;
-let polling = null;
+let selectedChar  = "navi";
+let pollTimer     = null;
+let faceCount     = 0;
+let selCount      = 0;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   await loadCharacters();
-  await loadCatalog();
-  pollStatus();
-  // Select first character
-  if (characters.length) selectChar(characters[0].key);
+  checkComfy();
+  setInterval(checkComfy, 8000);
 }
 
 async function loadCharacters() {
-  const r = await fetch('/characters');
-  const d = await r.json();
-  characters = d.characters;
-  aiReady = characters.some(c => c.ai_ready);
-  renderCharCards();
-  updateAiBadge();
+  try {
+    const r    = await fetch("/characters");
+    const data = await r.json();
+    const grid = document.getElementById("char-grid");
+    grid.innerHTML = "";
+    data.characters.forEach(c => {
+      const card = document.createElement("div");
+      card.className = `char-card${c.ai_ready ? " ai-ready" : ""}${c.key === selectedChar ? " active" : ""}`;
+      card.dataset.key = c.key;
+      card.innerHTML = `
+        <div class="char-emoji">${c.emoji}</div>
+        <div class="char-name">${c.label}</div>
+        <div class="char-sub">${c.subtitle}</div>`;
+      card.onclick = () => selectChar(c.key, card);
+      grid.appendChild(card);
+    });
+  } catch(e) { showToast("Couldn't load characters"); }
 }
 
-function renderCharCards() {
-  const wrap = document.getElementById('char-cards');
-  wrap.innerHTML = '';
-  characters.forEach((c, i) => {
-    const div = document.createElement('div');
-    div.className = 'char-card';
-    div.id = `card-${c.key}`;
-    div.style.setProperty('--c', c.color);
-    div.onclick = () => selectChar(c.key);
-    div.innerHTML = `
-      <span class="num">${i+1}</span>
-      <span class="emoji">${c.emoji}</span>
-      <div class="cname" style="color:${c.color}">${c.label}</div>
-      <div class="csub">${c.subtitle}</div>`;
-    wrap.appendChild(div);
-  });
+function selectChar(key, card) {
+  selectedChar = key;
+  document.querySelectorAll(".char-card").forEach(c => c.classList.remove("active"));
+  card.classList.add("active");
 }
 
-function updateAiBadge() {
-  const badge = document.getElementById('ai-badge');
-  const btn   = document.getElementById('gen-btn');
-  if (aiReady && currentMode === 'character') {
-    badge.style.display = 'block';
-    btn.style.display = 'block';
+async function checkComfy() {
+  try {
+    const r    = await fetch("/comfy_status");
+    const data = await r.json();
+    const badge = document.getElementById("comfy-badge");
+    badge.textContent = data.available ? "AI ENGINE ●" : "AI ENGINE ○";
+    badge.classList.toggle("online", data.available);
+  } catch(e) {}
+}
+
+// ── Camera click → person selection ──────────────────────────────────────────
+document.getElementById("cam-panel").addEventListener("click", async function(e) {
+  // Ignore clicks on buttons/overlays
+  if (e.target.tagName === "BUTTON" || e.target.tagName === "IMG" && e.target.id === "result-img") return;
+  if (document.getElementById("result-overlay").classList.contains("visible")) return;
+  if (document.getElementById("gen-overlay").classList.contains("visible")) return;
+
+  const feed = document.getElementById("feed");
+  const rect = feed.getBoundingClientRect();
+
+  // Click position relative to feed image
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+  const frameW = rect.width;
+  const frameH = rect.height;
+
+  const fd = new FormData();
+  fd.append("click_x", clickX);
+  fd.append("click_y", clickY);
+  fd.append("frame_w", frameW);
+  fd.append("frame_h", frameH);
+
+  try {
+    const r    = await fetch("/select_person", {method:"POST", body:fd});
+    const data = await r.json();
+    updateSelectionUI(data.faces);
+  } catch(e) {}
+});
+
+function updateSelectionUI(faces) {
+  faceCount = faces.length;
+  selCount  = faces.filter(f => f.selected).length;
+
+  const badge    = document.getElementById("selected-badge");
+  const clearBtn = document.getElementById("clear-sel-btn");
+  const status   = document.getElementById("selection-status");
+  const hint     = document.getElementById("select-hint");
+
+  if (selCount > 0) {
+    badge.textContent = `${selCount} selected`;
+    badge.classList.add("visible");
+    clearBtn.classList.add("visible");
+    status.textContent = `Transforming ${selCount} of ${faceCount} people`;
+    status.className = "";
+    hint.classList.add("hidden");
   } else {
-    badge.style.display = 'none';
-    btn.style.display = currentMode === 'character' ? 'block' : 'none';
-    if (!aiReady && btn.style.display === 'block') {
-      btn.textContent = '⚡ TRANSFORM ME';
-      btn.title = 'Start ComfyUI for AI quality. See launch_comfy.py';
-    }
+    badge.classList.remove("visible");
+    clearBtn.classList.remove("visible");
+    status.textContent = faceCount > 0 ? "Tap someone to select · or transform all" : "All people will be transformed";
+    status.className = "all";
+    hint.classList.toggle("hidden", faceCount === 0);
   }
 }
 
-// ── Character selection ───────────────────────────────────────────────────────
-function selectChar(key) {
-  currentChar = key;
-  const cfg = characters.find(c => c.key === key);
-  if (!cfg) return;
-
-  // Update cards
-  document.querySelectorAll('.char-card').forEach(el => {
-    el.classList.remove('active');
-    el.style.borderColor = '';
-  });
-  const card = document.getElementById(`card-${key}`);
-  if (card) {
-    card.classList.add('active');
-    card.style.borderColor = cfg.color;
-  }
-
-  // Update header label
-  document.getElementById('mode-label').textContent = cfg.label.toUpperCase();
-
-  // Update character overlay
-  document.getElementById('char-name').textContent = cfg.label.toUpperCase();
-  document.getElementById('char-name').style.color = cfg.color;
-  document.getElementById('char-sub').textContent  = cfg.subtitle.toUpperCase();
-  const lbl = document.getElementById('char-label');
-  lbl.style.display = currentMode === 'character' ? 'block' : 'none';
-
-  // Send to server
-  const fd = new FormData();
-  fd.append('mode', 'character');
-  fd.append('character', key);
-  fetch('/set_mode', {method:'POST', body:fd});
+async function clearSelection() {
+  await fetch("/clear_selection", {method:"POST"});
+  updateSelectionUI([]);
 }
 
-// ── Mode switching ────────────────────────────────────────────────────────────
-function setMode(mode) {
-  currentMode = mode;
-  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-
-  const labels = {character:'CHARACTER',minecraft:'MINECRAFT',
-                  cyberpunk:'CYBERPUNK',faceswap:'FACE SWAP ↑',passthrough:'LIVE'};
-  document.querySelectorAll('.pill').forEach(p => {
-    const txt = p.textContent.trim();
-    if (txt === labels[mode]) p.classList.add('active');
-  });
-
-  const fd = new FormData();
-  fd.append('mode', mode);
-  if (mode === 'character' && currentChar) fd.append('character', currentChar);
-  fetch('/set_mode', {method:'POST', body:fd});
-
-  // Show/hide UI elements
-  document.getElementById('char-label').style.display =
-    mode === 'character' ? 'block' : 'none';
-  document.getElementById('gen-btn').style.display =
-    mode === 'character' ? 'block' : 'none';
-  updateAiBadge();
-}
-
-// ── AI Generation ─────────────────────────────────────────────────────────────
-async function generate() {
-  if (!currentChar) return;
-  const btn = document.getElementById('gen-btn');
+// ── Transform ─────────────────────────────────────────────────────────────────
+async function doTransform() {
+  const btn = document.getElementById("transform-btn");
   btn.disabled = true;
 
-  // Show spinner
-  document.getElementById('gen-overlay').classList.add('show');
-  document.getElementById('gen-sub').textContent =
-    aiReady ? 'AI is transforming you — 2-3 seconds...'
-             : 'Processing transform...';
-
-  const fd = new FormData();
-  fd.append('character', currentChar);
+  // Check ComfyUI
   try {
-    const r = await fetch('/generate', {method:'POST', body:fd});
+    const r = await fetch("/comfy_status");
     const d = await r.json();
-    if (d.status === 'generating' || d.status === 'done') {
-      startPolling();
+    if (!d.available) {
+      showToast("AI Engine offline — run ~/start_comfyui.sh in a terminal");
+      btn.disabled = false;
+      return;
+    }
+  } catch(e) { btn.disabled = false; return; }
+
+  // Show spinner
+  document.getElementById("gen-overlay").classList.add("visible");
+  document.getElementById("gen-msg").textContent = selCount > 0
+    ? `Transforming ${selCount} selected person${selCount>1?"s":""}...`
+    : "Transforming...";
+
+  // Start generation
+  const fd = new FormData();
+  fd.append("character", selectedChar);
+  try {
+    const r    = await fetch("/generate", {method:"POST", body:fd});
+    const data = await r.json();
+    if (data.status === "generating" || data.status === "busy") {
+      pollTimer = setInterval(pollStatus, 1000);
     } else {
-      showGenError(d.message || 'Failed to start');
+      hideSpinner();
+      showToast(data.message || "Error starting generation");
+      btn.disabled = false;
     }
   } catch(e) {
-    showGenError('Server error');
+    hideSpinner();
+    showToast("Connection error");
+    btn.disabled = false;
   }
 }
 
-function startPolling() {
-  if (polling) clearInterval(polling);
-  polling = setInterval(async () => {
-    try {
-      const r = await fetch('/generate_status');
-      const d = await r.json();
-      if (d.status === 'done' && d.image) {
-        clearInterval(polling); polling = null;
-        showResult(d.image);
-      } else if (d.status === 'error') {
-        clearInterval(polling); polling = null;
-        showGenError(d.message || 'Generation failed');
-      }
-    } catch(e) {}
-  }, 500);
+async function pollStatus() {
+  try {
+    const r    = await fetch("/generate_status");
+    const data = await r.json();
+    if (data.status === "done" && data.image) {
+      clearInterval(pollTimer);
+      hideSpinner();
+      showResult(data.image);
+      document.getElementById("transform-btn").disabled = false;
+    } else if (data.status === "error") {
+      clearInterval(pollTimer);
+      hideSpinner();
+      showToast("Generation failed: " + (data.message || "unknown error"));
+      document.getElementById("transform-btn").disabled = false;
+    } else if (data.message) {
+      document.getElementById("gen-msg").textContent = data.message;
+    }
+  } catch(e) {}
 }
 
-function showResult(dataUrl) {
-  document.getElementById('gen-overlay').classList.remove('show');
-  document.getElementById('result-img').src = dataUrl;
-  document.getElementById('result-overlay').classList.add('show');
-  document.getElementById('gen-btn').disabled = false;
+function hideSpinner() {
+  document.getElementById("gen-overlay").classList.remove("visible");
 }
 
-function showGenError(msg) {
-  document.getElementById('gen-overlay').classList.remove('show');
-  document.getElementById('gen-btn').disabled = false;
-  toast('Error: ' + msg, 4000);
+function showResult(src) {
+  document.getElementById("result-img").src = src;
+  document.getElementById("result-overlay").classList.add("visible");
 }
 
 function closeResult() {
-  document.getElementById('result-overlay').classList.remove('show');
+  document.getElementById("result-overlay").classList.remove("visible");
+  document.getElementById("result-img").src = "";
 }
 
-function saveResult() {
-  const img = document.getElementById('result-img');
-  const a = document.createElement('a');
-  a.href = img.src;
-  a.download = `amd_adapt_${currentChar}_${Date.now()}.jpg`;
-  a.click();
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("visible");
+  setTimeout(() => t.classList.remove("visible"), 4000);
 }
-
-// ── Face swap panel ───────────────────────────────────────────────────────────
-let swapOpen = false;
-function toggleSwap() {
-  swapOpen = !swapOpen;
-  document.getElementById('swap-panel').classList.toggle('open', swapOpen);
-}
-
-async function loadCatalog() {
-  const r = await fetch('/catalog');
-  const d = await r.json();
-  const wrap = document.getElementById('swap-faces');
-  wrap.innerHTML = '';
-  d.faces.forEach(f => {
-    const div = document.createElement('div');
-    div.className = 'face-card';
-    div.id = `face-${f.key.replace('/','-')}`;
-    div.onclick = () => selectFace(f.key, div);
-    div.innerHTML = `<img src="/face_thumb?key=${encodeURIComponent(f.key)}" loading="lazy">
-                     <div class="flabel">${f.label}</div>`;
-    wrap.appendChild(div);
-  });
-  // Add button
-  const add = document.createElement('div');
-  add.className = 'add-face';
-  add.innerHTML = '<span style="font-size:1.5rem">+</span><span>Add Face</span>';
-  add.onclick = () => document.getElementById('file-input').click();
-  wrap.appendChild(add);
-}
-
-function selectFace(key, el) {
-  document.querySelectorAll('.face-card').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  const fd = new FormData();
-  fd.append('mode','faceswap');
-  fd.append('face_key', key);
-  fetch('/set_mode',{method:'POST',body:fd});
-  setMode('faceswap');
-}
-
-// ── Status polling ────────────────────────────────────────────────────────────
-async function pollStatus() {
-  try {
-    const r = await fetch('/status');
-    const d = await r.json();
-    const dot = document.getElementById('cam-dot');
-    dot.className = 'dot' + (d.camera ? ' live' : '');
-    document.getElementById('cam-txt').textContent =
-      d.camera ? 'CAMERA LIVE' : 'NO CAMERA';
-    if (d.ai_ready !== aiReady) {
-      aiReady = d.ai_ready;
-      updateAiBadge();
-    }
-  } catch(e) {}
-  setTimeout(pollStatus, 2000);
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-function toast(msg, dur=2000) {
-  const el = document.getElementById('toast');
-  el.textContent = '✓ ' + msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), dur);
-}
-
-// ── Keyboard shortcuts ────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-  const n = parseInt(e.key);
-  if (n >= 1 && n <= 6 && characters[n-1]) {
-    setMode('character');
-    selectChar(characters[n-1].key);
-  }
-  if (e.key.toLowerCase() === 'f') toggleSwap();
-  if (e.key === 'Escape') { setMode('passthrough'); closeResult(); }
-  if (e.key === 'Enter' && currentMode === 'character') generate();
-});
-
-// ── File upload ───────────────────────────────────────────────────────────────
-const fileInput = document.createElement('input');
-fileInput.id = 'file-input';
-fileInput.type = 'file';
-fileInput.accept = 'image/*';
-fileInput.style.display = 'none';
-document.body.appendChild(fileInput);
-fileInput.addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const label = file.name.replace(/\.[^.]+$/, '').replace(/_/g,' ');
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('label', label);
-  fd.append('category', 'custom');
-  await fetch('/upload_face',{method:'POST',body:fd});
-  await loadCatalog();
-  toast('Face added: ' + label);
-  fileInput.value = '';
-});
 
 init();
 </script>
