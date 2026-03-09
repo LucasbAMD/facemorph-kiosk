@@ -216,8 +216,13 @@ class FaceProcessor:
         self.face_det = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
+        # Full-body HOG detector
+        self.hog = cv2.HOGDescriptor()
+        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+
         # Detection state
         self._detected_faces   = []   # [(x,y,w,h), ...]
+        self._pending_crops    = {}   # index → face crop saved at selection time
         self._recognized_names = {}   # face index → name string
         self._selected_people  = set()
         self._frame_size       = (0, 0)
@@ -320,21 +325,37 @@ class FaceProcessor:
 
     # ── Face naming ───────────────────────────────────────────────────────────
     def name_selected_face(self, index, name, frame):
-        """Extract face crop at given index and teach the recognizer."""
+        """Use saved crop from selection time, or re-detect from current frame."""
         with self._lock:
+            crop = self._pending_crops.get(index)
             faces = list(self._detected_faces)
-        if index >= len(faces): return False
-        x, y, w, h = faces[index]
-        # Pad crop slightly
-        pad = 10
-        x1 = max(0, x-pad); y1 = max(0, y-pad)
-        x2 = min(frame.shape[1], x+w+pad)
-        y2 = min(frame.shape[0], y+h+pad)
-        crop = frame[y1:y2, x1:x2]
-        if crop.size == 0: return False
-        self.recognizer.learn(crop, name)
-        print(f"[OK] Learned face: {name}")
-        return True
+
+        # Use pre-saved crop if available
+        if crop is not None and crop.size > 0:
+            self.recognizer.learn(crop, name)
+            print(f"[OK] Learned face: {name} (from saved crop)")
+            return True
+
+        # Fallback: detect face from current frame
+        if index < len(faces):
+            x, y, w, h = faces[index]
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            roi  = gray[max(0,y):min(frame.shape[0],y+h),
+                        max(0,x):min(frame.shape[1],x+w)]
+            sub  = self.face_det.detectMultiScale(roi, 1.1, 4, minSize=(30,30))
+            if len(sub) > 0:
+                fx2,fy2,fw2,fh2 = sub[0]
+                crop = frame[y+fy2:y+fy2+fh2, x+fx2:x+fx2+fw2]
+            else:
+                crop = frame[max(0,y):min(frame.shape[0],y+h//3),
+                             max(0,x):min(frame.shape[1],x+w)]
+            if crop is not None and crop.size > 0:
+                self.recognizer.learn(crop, name)
+                print(f"[OK] Learned face: {name} (from current frame)")
+                return True
+
+        print(f"[WARN] Could not extract face crop for {name}")
+        return False
 
     def get_known_names(self):
         return self.recognizer.get_known_names()
@@ -374,12 +395,31 @@ class FaceProcessor:
         with self._lock:
             self._frame_size = (w, h)
 
-        # Detect faces
-        gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self.face_det.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+        # Detect full bodies with HOG, fall back to face detector + body estimate
+        h, w = frame.shape[:2]
+        small = cv2.resize(frame, (w//2, h//2))
+        bodies, _ = self.hog.detectMultiScale(
+            small, winStride=(8,8), padding=(4,4), scale=1.05)
+
+        if len(bodies) > 0:
+            # Scale back up from downsampled frame
+            detected = [(x*2, y*2, bw*2, bh*2) for (x,y,bw,bh) in bodies]
+        else:
+            # HOG found nothing — fall back to face detector, expand box to body
+            gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = self.face_det.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+            detected = []
+            for (fx, fy, fw, fh) in (faces if len(faces) > 0 else []):
+                # Expand face box to full body estimate
+                body_x = max(0, fx - fw//2)
+                body_y = max(0, fy - fh//2)
+                body_w = min(w - body_x, fw * 2)
+                body_h = min(h - body_y, fh * 5)
+                detected.append((body_x, body_y, body_w, body_h))
+
         with self._lock:
-            self._detected_faces = [tuple(f) for f in faces] if len(faces) > 0 else []
+            self._detected_faces = detected
             self._selected_people = {
                 i for i in self._selected_people if i < len(self._detected_faces)}
             sel   = set(self._selected_people)
