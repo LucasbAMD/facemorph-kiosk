@@ -1,5 +1,5 @@
 #!/bin/bash
-# start.sh — AMD Adapt Kiosk launcher
+# start.sh — AMD Adapt Kiosk
 # Usage: bash ~/facemorph-kiosk/start.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -13,8 +13,12 @@ fi
 cd "$SCRIPT_DIR"
 source "$VENV/bin/activate"
 
-# Install any missing packages silently
-pip install -q uvicorn fastapi opencv-contrib-python 2>/dev/null
+# Safety net — fix opencv if mediapipe clobbered it
+python3 -c "import cv2; cv2.face.LBPHFaceRecognizer_create()" 2>/dev/null || {
+    echo "[..] Fixing opencv-contrib..."
+    pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python 2>/dev/null || true
+    pip install --no-cache-dir "opencv-contrib-python>=4.9.0.80" -q
+}
 
 echo ""
 echo "============================================================"
