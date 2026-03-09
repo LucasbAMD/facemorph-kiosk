@@ -6,17 +6,18 @@
 <title>AMD ADAPT KIOSK</title>
 <style>
   :root {
-    --amd-red: #ED1C24;
-    --amd-dark: #0a0a0a;
-    --amd-gray: #1a1a1a;
-    --amd-light: #2a2a2a;
+    --red:  #ED1C24;
+    --dark: #0a0a0a;
+    --gray: #1a1a1a;
+    --mid:  #2a2a2a;
     --text: #f0f0f0;
     --cyan: #00d4ff;
-    --dim: #555;
+    --gold: #ffcc00;
+    --dim:  #555;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: var(--amd-dark);
+    background: var(--dark);
     color: var(--text);
     font-family: 'Segoe UI', sans-serif;
     height: 100vh;
@@ -26,256 +27,191 @@
     user-select: none;
   }
 
+  /* ── Ticker ── */
+  #ticker-wrap {
+    background: #000;
+    border-bottom: 1px solid #222;
+    height: 30px;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+  }
+  #ticker-wrap::before, #ticker-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 60px;
+    z-index: 2;
+  }
+  #ticker-wrap::before { left: 0;  background: linear-gradient(to right, #000, transparent); }
+  #ticker-wrap::after  { right: 0; background: linear-gradient(to left,  #000, transparent); }
+  .ticker-label {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 120px;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    background: var(--red);
+    color: white;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    z-index: 3;
+  }
+  #ticker-inner {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding-left: 130px;
+    white-space: nowrap;
+    animation: ticker-scroll 60s linear infinite;
+  }
+  @keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 48px;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+  }
+  .ticker-item .ti-cat  { color: var(--red);  font-weight: 700; font-size: 0.6rem; letter-spacing: 2px; }
+  .ticker-item .ti-name { color: var(--text); }
+  .ticker-item .ti-sep  { color: var(--dim); margin: 0 4px; }
+  .ticker-dot { color: #444; font-size: 0.5rem; margin-right: 48px; }
+
   /* ── Header ── */
   header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 24px;
+    padding: 10px 20px;
     background: #111;
-    border-bottom: 2px solid var(--amd-red);
+    border-bottom: 2px solid var(--red);
     flex-shrink: 0;
   }
   .logo { display: flex; align-items: center; gap: 12px; }
-  .logo-amd {
-    background: var(--amd-red);
-    color: white;
-    font-weight: 900;
-    font-size: 1.3rem;
-    padding: 4px 10px;
-    letter-spacing: 2px;
-  }
-  .logo-text { font-size: 1.1rem; font-weight: 300; letter-spacing: 4px; color: #ccc; }
-  #comfy-badge {
-    font-size: 0.75rem;
-    padding: 4px 10px;
-    border-radius: 20px;
-    background: #222;
-    border: 1px solid var(--dim);
-    color: var(--dim);
-  }
+  .logo-amd { background: var(--red); color: white; font-weight: 900; font-size: 1.2rem; padding: 3px 9px; letter-spacing: 2px; }
+  .logo-text { font-size: 1rem; font-weight: 300; letter-spacing: 4px; color: #ccc; }
+  #comfy-badge { font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; background: #222; border: 1px solid var(--dim); color: var(--dim); }
   #comfy-badge.online { border-color: #22dd44; color: #22dd44; }
 
-  /* ── Main layout ── */
-  main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    gap: 0;
-  }
+  /* ── Main ── */
+  main { display: flex; flex: 1; overflow: hidden; }
 
-  /* ── Camera panel ── */
-  #cam-panel {
-    flex: 1;
-    position: relative;
-    background: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: crosshair;
-  }
-  #feed {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-  }
+  /* ── Camera ── */
+  #cam-panel { flex: 1; position: relative; background: #000; cursor: crosshair; }
+  #feed { width: 100%; height: 100%; object-fit: contain; display: block; }
 
-  /* Selection hint overlay */
-  #select-hint {
+  #selected-badge { position: absolute; top: 14px; left: 14px; background: var(--cyan); color: #000; font-weight: 700; font-size: 0.82rem; padding: 5px 13px; border-radius: 20px; display: none; }
+  #selected-badge.on { display: block; }
+  #clear-sel-btn { position: absolute; top: 14px; left: 14px; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); font-size: 0.78rem; padding: 5px 13px; border-radius: 20px; cursor: pointer; display: none; }
+  #clear-sel-btn.on { display: block; }
+
+  /* ── Name tag dialog ── */
+  #name-dialog {
     position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.7);
-    color: var(--cyan);
-    font-size: 0.85rem;
-    padding: 8px 18px;
-    border-radius: 20px;
+    background: #111;
     border: 1px solid var(--cyan);
-    pointer-events: none;
-    transition: opacity 0.3s;
-  }
-  #select-hint.hidden { opacity: 0; }
-
-  /* Selected count badge */
-  #selected-badge {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    background: var(--cyan);
-    color: #000;
-    font-weight: 700;
-    font-size: 0.85rem;
-    padding: 6px 14px;
-    border-radius: 20px;
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 220px;
+    box-shadow: 0 4px 24px rgba(0,212,255,0.2);
     display: none;
-  }
-  #selected-badge.visible { display: block; }
-
-  /* Clear selection btn */
-  #clear-sel-btn {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    background: transparent;
-    color: var(--cyan);
-    border: 1px solid var(--cyan);
-    font-size: 0.8rem;
-    padding: 6px 14px;
-    border-radius: 20px;
-    cursor: pointer;
-    display: none;
-  }
-  #clear-sel-btn.visible { display: block; }
-
-  /* AI Result overlay */
-  #result-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.92);
-    display: flex;
+    z-index: 20;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    display: none;
+    gap: 10px;
   }
-  #result-overlay.visible { display: flex; }
-  #result-img { max-height: 75vh; max-width: 90%; border-radius: 8px; }
-  #result-close {
-    background: var(--amd-red);
-    color: white;
-    border: none;
-    padding: 12px 36px;
+  #name-dialog.on { display: flex; }
+  #name-dialog h4 { font-size: 0.78rem; color: var(--cyan); letter-spacing: 1px; }
+  #name-input {
+    background: #1a1a1a;
+    border: 1px solid #444;
     border-radius: 6px;
-    font-size: 1rem;
-    cursor: pointer;
-    font-weight: 700;
-    letter-spacing: 1px;
+    color: white;
+    padding: 7px 10px;
+    font-size: 0.9rem;
+    outline: none;
+    width: 100%;
   }
+  #name-input:focus { border-color: var(--cyan); }
+  .name-dialog-btns { display: flex; gap: 8px; }
+  .name-dialog-btns button {
+    flex: 1; padding: 7px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 0.8rem; font-weight: 700;
+  }
+  #name-save-btn { background: var(--cyan); color: #000; }
+  #name-cancel-btn { background: #2a2a2a; color: #ccc; }
 
-  /* Generating spinner */
-  #gen-overlay {
+  /* ── Known names panel ── */
+  #known-panel {
     position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 60%;
   }
-  #gen-overlay.visible { display: flex; }
-  .spinner {
-    width: 52px; height: 52px;
-    border: 4px solid #333;
-    border-top-color: var(--cyan);
-    border-radius: 50%;
-    animation: spin 0.9s linear infinite;
+  .known-tag {
+    background: rgba(0,0,0,0.7);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    border-radius: 20px;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
   }
+  .known-tag .forget-x { color: #aa7700; font-size: 0.65rem; margin-left: 2px; }
+  .known-tag:hover .forget-x { color: var(--red); }
+
+  /* ── Generating / result overlays ── */
+  #gen-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 15; }
+  #gen-overlay.on { display: flex; }
+  .spinner { width: 52px; height: 52px; border: 4px solid #333; border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #gen-msg { color: var(--cyan); font-size: 1rem; letter-spacing: 1px; }
 
-  /* ── Right sidebar ── */
-  aside {
-    width: 280px;
-    flex-shrink: 0;
-    background: var(--amd-gray);
-    border-left: 1px solid #333;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+  #result-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.92); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 16; }
+  #result-overlay.on { display: flex; }
+  #result-img { max-height: 75vh; max-width: 90%; border-radius: 8px; }
+  #result-close { background: var(--red); color: white; border: none; padding: 12px 36px; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 700; letter-spacing: 1px; }
 
-  .section-title {
-    font-size: 0.65rem;
-    letter-spacing: 3px;
-    color: var(--dim);
-    text-transform: uppercase;
-    padding: 14px 18px 8px;
-    border-bottom: 1px solid #2a2a2a;
-  }
-
-  /* Character grid */
-  #char-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 12px;
-    overflow-y: auto;
-  }
-  .char-card {
-    background: var(--amd-light);
-    border: 2px solid #333;
-    border-radius: 8px;
-    padding: 12px 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-  }
+  /* ── Sidebar ── */
+  aside { width: 270px; flex-shrink: 0; background: var(--gray); border-left: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+  .section-title { font-size: 0.6rem; letter-spacing: 3px; color: var(--dim); text-transform: uppercase; padding: 12px 16px 8px; border-bottom: 1px solid #222; }
+  #char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 10px; overflow-y: auto; }
+  .char-card { background: var(--mid); border: 2px solid #333; border-radius: 8px; padding: 10px 6px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
   .char-card:hover { border-color: #555; background: #333; }
-  .char-card.active { border-color: var(--cyan); background: rgba(0,212,255,0.08); }
-  .char-emoji { font-size: 1.6rem; margin-bottom: 4px; }
-  .char-name { font-size: 0.78rem; font-weight: 600; }
-  .char-sub  { font-size: 0.6rem; color: var(--dim); margin-top: 2px; }
-  .char-card.ai-ready .char-name::after {
-    content: " ✦";
-    color: var(--cyan);
-    font-size: 0.65rem;
-  }
+  .char-card.active { border-color: var(--cyan); background: rgba(0,212,255,0.07); }
+  .char-emoji { font-size: 1.5rem; margin-bottom: 3px; }
+  .char-name  { font-size: 0.75rem; font-weight: 600; }
+  .char-sub   { font-size: 0.58rem; color: var(--dim); margin-top: 2px; }
+  .char-card.ai-ready .char-name::after { content: " ✦"; color: var(--cyan); font-size: 0.6rem; }
 
-  /* Transform button */
-  #transform-section {
-    padding: 14px;
-    border-top: 1px solid #2a2a2a;
-    margin-top: auto;
-  }
-  #transform-btn {
-    width: 100%;
-    padding: 16px;
-    background: var(--amd-red);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 2px;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-    text-transform: uppercase;
-  }
-  #transform-btn:hover { opacity: 0.88; transform: scale(1.01); }
-  #transform-btn:active { transform: scale(0.98); }
+  #transform-section { padding: 12px; border-top: 1px solid #222; margin-top: auto; }
+  #transform-btn { width: 100%; padding: 14px; background: var(--red); color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700; letter-spacing: 2px; cursor: pointer; text-transform: uppercase; transition: opacity 0.15s; }
+  #transform-btn:hover { opacity: 0.88; }
   #transform-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-  #selection-status {
-    font-size: 0.72rem;
-    color: var(--cyan);
-    text-align: center;
-    padding: 8px 0 4px;
-    min-height: 22px;
-  }
+  #selection-status { font-size: 0.7rem; color: var(--cyan); text-align: center; padding: 7px 0 3px; min-height: 20px; }
   #selection-status.all { color: var(--dim); }
 
-  /* Error toast */
-  #toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #c0392b;
-    color: white;
-    padding: 10px 24px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    display: none;
-    z-index: 999;
-  }
-  #toast.visible { display: block; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #c0392b; color: white; padding: 9px 22px; border-radius: 8px; font-size: 0.83rem; display: none; z-index: 99; }
+  #toast.on { display: block; }
 </style>
 </head>
 <body>
+
+<!-- Ticker -->
+<div id="ticker-wrap">
+  <div class="ticker-label">AMD STACK</div>
+  <div id="ticker-inner"><!-- filled by JS --></div>
+</div>
 
 <header>
   <div class="logo">
@@ -286,33 +222,40 @@
 </header>
 
 <main>
-  <!-- Camera feed -->
   <div id="cam-panel">
-    <img id="feed" src="/video_feed" alt="Camera Feed">
+    <img id="feed" src="/video_feed" alt="Live Feed">
 
     <div id="selected-badge"></div>
-    <button id="clear-sel-btn" onclick="clearSelection()">✕ Clear Selection</button>
+    <button id="clear-sel-btn" onclick="clearSelection()">✕ Clear</button>
 
-    <div id="select-hint">Tap a person to select them for transformation</div>
+    <!-- Known faces tags -->
+    <div id="known-panel"></div>
 
-    <!-- Generating spinner -->
+    <!-- Name dialog -->
+    <div id="name-dialog">
+      <h4>NAME THIS PERSON</h4>
+      <input id="name-input" type="text" placeholder="Enter name..." maxlength="30"
+             onkeydown="if(event.key==='Enter')saveName()">
+      <div class="name-dialog-btns">
+        <button id="name-save-btn"   onclick="saveName()">Save</button>
+        <button id="name-cancel-btn" onclick="closeName()">Cancel</button>
+      </div>
+    </div>
+
     <div id="gen-overlay">
       <div class="spinner"></div>
       <div id="gen-msg">Transforming...</div>
     </div>
 
-    <!-- AI result -->
     <div id="result-overlay">
       <img id="result-img" src="" alt="AI Result">
       <button id="result-close" onclick="closeResult()">← Back to Camera</button>
     </div>
   </div>
 
-  <!-- Sidebar -->
   <aside>
     <div class="section-title">Choose Character</div>
-    <div id="char-grid"><!-- populated by JS --></div>
-
+    <div id="char-grid"></div>
     <div id="transform-section">
       <div id="selection-status" class="all">All people will be transformed</div>
       <button id="transform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
@@ -323,16 +266,50 @@
 <div id="toast"></div>
 
 <script>
+// ── Ticker data ───────────────────────────────────────────────────────────────
+const TICKER_ITEMS = [
+  { cat:"CPU",      name:"AMD Threadripper PRO 9995X  ·  96 Cores / 192 Threads  ·  5.1 GHz Boost" },
+  { cat:"GPU",      name:"AMD Radeon PRO W7900  ·  48 GB GDDR6  ·  gfx1100 RDNA3" },
+  { cat:"PLATFORM", name:"ROCm 6.2  ·  HIP Runtime  ·  DirectML" },
+  { cat:"AI MODEL", name:"SDXL-Turbo  ·  Stable Diffusion XL 1.0 FP16  ·  4-step inference" },
+  { cat:"AI MODEL", name:"ControlNet LoRA Canny Rank-128  ·  Pose-guided generation" },
+  { cat:"ENGINE",   name:"ComfyUI  ·  v0.3.10  ·  Custom AMD-optimized pipeline" },
+  { cat:"VISION",   name:"OpenCV  ·  Face Detection  ·  Haar Cascade  ·  LBPH Recognition" },
+  { cat:"VISION",   name:"rembg  ·  u2net-human-seg  ·  Real-time body segmentation" },
+  { cat:"VISION",   name:"MediaPipe  ·  Pose Landmarks  ·  33-point skeleton tracking" },
+  { cat:"BACKEND",  name:"FastAPI  ·  Uvicorn ASGI  ·  MJPEG stream  ·  REST API" },
+  { cat:"OS",       name:"Ubuntu 24.04 LTS  ·  ROCm 6.2 kernel driver  ·  HSA Runtime" },
+  { cat:"CAMERA",   name:"Logitech Brio 4K  ·  1920×1080 @ 30fps  ·  USB 3.0" },
+];
+
+function buildTicker() {
+  const inner = document.getElementById("ticker-inner");
+  // Duplicate for seamless loop
+  const all = [...TICKER_ITEMS, ...TICKER_ITEMS];
+  inner.innerHTML = all.map(item =>
+    `<span class="ticker-item">
+       <span class="ti-cat">${item.cat}</span>
+       <span class="ti-sep">▸</span>
+       <span class="ti-name">${item.name}</span>
+     </span>
+     <span class="ticker-dot">◆</span>`
+  ).join("");
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
 let selectedChar  = "navi";
 let pollTimer     = null;
-let faceCount     = 0;
 let selCount      = 0;
+let faceCount     = 0;
+let pendingNameIdx = null;  // face index waiting to be named
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  buildTicker();
   await loadCharacters();
   checkComfy();
   setInterval(checkComfy, 8000);
+  refreshKnownNames();
 }
 
 async function loadCharacters() {
@@ -343,133 +320,220 @@ async function loadCharacters() {
     grid.innerHTML = "";
     data.characters.forEach(c => {
       const card = document.createElement("div");
-      card.className = `char-card${c.ai_ready ? " ai-ready" : ""}${c.key === selectedChar ? " active" : ""}`;
+      card.className = `char-card${c.ai_ready?" ai-ready":""}${c.key===selectedChar?" active":""}`;
       card.dataset.key = c.key;
-      card.innerHTML = `
-        <div class="char-emoji">${c.emoji}</div>
-        <div class="char-name">${c.label}</div>
-        <div class="char-sub">${c.subtitle}</div>`;
-      card.onclick = () => selectChar(c.key, card);
+      card.innerHTML = `<div class="char-emoji">${c.emoji}</div>
+                        <div class="char-name">${c.label}</div>
+                        <div class="char-sub">${c.subtitle}</div>`;
+      card.onclick = () => { selectedChar = c.key; document.querySelectorAll(".char-card").forEach(x=>x.classList.remove("active")); card.classList.add("active"); };
       grid.appendChild(card);
     });
-  } catch(e) { showToast("Couldn't load characters"); }
-}
-
-function selectChar(key, card) {
-  selectedChar = key;
-  document.querySelectorAll(".char-card").forEach(c => c.classList.remove("active"));
-  card.classList.add("active");
+  } catch(e) {}
 }
 
 async function checkComfy() {
   try {
-    const r    = await fetch("/comfy_status");
-    const data = await r.json();
-    const badge = document.getElementById("comfy-badge");
-    badge.textContent = data.available ? "AI ENGINE ●" : "AI ENGINE ○";
-    badge.classList.toggle("online", data.available);
+    const r = await fetch("/comfy_status");
+    const d = await r.json();
+    const b = document.getElementById("comfy-badge");
+    b.textContent = d.available ? "AI ENGINE ●" : "AI ENGINE ○";
+    b.classList.toggle("online", d.available);
   } catch(e) {}
 }
 
-// ── Camera click → person selection ──────────────────────────────────────────
-document.getElementById("cam-panel").addEventListener("click", async function(e) {
-  // Ignore clicks on buttons/overlays
-  if (e.target.tagName === "BUTTON" || e.target.tagName === "IMG" && e.target.id === "result-img") return;
-  if (document.getElementById("result-overlay").classList.contains("visible")) return;
-  if (document.getElementById("gen-overlay").classList.contains("visible")) return;
-
+// ── Camera click: select person OR name ───────────────────────────────────────
+// object-fit:contain adds letterbox bars — we must map click into actual image coords
+function getImageCoords(e) {
   const feed = document.getElementById("feed");
   const rect = feed.getBoundingClientRect();
 
-  // Click position relative to feed image
-  const clickX = e.clientX - rect.left;
-  const clickY = e.clientY - rect.top;
-  const frameW = rect.width;
-  const frameH = rect.height;
+  // Natural size of the video stream (use reported frame size if available)
+  const natW = feed.naturalWidth  || 1280;
+  const natH = feed.naturalHeight || 720;
+
+  // Rendered size
+  const renW = rect.width;
+  const renH = rect.height;
+
+  // Aspect ratios
+  const imgAR = natW / natH;
+  const boxAR = renW / renH;
+
+  let imgW, imgH, offX, offY;
+  if (imgAR > boxAR) {
+    // Pillarbox: image fills width, black bars top/bottom
+    imgW = renW;
+    imgH = renW / imgAR;
+    offX = 0;
+    offY = (renH - imgH) / 2;
+  } else {
+    // Letterbox: image fills height, black bars left/right
+    imgH = renH;
+    imgW = renH * imgAR;
+    offX = (renW - imgW) / 2;
+    offY = 0;
+  }
+
+  const cx = e.clientX - rect.left - offX;
+  const cy = e.clientY - rect.top  - offY;
+
+  // Reject clicks in the black bars
+  if (cx < 0 || cy < 0 || cx > imgW || cy > imgH) return null;
+
+  return { clickX: cx, clickY: cy, frameW: imgW, frameH: imgH };
+}
+
+document.getElementById("cam-panel").addEventListener("click", async function(e) {
+  if (e.target.closest("button")) return;
+  if (e.target.id === "result-img") return;
+  if (document.getElementById("result-overlay").classList.contains("on")) return;
+  if (document.getElementById("gen-overlay").classList.contains("on")) return;
+  if (document.getElementById("name-dialog").classList.contains("on")) { closeName(); return; }
+
+  const coords = getImageCoords(e);
+  if (!coords) return;  // clicked in letterbox bar, ignore
 
   const fd = new FormData();
-  fd.append("click_x", clickX);
-  fd.append("click_y", clickY);
-  fd.append("frame_w", frameW);
-  fd.append("frame_h", frameH);
+  fd.append("click_x", coords.clickX);
+  fd.append("click_y", coords.clickY);
+  fd.append("frame_w", coords.frameW);
+  fd.append("frame_h", coords.frameH);
 
-  try {
-    const r    = await fetch("/select_person", {method:"POST", body:fd});
-    const data = await r.json();
-    updateSelectionUI(data.faces);
-  } catch(e) {}
+  const r    = await fetch("/select_person", {method:"POST", body:fd});
+  const data = await r.json();
+  updateSelectionUI(data.faces);
+
+  // If a newly selected face has no name, offer to name them
+  const newlySelected = data.faces.find(f => f.selected && !f.name);
+  if (newlySelected) {
+    openNameDialog(newlySelected, e.clientX, e.clientY);
+  }
 });
 
 function updateSelectionUI(faces) {
   faceCount = faces.length;
   selCount  = faces.filter(f => f.selected).length;
-
   const badge    = document.getElementById("selected-badge");
   const clearBtn = document.getElementById("clear-sel-btn");
   const status   = document.getElementById("selection-status");
-  const hint     = document.getElementById("select-hint");
-
   if (selCount > 0) {
     badge.textContent = `${selCount} selected`;
-    badge.classList.add("visible");
-    clearBtn.classList.add("visible");
-    status.textContent = `Transforming ${selCount} of ${faceCount} people`;
+    badge.classList.add("on");
+    clearBtn.classList.add("on");
+    status.textContent = `Transforming ${selCount} of ${faceCount} person${faceCount>1?"s":""}`;
     status.className = "";
-    hint.classList.add("hidden");
   } else {
-    badge.classList.remove("visible");
-    clearBtn.classList.remove("visible");
+    badge.classList.remove("on");
+    clearBtn.classList.remove("on");
     status.textContent = faceCount > 0 ? "Tap someone to select · or transform all" : "All people will be transformed";
     status.className = "all";
-    hint.classList.toggle("hidden", faceCount === 0);
   }
 }
 
 async function clearSelection() {
   await fetch("/clear_selection", {method:"POST"});
   updateSelectionUI([]);
+  closeName();
+}
+
+// ── Name dialog ───────────────────────────────────────────────────────────────
+function openNameDialog(face, clientX, clientY) {
+  pendingNameIdx = face.index;
+  const dlg  = document.getElementById("name-dialog");
+  const inp  = document.getElementById("name-input");
+  const panel = document.getElementById("cam-panel");
+  const rect  = panel.getBoundingClientRect();
+
+  // Position near click, keep inside panel
+  let left = clientX - rect.left + 12;
+  let top  = clientY - rect.top  - 30;
+  left = Math.min(left, rect.width  - 240);
+  top  = Math.max(top,  10);
+
+  dlg.style.left = left + "px";
+  dlg.style.top  = top  + "px";
+  inp.value = face.name || "";
+  dlg.classList.add("on");
+  setTimeout(() => inp.focus(), 50);
+}
+
+function closeName() {
+  document.getElementById("name-dialog").classList.remove("on");
+  pendingNameIdx = null;
+}
+
+async function saveName() {
+  const name = document.getElementById("name-input").value.trim();
+  if (!name || pendingNameIdx === null) { closeName(); return; }
+  const fd = new FormData();
+  fd.append("index", pendingNameIdx);
+  fd.append("name",  name);
+  try {
+    await fetch("/name_face", {method:"POST", body:fd});
+    showToast(`✓ ${name} saved — will be recognized automatically`, "ok");
+    refreshKnownNames();
+  } catch(e) { showToast("Could not save name"); }
+  closeName();
+}
+
+async function refreshKnownNames() {
+  try {
+    const r    = await fetch("/known_names");
+    const data = await r.json();
+    const panel = document.getElementById("known-panel");
+    const names = Object.values(data.names);
+    panel.innerHTML = names.map(n =>
+      `<div class="known-tag" title="Click ✕ to forget ${n}">
+         👤 ${n}
+         <span class="forget-x" onclick="forgetFace('${n}',event)">✕</span>
+       </div>`
+    ).join("");
+  } catch(e) {}
+}
+
+async function forgetFace(name, e) {
+  e.stopPropagation();
+  const fd = new FormData();
+  fd.append("name", name);
+  await fetch("/forget_face", {method:"POST", body:fd});
+  showToast(`Removed ${name}`);
+  refreshKnownNames();
 }
 
 // ── Transform ─────────────────────────────────────────────────────────────────
 async function doTransform() {
   const btn = document.getElementById("transform-btn");
   btn.disabled = true;
-
-  // Check ComfyUI
+  closeName();
   try {
     const r = await fetch("/comfy_status");
     const d = await r.json();
-    if (!d.available) {
-      showToast("AI Engine offline — run ~/start_comfyui.sh in a terminal");
-      btn.disabled = false;
-      return;
-    }
-  } catch(e) { btn.disabled = false; return; }
+    if (!d.available) { showToast("AI Engine offline — run ~/start_comfyui.sh"); btn.disabled=false; return; }
+  } catch(e) { btn.disabled=false; return; }
 
-  // Show spinner
-  document.getElementById("gen-overlay").classList.add("visible");
+  document.getElementById("gen-overlay").classList.add("on");
   document.getElementById("gen-msg").textContent = selCount > 0
     ? `Transforming ${selCount} selected person${selCount>1?"s":""}...`
-    : "Transforming...";
+    : "Transforming everyone...";
 
-  // Start generation
   const fd = new FormData();
   fd.append("character", selectedChar);
   try {
     const r    = await fetch("/generate", {method:"POST", body:fd});
+    if (r.status === 400) {
+      const d = await r.json();
+      hideSpinner();
+      showToast(d.detail || "Select at least one person first");
+      btn.disabled = false;
+      return;
+    }
     const data = await r.json();
     if (data.status === "generating" || data.status === "busy") {
       pollTimer = setInterval(pollStatus, 1000);
     } else {
-      hideSpinner();
-      showToast(data.message || "Error starting generation");
-      btn.disabled = false;
+      hideSpinner(); showToast(data.message||"Error"); btn.disabled=false;
     }
-  } catch(e) {
-    hideSpinner();
-    showToast("Connection error");
-    btn.disabled = false;
-  }
+  } catch(e) { hideSpinner(); showToast("Connection error"); btn.disabled=false; }
 }
 
 async function pollStatus() {
@@ -477,14 +541,11 @@ async function pollStatus() {
     const r    = await fetch("/generate_status");
     const data = await r.json();
     if (data.status === "done" && data.image) {
-      clearInterval(pollTimer);
-      hideSpinner();
-      showResult(data.image);
+      clearInterval(pollTimer); hideSpinner(); showResult(data.image);
       document.getElementById("transform-btn").disabled = false;
     } else if (data.status === "error") {
-      clearInterval(pollTimer);
-      hideSpinner();
-      showToast("Generation failed: " + (data.message || "unknown error"));
+      clearInterval(pollTimer); hideSpinner();
+      showToast("Error: " + (data.message||"unknown"));
       document.getElementById("transform-btn").disabled = false;
     } else if (data.message) {
       document.getElementById("gen-msg").textContent = data.message;
@@ -492,25 +553,24 @@ async function pollStatus() {
   } catch(e) {}
 }
 
-function hideSpinner() {
-  document.getElementById("gen-overlay").classList.remove("visible");
-}
+function hideSpinner() { document.getElementById("gen-overlay").classList.remove("on"); }
 
 function showResult(src) {
   document.getElementById("result-img").src = src;
-  document.getElementById("result-overlay").classList.add("visible");
+  document.getElementById("result-overlay").classList.add("on");
 }
 
 function closeResult() {
-  document.getElementById("result-overlay").classList.remove("visible");
+  document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
 }
 
-function showToast(msg) {
+function showToast(msg, type="err") {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.classList.add("visible");
-  setTimeout(() => t.classList.remove("visible"), 4000);
+  t.style.background = type === "ok" ? "#1a7a3a" : "#c0392b";
+  t.classList.add("on");
+  setTimeout(() => t.classList.remove("on"), 4000);
 }
 
 init();
