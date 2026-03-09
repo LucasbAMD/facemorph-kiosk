@@ -468,7 +468,7 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
     const data = await r.json();
     updateSelUI(data.faces);
     const newSel = data.faces.find(f => f.selected && !f.name);
-    if (newSel) openNameDialog(newSel, e.clientX, e.clientY);
+    if (newSel) openNameDialog(newSel);
   } catch(err) {}
 });
 
@@ -499,9 +499,12 @@ function updateSelUI(faces) {
 }
 
 function nameSelected() {
-  // Find first selected face
   const face = lastFaces.find(f => f.selected);
-  if (face) openNameDialog(face);
+  if (face) {
+    openNameDialog(face);
+  } else {
+    toast("Tap your face on the camera first to select yourself");
+  }
 }
 
 async function clearSel() {
@@ -524,16 +527,24 @@ function closeName() {
 
 async function saveName() {
   const name = document.getElementById("name-input").value.trim();
-  if (!name || pendingNameIdx === null) { closeName(); return; }
+  if (!name) { toast("Please enter a name"); return; }
+  if (pendingNameIdx === null) { toast("No person selected"); closeName(); return; }
   const fd = new FormData();
   fd.append("index", pendingNameIdx);
   fd.append("name",  name);
   try {
-    await fetch("/name_face", { method:"POST", body:fd });
-    toast(`✓ ${name} saved`, "ok");
-    refreshKnownNames();
-  } catch(e) { toast("Could not save name"); }
-  closeName();
+    const r    = await fetch("/name_face", { method:"POST", body:fd });
+    const data = await r.json();
+    if (data.status === "ok") {
+      toast(`✓ ${name} saved — will be recognized automatically`, "ok");
+      refreshKnownNames();
+      closeName();
+    } else {
+      toast(`Could not save — try selecting the person again`);
+    }
+  } catch(e) {
+    toast("Connection error: " + e.message);
+  }
 }
 
 async function refreshKnownNames() {
