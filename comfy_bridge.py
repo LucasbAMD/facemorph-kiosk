@@ -125,11 +125,10 @@ def generate_character(frame, char_key, selection_mask=None, timeout=180):
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
-        # Apply selection mask so only chosen people are transformed
-        masked_frame = _apply_selection_mask(frame, selection_mask)
-
-        img_name   = _upload_frame(masked_frame)
-        canny_name = _make_canny(masked_frame, selection_mask)
+        # Send full clean frame to AI — mask only used for Canny edge cleanup
+        # Dimming the image confuses the model and produces small blurry results
+        img_name   = _upload_frame(frame)
+        canny_name = _make_canny(frame, selection_mask)
         workflow   = _build_workflow(char_key, img_name, canny_name)
         client_id  = uuid.uuid4().hex
         result     = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
