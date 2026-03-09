@@ -112,37 +112,44 @@
   #clear-sel-btn { position: absolute; top: 14px; left: 14px; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); font-size: 0.78rem; padding: 5px 13px; border-radius: 20px; cursor: pointer; display: none; }
   #clear-sel-btn.on { display: block; }
 
-  /* ── Name tag dialog ── */
-  #name-dialog {
-    position: absolute;
-    background: #111;
-    border: 1px solid var(--cyan);
-    border-radius: 10px;
-    padding: 14px 16px;
-    min-width: 220px;
-    box-shadow: 0 4px 24px rgba(0,212,255,0.2);
+  /* ── Name modal (centered overlay) ── */
+  #name-modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
     display: none;
-    z-index: 20;
-    flex-direction: column;
-    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
   }
-  #name-dialog.on { display: flex; }
-  #name-dialog h4 { font-size: 0.78rem; color: var(--cyan); letter-spacing: 1px; }
+  #name-modal-bg.on { display: flex; }
+  #name-dialog {
+    background: #141414;
+    border: 1px solid var(--cyan);
+    border-radius: 12px;
+    padding: 22px 24px;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 8px 40px rgba(0,212,255,0.25);
+  }
+  #name-dialog h4 { font-size: 0.85rem; color: var(--cyan); letter-spacing: 1px; }
   #name-input {
     background: #1a1a1a;
     border: 1px solid #444;
     border-radius: 6px;
     color: white;
-    padding: 7px 10px;
-    font-size: 0.9rem;
+    padding: 9px 12px;
+    font-size: 1rem;
     outline: none;
     width: 100%;
   }
   #name-input:focus { border-color: var(--cyan); }
   .name-dialog-btns { display: flex; gap: 8px; }
   .name-dialog-btns button {
-    flex: 1; padding: 7px; border: none; border-radius: 6px;
-    cursor: pointer; font-size: 0.8rem; font-weight: 700;
+    flex: 1; padding: 9px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 700;
   }
   #name-save-btn { background: var(--cyan); color: #000; }
   #name-cancel-btn { background: #2a2a2a; color: #ccc; }
@@ -388,7 +395,7 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
   if (e.target.id === "result-img") return;
   if (document.getElementById("result-overlay").classList.contains("on")) return;
   if (document.getElementById("gen-overlay").classList.contains("on")) return;
-  if (document.getElementById("name-dialog").classList.contains("on")) { closeName(); return; }
+  if (document.getElementById("name-modal-bg").classList.contains("on")) { closeName(); return; }
 
   const coords = getImageCoords(e);
   if (!coords) return;  // clicked in letterbox bar, ignore
@@ -439,26 +446,14 @@ async function clearSelection() {
 // ── Name dialog ───────────────────────────────────────────────────────────────
 function openNameDialog(face, clientX, clientY) {
   pendingNameIdx = face.index;
-  const dlg  = document.getElementById("name-dialog");
-  const inp  = document.getElementById("name-input");
-  const panel = document.getElementById("cam-panel");
-  const rect  = panel.getBoundingClientRect();
-
-  // Position near click, keep inside panel
-  let left = clientX - rect.left + 12;
-  let top  = clientY - rect.top  - 30;
-  left = Math.min(left, rect.width  - 240);
-  top  = Math.max(top,  10);
-
-  dlg.style.left = left + "px";
-  dlg.style.top  = top  + "px";
+  const inp = document.getElementById("name-input");
   inp.value = face.name || "";
-  dlg.classList.add("on");
-  setTimeout(() => inp.focus(), 50);
+  document.getElementById("name-modal-bg").classList.add("on");
+  setTimeout(() => inp.focus(), 80);
 }
 
 function closeName() {
-  document.getElementById("name-dialog").classList.remove("on");
+  document.getElementById("name-modal-bg").classList.remove("on");
   pendingNameIdx = null;
 }
 
@@ -572,6 +567,10 @@ function showToast(msg, type="err") {
   t.classList.add("on");
   setTimeout(() => t.classList.remove("on"), 4000);
 }
+
+document.getElementById("name-modal-bg").addEventListener("click", function(e) {
+  if (e.target === this) closeName();
+});
 
 init();
 </script>
