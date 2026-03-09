@@ -139,7 +139,9 @@ async def get_faces():
 async def select_person(click_x: float = Form(...), click_y: float = Form(...),
                         frame_w: float = Form(...), frame_h: float = Form(...)):
     """Toggle selection of person at click coordinates."""
-    processor.toggle_person(click_x, click_y, frame_w, frame_h)
+    with frame_lock:
+        frame = latest_frame.copy() if latest_frame is not None else None
+    processor.toggle_person(click_x, click_y, frame_w, frame_h, frame)
     return JSONResponse({"faces": processor.get_detected_faces()})
 
 @app.post("/clear_selection")
