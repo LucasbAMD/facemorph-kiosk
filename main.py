@@ -52,10 +52,16 @@ def start_capture(camera_index: int = 0):
     global cap, latest_frame, capture_running
     capture_running = True
     with cap_lock:
-        cap = cv2.VideoCapture(
-            camera_index,
-            cv2.CAP_DSHOW if hasattr(cv2, "CAP_DSHOW") else 0
-        )
+        # Try given index first, then fall back to alternatives
+        cap = cv2.VideoCapture(camera_index)
+        if not cap.isOpened():
+            for alt in [2, 1, 0, 3]:
+                if alt == camera_index:
+                    continue
+                cap = cv2.VideoCapture(alt)
+                if cap.isOpened():
+                    print(f"[OK] Camera opened at index {alt}")
+                    break
         cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1920)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         cap.set(cv2.CAP_PROP_FPS, 30)
