@@ -329,6 +329,13 @@
     </div>
     <div id="xform-section">
       <div id="sel-status">Select a person to transform</div>
+      <button id="name-btn" onclick="nameSelected()" style="
+        width:100%; padding:9px; margin-bottom:8px;
+        background:transparent; color:var(--cyan);
+        border:1px solid var(--cyan); border-radius:8px;
+        font-size:0.8rem; font-weight:700; letter-spacing:1px;
+        cursor:pointer; display:none; text-transform:uppercase;
+      ">👤 NAME SELECTED PERSON</button>
       <button id="xform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
     </div>
   </div>
@@ -465,24 +472,36 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
   } catch(err) {}
 });
 
+let lastFaces = [];
+
 function updateSelUI(faces) {
-  faceCount = faces ? faces.length : 0;
-  selCount  = faces ? faces.filter(f => f.selected).length : 0;
-  const badge  = document.getElementById("sel-badge");
-  const clrBtn = document.getElementById("clear-btn");
-  const status = document.getElementById("sel-status");
+  lastFaces = faces || [];
+  faceCount = lastFaces.length;
+  selCount  = lastFaces.filter(f => f.selected).length;
+  const badge   = document.getElementById("sel-badge");
+  const clrBtn  = document.getElementById("clear-btn");
+  const status  = document.getElementById("sel-status");
+  const nameBtn = document.getElementById("name-btn");
   if (selCount > 0) {
     badge.textContent = `${selCount} selected`;
     badge.classList.add("on");
     clrBtn.classList.add("on");
     status.textContent = `Transforming ${selCount} of ${faceCount} person${faceCount > 1 ? "s" : ""}`;
     status.className = "has";
+    nameBtn.style.display = "block";
   } else {
     badge.classList.remove("on");
     clrBtn.classList.remove("on");
     status.textContent = faceCount > 0 ? "Tap a person to select" : "Select a person to transform";
     status.className = "";
+    nameBtn.style.display = "none";
   }
+}
+
+function nameSelected() {
+  // Find first selected face
+  const face = lastFaces.find(f => f.selected);
+  if (face) openNameDialog(face);
 }
 
 async function clearSel() {
