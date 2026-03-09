@@ -22,7 +22,7 @@ sudo dpkg --configure -a 2>/dev/null || true
 echo ""
 echo "── Step 1: Base packages ──"
 sudo apt update -qq
-sudo apt install -y python3-venv python3-pip git wget curl gnupg2
+sudo apt install -y python3-venv python3-pip python-is-python3 git wget curl gnupg2
 
 # ── 2. GPU + ROCm device permissions ─────────────────────────────────────────
 echo ""
@@ -54,6 +54,9 @@ fi
 
 source venv/bin/activate
 pip install --upgrade pip wheel -q
+
+# Ensure opencv-contrib (not base opencv) — they conflict
+pip uninstall -y opencv-python opencv-python-headless 2>/dev/null || true
 
 if [ "$IS_ROCM" = true ]; then
     echo "[..] Installing PyTorch ROCm 6.2..."
@@ -104,6 +107,9 @@ fi
 python3 -m venv "$COMFY_VENV"
 source "$COMFY_VENV/bin/activate"
 pip install --upgrade pip wheel -q
+
+# Ensure opencv-contrib (not base opencv) — they conflict
+pip uninstall -y opencv-python opencv-python-headless 2>/dev/null || true
 
 if [ "$IS_ROCM" = true ]; then
     echo "[..] Installing ROCm PyTorch for ComfyUI..."
