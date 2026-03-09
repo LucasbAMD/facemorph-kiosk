@@ -168,9 +168,7 @@ async def generate(character: str = Form(...)):
         raise HTTPException(400, "Please select at least one person before transforming")
 
     selected_mask = processor.get_selected_mask(frame)
-    h, w = frame.shape[:2]
-    skeleton = processor.get_pose_skeleton(h, w)
-    started = comfy.generate(frame, character, selected_mask, skeleton)
+    started = comfy.generate(frame, character, selected_mask)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Transforming..."})
