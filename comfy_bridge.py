@@ -144,7 +144,7 @@ def _build_workflow(char_key, image_name, canny_name):
         "1":  {"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":"sd_xl_turbo_1.0_fp16.safetensors"}},
         "2":  {"class_type":"ControlNetLoader","inputs":{"control_net_name":"control-lora-canny-rank128.safetensors"}},
         "3":  {"class_type":"LoadImage","inputs":{"image":image_name}},
-        "4":  {"class_type":"LoadImage","inputs":{"image":control_name}},
+        "4":  {"class_type":"LoadImage","inputs":{"image":canny_name}},
         "5":  {"class_type":"VAEEncode","inputs":{"pixels":["3",0],"vae":["1",2]}},
         "6":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["positive"],"clip":["1",1]}},
         "7":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["negative"],"clip":["1",1]}},
@@ -187,8 +187,8 @@ def generate_character(frame, char_key, selection_mask=None, timeout=180):
         # Blur background so model focuses on the person
         prepped      = _blur_background(frame, selection_mask)
         img_name     = _upload_frame(prepped)
-        control_name = _make_control_image(prepped, selection_mask, skeleton)
-        workflow   = _build_workflow(char_key, img_name, canny_name)
+        control_name = _make_control_image(prepped, selection_mask)
+        workflow     = _build_workflow(char_key, img_name, control_name)
         client_id  = uuid.uuid4().hex
         result     = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
         prompt_id  = result["prompt_id"]
