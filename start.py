@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """
-start.py — Launch AMD Adapt Kiosk
-Usage (recommended):
-  cd ~/facemorph-kiosk && source venv/bin/activate && python start.py
-
-Or via venv directly:
-  ~/facemorph-kiosk/venv/bin/python start.py
+start.py — AMD Adapt Kiosk launcher
+Just run:  python start.py  (from anywhere inside the repo)
+It will auto-activate the venv and launch the server.
 """
 import subprocess
 import sys
@@ -15,12 +12,23 @@ import threading
 import time
 from pathlib import Path
 
-ROOT    = Path(__file__).parent
-VENV_PY = ROOT / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+ROOT    = Path(__file__).resolve().parent
+VENV_PY = ROOT / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python3")
+IN_VENV = os.environ.get("VIRTUAL_ENV") is not None or \
+          Path(sys.executable).resolve() == VENV_PY.resolve()
 
-# If we're already inside the venv, just run directly
-IN_VENV = (Path(sys.executable).resolve() == VENV_PY.resolve()) or \
-          (os.environ.get("VIRTUAL_ENV") is not None)
+if not IN_VENV:
+    # Re-launch this script inside the venv automatically
+    if not VENV_PY.exists():
+        print("[ERROR] venv not found. Run:  bash setup_ubuntu.sh")
+        sys.exit(1)
+    print("[..] Activating venv and launching kiosk...")
+    os.chdir(ROOT)
+    os.execv(str(VENV_PY), [str(VENV_PY), str(__file__)])
+    # execv replaces the current process — nothing below runs
+
+# ── We're inside the venv from here ──────────────────────────────────────────
+os.chdir(ROOT)
 
 def open_browser():
     time.sleep(2.5)
@@ -29,23 +37,12 @@ def open_browser():
     except Exception:
         pass
 
-if IN_VENV:
-    # Already in venv — run main directly
-    threading.Thread(target=open_browser, daemon=True).start()
-    os.chdir(ROOT)
-    import uvicorn
-    print("\n" + "="*60)
-    print("  AMD ADAPT KIOSK")
-    print("  http://localhost:8000")
-    print("="*60 + "\n")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, workers=1)
-else:
-    if not VENV_PY.exists():
-        print("[ERROR] venv not found. Run:  bash setup_ubuntu.sh")
-        sys.exit(1)
-    threading.Thread(target=open_browser, daemon=True).start()
-    os.chdir(ROOT)
-    result = subprocess.run([str(VENV_PY), "-m", "uvicorn", "main:app",
-                             "--host", "0.0.0.0", "--port", "8000",
-                             "--workers", "1"])
-    sys.exit(result.returncode)
+print("\n" + "="*60)
+print("  AMD ADAPT KIOSK")
+print("  http://localhost:8000")
+print("="*60 + "\n")
+
+threading.Thread(target=open_browser, daemon=True).start()
+
+import uvicorn
+uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, workers=1)
