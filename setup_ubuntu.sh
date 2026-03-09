@@ -120,7 +120,7 @@ pip uninstall -y comfy-aimdo 2>/dev/null || true
 cd "$COMFY_DIR"
 grep -v "^torch\|^torchvision\|^torchaudio\|comfy.aimdo\|comfy-aimdo" requirements.txt > /tmp/comfy_req.txt
 pip install -q -r /tmp/comfy_req.txt
-pip install -q torchsde kornia spandrel
+pip install -q torchsde kornia spandrel requests
 cd "$SCRIPT_DIR"
 
 # Verify GPU visible
