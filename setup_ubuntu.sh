@@ -1,6 +1,6 @@
 #!/bin/bash
 # setup_ubuntu.sh — AMD Adapt Kiosk full setup
-# Ubuntu 22.04 or 24.04 · AMD GPU (W7900 recommended for AI generation)
+# Ubuntu 22.04 or 24.04 · AMD W7900 + ROCm
 
 echo ""
 echo "======================================================"
@@ -9,15 +9,8 @@ echo "======================================================"
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-IS_ROCM=false
 UBUNTU_VER=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2)
 echo "[INFO] Ubuntu $UBUNTU_VER detected"
-
-if [ "$UBUNTU_VER" = "22.04" ]; then
-    CODENAME="jammy"
-else
-    CODENAME="noble"
-fi
 
 # ── 0. Fix broken packages ────────────────────────────────────────────────────
 echo ""
@@ -31,20 +24,20 @@ echo "── Step 1: Base packages ──"
 sudo apt update -qq
 sudo apt install -y python3-venv python3-pip git wget curl gnupg2
 
-# ── 2. GPU detection ──────────────────────────────────────────────────────────
+# ── 2. GPU + ROCm device permissions ─────────────────────────────────────────
 echo ""
-echo "── Step 2: GPU detection ──"
-
+echo "── Step 2: GPU setup ──"
 if command -v rocm-smi &>/dev/null; then
-    # ROCm already installed — always use ROCm PyTorch
+    echo "[OK] ROCm detected"
+    rocm-smi 2>/dev/null | head -5 || true
+    # Fix device permissions so PyTorch can see the GPU without full logout
+    sudo chmod 666 /dev/kfd 2>/dev/null || true
+    sudo chmod 666 /dev/dri/renderD128 2>/dev/null || true
+    sudo usermod -a -G render,video $USER 2>/dev/null || true
     IS_ROCM=true
-    GPU_INFO=$(rocm-smi --showproductname 2>/dev/null | grep -i "card\|product\|series" | head -3)
-    echo "[OK] ROCm is installed"
-    echo "[OK] GPU info: $GPU_INFO"
-    echo "[OK] Will use ROCm PyTorch for full GPU acceleration"
 else
-    echo "[INFO] ROCm not detected — run bash install_rocm.sh first, then log out/in, then re-run this script"
-    echo "[INFO] Continuing with CPU mode for now..."
+    echo "[WARN] ROCm not found — run bash install_rocm.sh first"
+    IS_ROCM=false
 fi
 
 # ── 3. Kiosk Python venv ──────────────────────────────────────────────────────
@@ -59,25 +52,18 @@ if [ ! -d "venv" ]; then
     }
 fi
 
-if [ ! -f "venv/bin/activate" ]; then
-    echo "[ERR] Failed to create venv. Run: sudo apt install python3-venv"
-    exit 1
-fi
-
 source venv/bin/activate
 pip install --upgrade pip wheel -q
 
 if [ "$IS_ROCM" = true ]; then
-    echo "[..] Installing PyTorch with ROCm 6.2 (GPU accelerated)..."
+    echo "[..] Installing PyTorch ROCm 6.2..."
     pip install torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/rocm6.2 -q
 else
-    echo "[..] Installing PyTorch CPU..."
     pip install torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/cpu -q
 fi
 
-echo "[..] Installing kiosk packages..."
 pip install -q \
     "fastapi==0.111.0" \
     "uvicorn[standard]==0.29.0" \
@@ -90,33 +76,37 @@ pip install -q \
     "aiofiles==23.2.1" \
     "requests==2.31.0" \
     "onnxruntime"
-
 pip install -q "insightface==0.7.3" 2>/dev/null || true
 echo "[OK] Kiosk packages installed"
+deactivate
 
 # ── 4. ComfyUI ────────────────────────────────────────────────────────────────
 echo ""
 echo "── Step 4: ComfyUI ──"
 COMFY_DIR="$HOME/ComfyUI"
 
-if [ ! -d "$COMFY_DIR" ]; then
-    echo "[..] Cloning ComfyUI..."
+# Remove any existing broken install
+if [ -d "$COMFY_DIR" ]; then
+    echo "[..] Removing existing ComfyUI install..."
+    rm -rf "$COMFY_DIR"
+fi
+
+# Clone known-good version that works on AMD ROCm without comfy-aimdo issues
+echo "[..] Cloning ComfyUI v0.3.10 (AMD-compatible)..."
+git clone --branch v0.3.10 https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR" 2>/dev/null || \
     git clone https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
-else
-    echo "[OK] ComfyUI already present"
-    cd "$COMFY_DIR" && git pull -q && cd "$SCRIPT_DIR"
-fi
 
+# ComfyUI venv
 COMFY_VENV="$HOME/comfyui-venv"
-if [ ! -d "$COMFY_VENV" ]; then
-    python3 -m venv "$COMFY_VENV"
+if [ -d "$COMFY_VENV" ]; then
+    rm -rf "$COMFY_VENV"
 fi
-
+python3 -m venv "$COMFY_VENV"
 source "$COMFY_VENV/bin/activate"
 pip install --upgrade pip wheel -q
 
 if [ "$IS_ROCM" = true ]; then
-    echo "[..] Installing PyTorch ROCm for ComfyUI..."
+    echo "[..] Installing ROCm PyTorch for ComfyUI..."
     pip install torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/rocm6.2 -q
 else
@@ -124,11 +114,28 @@ else
         --index-url https://download.pytorch.org/whl/cpu -q
 fi
 
+# Remove comfy-aimdo if it snuck in
+pip uninstall -y comfy-aimdo 2>/dev/null || true
+
 cd "$COMFY_DIR"
-grep -v "^torch\|^torchvision\|^torchaudio" requirements.txt > /tmp/comfy_req.txt
+grep -v "^torch\|^torchvision\|^torchaudio\|comfy.aimdo\|comfy-aimdo" requirements.txt > /tmp/comfy_req.txt
 pip install -q -r /tmp/comfy_req.txt
 cd "$SCRIPT_DIR"
-echo "[OK] ComfyUI installed"
+
+# Verify GPU visible
+echo ""
+echo "[..] Verifying GPU..."
+python3 -c "
+import torch
+print(f'PyTorch: {torch.__version__}')
+print(f'GPU visible: {torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'GPU: {torch.cuda.get_device_name(0)}')
+    print('[OK] GPU ready!')
+else:
+    print('[WARN] GPU not visible yet — may need logout/login')
+"
+deactivate
 
 # ── 5. Models ─────────────────────────────────────────────────────────────────
 echo ""
@@ -139,7 +146,7 @@ if [ "$IS_ROCM" = true ]; then
 
     SDXL="$MODELS/checkpoints/sd_xl_turbo_1.0_fp16.safetensors"
     if [ ! -f "$SDXL" ]; then
-        echo "[..] Downloading SDXL-Turbo (~3.1 GB) — this takes a while..."
+        echo "[..] Downloading SDXL-Turbo (~3.1 GB)..."
         wget --show-progress -q \
             "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/sd_xl_turbo_1.0_fp16.safetensors" \
             -O "$SDXL"
@@ -159,18 +166,15 @@ if [ "$IS_ROCM" = true ]; then
         echo "[OK] ControlNet already present"
     fi
 else
-    echo "── Step 5: Models skipped (ROCm not installed) ──"
-    echo "[INFO] Run bash install_rocm.sh, log out/in, then re-run this script"
+    echo "── Step 5: Models skipped (no ROCm) ──"
 fi
 
-# ── 6. Launch script ──────────────────────────────────────────────────────────
+# ── 6. Launch scripts ─────────────────────────────────────────────────────────
 echo ""
 echo "── Step 6: Launch scripts ──"
 cp "$SCRIPT_DIR/start_comfyui.sh" "$HOME/start_comfyui.sh"
 chmod +x "$HOME/start_comfyui.sh"
-echo "[OK] ~/start_comfyui.sh created"
-
-deactivate
+echo "[OK] ~/start_comfyui.sh ready"
 
 echo ""
 echo "======================================================"
@@ -178,12 +182,9 @@ echo "  Setup Complete!"
 echo "======================================================"
 echo ""
 if [ "$IS_ROCM" = true ]; then
-    echo "  Full AI generation enabled!"
-    echo ""
     echo "  Terminal 1:  ~/start_comfyui.sh"
     echo "  Terminal 2:  cd $SCRIPT_DIR && source venv/bin/activate && python start.py"
 else
-    echo "  ROCm not found — live transforms only"
-    echo "  Run: bash install_rocm.sh, log out/in, then bash setup_ubuntu.sh again"
+    echo "  Run bash install_rocm.sh first, then re-run this script"
 fi
 echo ""
