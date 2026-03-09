@@ -1,6 +1,5 @@
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
-opencv-contrib-python>=4.9.0.80
 numpy>=2.0.0
 Pillow>=11.0.0
 mediapipe>=0.10.30,<0.11
@@ -9,3 +8,6 @@ python-multipart==0.0.9
 aiofiles==23.2.1
 requests==2.31.0
 onnxruntime
+# Must be last — mediapipe pulls in opencv-python which breaks cv2.face
+# Install manually after: pip uninstall opencv-python && pip install opencv-contrib-python
+opencv-contrib-python>=4.9.0.80
