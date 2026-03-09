@@ -14,15 +14,40 @@ import numpy as np
 
 COMFY_URL = "http://127.0.0.1:8188"
 
-# denoise: lower = more pose preserved. 0.55-0.65 is the sweet spot for pose fidelity.
-# cnet_strength: higher = ControlNet edges dominate generation.
+# Prompts instruct transformation of the subject, not generation of new characters.
+# denoise 0.72-0.78 is needed to actually transform the person's appearance.
+# cnet_strength 0.85 preserves pose without over-constraining the transformation.
 CHARACTER_PROMPTS = {
-    "navi":     {"positive":"Na'vi Avatar alien, bioluminescent blue skin, glowing cyan face markings, large amber eyes, Pandora jungle, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.60,"cnet_strength":0.95},
-    "hulk":     {"positive":"Incredible Hulk Marvel, massive green muscles, green skin, torn purple pants, angry, cinematic, photorealistic, 8k","negative":"normal skin, cartoon, ugly, blurry, extra limbs, wrong anatomy","denoise":0.62,"cnet_strength":0.95},
-    "thanos":   {"positive":"Thanos Marvel villain, purple wrinkled skin, gold armor, strong jaw, cosmic background, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.60,"cnet_strength":0.95},
-    "predator": {"positive":"Predator alien warrior, mandibles, dreadlocks, jungle, cinematic, detailed, 8k","negative":"human, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.58,"cnet_strength":0.95},
-    "ghost":    {"positive":"Ghost Marvel character, pale translucent body, white spectral aura, ethereal glow, dark background, cinematic, 8k","negative":"solid body, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.55,"cnet_strength":0.92},
-    "groot":    {"positive":"Groot Guardians of the Galaxy, living tree humanoid, bark skin, wooden body, green leaves, forest, cinematic, photorealistic, 8k","negative":"human skin, ugly, blurry, cartoon, extra limbs, wrong anatomy","denoise":0.60,"cnet_strength":0.95},
+    "navi":     {
+        "positive": "full body portrait of a single Na'vi from Avatar movie, blue skin, bioluminescent cyan stripes on face and body, large amber eyes, Pandora jungle background with glowing plants, cinematic lighting, photorealistic, 8k, one person only",
+        "negative": "human skin, multiple people, two people, three people, ugly, blurry, cartoon, duplicate, extra person, background figures, human face",
+        "denoise": 0.75, "cnet_strength": 0.85,
+    },
+    "hulk":     {
+        "positive": "full body portrait of the Incredible Hulk, massive green muscles, green skin all over body, torn purple pants, single subject, angry expression, dramatic sky background, cinematic, photorealistic, 8k",
+        "negative": "normal skin, multiple people, two people, cartoon, ugly, blurry, duplicate, extra person",
+        "denoise": 0.76, "cnet_strength": 0.85,
+    },
+    "thanos":   {
+        "positive": "full body portrait of Thanos Marvel villain, purple textured skin, gold and black armor, strong jaw and chin, single subject, cosmic space background, cinematic, photorealistic, 8k",
+        "negative": "human skin, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
+        "denoise": 0.75, "cnet_strength": 0.85,
+    },
+    "predator": {
+        "positive": "full body portrait of the Predator alien warrior, mandibles, dreadlocks, biomask, single subject, dense jungle background, thermal vision overlay, cinematic, detailed, 8k",
+        "negative": "human face, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
+        "denoise": 0.74, "cnet_strength": 0.85,
+    },
+    "ghost":    {
+        "positive": "full body portrait of a ghost, pale translucent spectral body, white ethereal aura, glowing edges, single subject, dark moody background, cinematic, 8k",
+        "negative": "solid opaque body, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
+        "denoise": 0.72, "cnet_strength": 0.82,
+    },
+    "groot":    {
+        "positive": "full body portrait of Groot from Guardians of the Galaxy, living tree humanoid, bark textured skin, wooden arms and body, green leaves growing from body, single subject, forest background, cinematic, photorealistic, 8k",
+        "negative": "human skin, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
+        "denoise": 0.75, "cnet_strength": 0.85,
+    },
 }
 
 def _api(endpoint, data=None, method="GET"):
@@ -75,8 +100,8 @@ def _make_canny(frame, selection_mask=None):
     gray    = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
 
     # Blur slightly to reduce noise before edge detection
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    edges   = cv2.Canny(blurred, 80, 160)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges   = cv2.Canny(blurred, 100, 200)
 
     # Mask edges to person silhouette only — removes background clutter
     if selection_mask is not None and not np.all(selection_mask >= 0.99):
@@ -121,14 +146,41 @@ def _build_workflow(char_key, image_name, canny_name):
         "11": {"class_type":"SaveImage","inputs":{"images":["10",0],"filename_prefix":f"kiosk_{char_key}"}},
     }
 
+def _blur_background(frame, selection_mask=None):
+    """
+    Heavily blur the background, keep person sharp.
+    Prevents background edges from confusing ControlNet into generating extra figures.
+    """
+    if selection_mask is None or np.all(selection_mask >= 0.99):
+        # No specific selection — use rembg-style simple background blur
+        # Just blur the whole image lightly to reduce edge noise
+        return cv2.GaussianBlur(frame, (1, 1), 0)
+
+    h, w     = frame.shape[:2]
+    mask_rs  = cv2.resize(selection_mask, (w, h))
+
+    # Soften mask edges
+    mask_soft = cv2.GaussianBlur(mask_rs, (31, 31), 0)
+    m3        = np.stack([mask_soft] * 3, axis=2)
+
+    # Heavily blur background
+    bg_blur = cv2.GaussianBlur(frame, (51, 51), 0)
+
+    # Composite: sharp person + blurred background
+    result = (frame.astype(np.float32) * m3 +
+              bg_blur.astype(np.float32) * (1.0 - m3))
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
 def generate_character(frame, char_key, selection_mask=None, timeout=180):
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
-        # Send full clean frame to AI — mask only used for Canny edge cleanup
-        # Dimming the image confuses the model and produces small blurry results
-        img_name   = _upload_frame(frame)
-        canny_name = _make_canny(frame, selection_mask)
+        # Blur background before sending to AI so model focuses on the person
+        # This prevents the AI from generating extra figures from background edges
+        prepped    = _blur_background(frame, selection_mask)
+        img_name   = _upload_frame(prepped)
+        canny_name = _make_canny(prepped, selection_mask)
         workflow   = _build_workflow(char_key, img_name, canny_name)
         client_id  = uuid.uuid4().hex
         result     = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
