@@ -12,17 +12,18 @@ if [ ! -d "$COMFY_DIR" ]; then
 fi
 
 if [ ! -d "$COMFY_VENV" ]; then
-    echo "[ERR] ComfyUI venv not found at $COMFY_VENV"
-    echo "      Run bash setup_ubuntu.sh first."
+    echo "[ERR] ComfyUI venv not found. Run bash setup_ubuntu.sh first."
     exit 1
 fi
 
 source "$COMFY_VENV/bin/activate"
 
-# W7900 / RDNA3 ROCm tuning (ignored on non-ROCm systems)
+# AMD W7900 / RDNA3 ROCm environment vars
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
 export PYTORCH_TUNABLEOP_ENABLED=1
 export DISABLE_ADDMM_CUDA_LT=1
+export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
+export AMD_LOG_LEVEL=0
 
 echo ""
 echo "======================================================"
@@ -31,9 +32,12 @@ echo "  http://127.0.0.1:8188"
 echo "======================================================"
 echo ""
 
+mkdir -p "$HOME/ComfyUI/output"
 cd "$COMFY_DIR"
+
 python main.py \
     --port 8188 \
     --listen 127.0.0.1 \
     --disable-auto-launch \
+    --force-fp16 \
     --output-directory "$HOME/ComfyUI/output"
