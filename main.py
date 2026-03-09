@@ -168,7 +168,9 @@ async def generate(character: str = Form(...)):
         raise HTTPException(400, "Please select at least one person before transforming")
 
     selected_mask = processor.get_selected_mask(frame)
-    started = comfy.generate(frame, character, selected_mask)
+    h, w = frame.shape[:2]
+    skeleton = processor.get_pose_skeleton(h, w)
+    started = comfy.generate(frame, character, selected_mask, skeleton)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Transforming..."})
@@ -238,7 +240,9 @@ async def name_face(index: int = Form(...), name: str = Form(...)):
     name = name.strip()
     if not name:
         raise HTTPException(400, "Name cannot be empty")
+    print(f"[NAME] Attempting to name index={index} name={name}")
     success = processor.name_selected_face(index, name, frame)
+    print(f"[NAME] Result: {'ok' if success else 'failed'}")
     return JSONResponse({"status": "ok" if success else "error",
                          "name": name, "index": index})
 
