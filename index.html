@@ -16,199 +16,267 @@
     --dim:  #555;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
+  html, body {
+    height: 100%;
     background: var(--dark);
     color: var(--text);
     font-family: 'Segoe UI', sans-serif;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
     overflow: hidden;
     user-select: none;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
   }
 
   /* ── Ticker ── */
   #ticker-wrap {
+    height: 28px;
+    min-height: 28px;
     background: #000;
     border-bottom: 1px solid #222;
-    height: 30px;
     overflow: hidden;
-    flex-shrink: 0;
     position: relative;
+    flex-shrink: 0;
   }
   #ticker-wrap::before, #ticker-wrap::after {
     content: '';
     position: absolute;
     top: 0; bottom: 0;
-    width: 60px;
+    width: 50px;
     z-index: 2;
+    pointer-events: none;
   }
   #ticker-wrap::before { left: 0;  background: linear-gradient(to right, #000, transparent); }
   #ticker-wrap::after  { right: 0; background: linear-gradient(to left,  #000, transparent); }
   .ticker-label {
     position: absolute;
     left: 0; top: 0; bottom: 0;
-    width: 120px;
+    width: 110px;
     display: flex;
     align-items: center;
-    padding-left: 12px;
+    padding-left: 10px;
     background: var(--red);
     color: white;
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 800;
     letter-spacing: 2px;
     z-index: 3;
   }
-  #ticker-inner {
+  #ticker-track {
     display: flex;
     align-items: center;
     height: 100%;
-    padding-left: 130px;
+    padding-left: 120px;
     white-space: nowrap;
-    animation: ticker-scroll 60s linear infinite;
+    animation: scroll 70s linear infinite;
   }
-  @keyframes ticker-scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-  }
-  .ticker-item {
+  @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ti {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    margin-right: 48px;
-    font-size: 0.7rem;
-    letter-spacing: 0.5px;
+    gap: 6px;
+    margin-right: 40px;
+    font-size: 0.68rem;
   }
-  .ticker-item .ti-cat  { color: var(--red);  font-weight: 700; font-size: 0.6rem; letter-spacing: 2px; }
-  .ticker-item .ti-name { color: var(--text); }
-  .ticker-item .ti-sep  { color: var(--dim); margin: 0 4px; }
-  .ticker-dot { color: #444; font-size: 0.5rem; margin-right: 48px; }
+  .ti-cat  { color: var(--red); font-weight: 700; font-size: 0.58rem; letter-spacing: 1.5px; }
+  .ti-sep  { color: #444; }
+  .ti-name { color: #ccc; }
+  .ti-dot  { color: #333; margin-right: 40px; font-size: 0.45rem; }
 
   /* ── Header ── */
   header {
+    height: 46px;
+    min-height: 46px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
+    padding: 0 20px;
     background: #111;
     border-bottom: 2px solid var(--red);
     flex-shrink: 0;
   }
-  .logo { display: flex; align-items: center; gap: 12px; }
-  .logo-amd { background: var(--red); color: white; font-weight: 900; font-size: 1.2rem; padding: 3px 9px; letter-spacing: 2px; }
-  .logo-text { font-size: 1rem; font-weight: 300; letter-spacing: 4px; color: #ccc; }
-  #comfy-badge { font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; background: #222; border: 1px solid var(--dim); color: var(--dim); }
-  #comfy-badge.online { border-color: #22dd44; color: #22dd44; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-amd  { background: var(--red); color: #fff; font-weight: 900; font-size: 1.1rem; padding: 2px 8px; letter-spacing: 2px; }
+  .logo-text { font-size: 0.95rem; font-weight: 300; letter-spacing: 4px; color: #bbb; }
+  #ai-badge  { font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; background: #1a1a1a; border: 1px solid #444; color: #555; transition: all 0.3s; }
+  #ai-badge.online { border-color: #22dd44; color: #22dd44; }
 
-  /* ── Main ── */
-  main { display: flex; flex: 1; overflow: hidden; }
+  /* ── Body ── */
+  #body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 
-  /* ── Camera ── */
-  #cam-panel { flex: 1; position: relative; background: #000; cursor: crosshair; }
-  #feed { width: 100%; height: 100%; object-fit: contain; display: block; }
-
-  #selected-badge { position: absolute; top: 14px; left: 14px; background: var(--cyan); color: #000; font-weight: 700; font-size: 0.82rem; padding: 5px 13px; border-radius: 20px; display: none; }
-  #selected-badge.on { display: block; }
-  #clear-sel-btn { position: absolute; top: 14px; left: 14px; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); font-size: 0.78rem; padding: 5px 13px; border-radius: 20px; cursor: pointer; display: none; }
-  #clear-sel-btn.on { display: block; }
-
-  /* ── Name modal (centered overlay) ── */
-  #name-modal-bg {
-    position: fixed;
+  /* ── Camera panel ── */
+  #cam-panel {
+    flex: 1;
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    cursor: crosshair;
+    min-width: 0;
+  }
+  #feed {
+    position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.6);
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* overlays */
+  .abs-overlay {
+    position: absolute;
+    inset: 0;
     display: none;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 16px;
+    z-index: 10;
+  }
+  .abs-overlay.on { display: flex; }
+  #gen-overlay  { background: rgba(0,0,0,0.78); }
+  #result-overlay { background: rgba(0,0,0,0.92); }
+
+  .spinner {
+    width: 50px; height: 50px;
+    border: 4px solid #333;
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.85s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #gen-msg { color: var(--cyan); font-size: 0.95rem; letter-spacing: 1px; }
+  #result-img { max-height: 80vh; max-width: 92%; border-radius: 8px; }
+  #result-close {
+    background: var(--red); color: #fff; border: none;
+    padding: 11px 32px; border-radius: 6px; font-size: 0.95rem;
+    cursor: pointer; font-weight: 700; letter-spacing: 1px;
+  }
+
+  /* selection badges */
+  #sel-badge {
+    position: absolute; top: 12px; left: 12px;
+    background: var(--cyan); color: #000;
+    font-weight: 700; font-size: 0.8rem;
+    padding: 5px 12px; border-radius: 20px;
+    display: none; z-index: 5;
+  }
+  #sel-badge.on { display: block; }
+  #clear-btn {
+    position: absolute; top: 12px; left: 12px;
+    background: transparent; color: var(--cyan);
+    border: 1px solid var(--cyan); font-size: 0.75rem;
+    padding: 5px 12px; border-radius: 20px;
+    cursor: pointer; display: none; z-index: 5;
+  }
+  #clear-btn.on { display: block; }
+  #known-panel {
+    position: absolute; bottom: 12px; left: 12px;
+    display: flex; flex-wrap: wrap; gap: 5px;
+    max-width: 55%; z-index: 5;
+  }
+  .known-tag {
+    background: rgba(0,0,0,0.75);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    border-radius: 20px; font-size: 0.68rem;
+    padding: 3px 9px; cursor: default;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .ktx { color: #886600; font-size: 0.6rem; cursor: pointer; margin-left: 2px; }
+  .ktx:hover { color: var(--red); }
+
+  /* name modal */
+  #name-modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: none; align-items: center; justify-content: center;
     z-index: 50;
   }
   #name-modal-bg.on { display: flex; }
   #name-dialog {
     background: #141414;
     border: 1px solid var(--cyan);
-    border-radius: 12px;
-    padding: 22px 24px;
-    width: 300px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+    border-radius: 12px; padding: 22px 24px;
+    width: 300px; display: flex; flex-direction: column; gap: 14px;
     box-shadow: 0 8px 40px rgba(0,212,255,0.25);
   }
-  #name-dialog h4 { font-size: 0.85rem; color: var(--cyan); letter-spacing: 1px; }
+  #name-dialog h4 { font-size: 0.82rem; color: var(--cyan); letter-spacing: 1px; }
   #name-input {
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 6px;
-    color: white;
-    padding: 9px 12px;
-    font-size: 1rem;
-    outline: none;
-    width: 100%;
+    background: #1a1a1a; border: 1px solid #444; border-radius: 6px;
+    color: #fff; padding: 9px 12px; font-size: 0.95rem; outline: none; width: 100%;
   }
   #name-input:focus { border-color: var(--cyan); }
-  .name-dialog-btns { display: flex; gap: 8px; }
-  .name-dialog-btns button {
-    flex: 1; padding: 9px; border: none; border-radius: 6px;
-    cursor: pointer; font-size: 0.85rem; font-weight: 700;
-  }
-  #name-save-btn { background: var(--cyan); color: #000; }
-  #name-cancel-btn { background: #2a2a2a; color: #ccc; }
-
-  /* ── Known names panel ── */
-  #known-panel {
-    position: absolute;
-    bottom: 14px;
-    left: 14px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    max-width: 60%;
-  }
-  .known-tag {
-    background: rgba(0,0,0,0.7);
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    border-radius: 20px;
-    font-size: 0.7rem;
-    padding: 3px 10px;
-    cursor: pointer;
-    display: flex; align-items: center; gap: 5px;
-  }
-  .known-tag .forget-x { color: #aa7700; font-size: 0.65rem; margin-left: 2px; }
-  .known-tag:hover .forget-x { color: var(--red); }
-
-  /* ── Generating / result overlays ── */
-  #gen-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 15; }
-  #gen-overlay.on { display: flex; }
-  .spinner { width: 52px; height: 52px; border: 4px solid #333; border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #gen-msg { color: var(--cyan); font-size: 1rem; letter-spacing: 1px; }
-
-  #result-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.92); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 16; }
-  #result-overlay.on { display: flex; }
-  #result-img { max-height: 75vh; max-width: 90%; border-radius: 8px; }
-  #result-close { background: var(--red); color: white; border: none; padding: 12px 36px; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 700; letter-spacing: 1px; }
+  .nd-btns { display: flex; gap: 8px; }
+  .nd-btns button { flex: 1; padding: 9px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 700; }
+  #nd-save   { background: var(--cyan); color: #000; }
+  #nd-cancel { background: #2a2a2a; color: #ccc; }
 
   /* ── Sidebar ── */
-  aside { width: 270px; flex-shrink: 0; background: var(--gray); border-left: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
-  .section-title { font-size: 0.6rem; letter-spacing: 3px; color: var(--dim); text-transform: uppercase; padding: 12px 16px 8px; border-bottom: 1px solid #222; }
-  #char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 10px; overflow-y: auto; }
-  .char-card { background: var(--mid); border: 2px solid #333; border-radius: 8px; padding: 10px 6px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
-  .char-card:hover { border-color: #555; background: #333; }
-  .char-card.active { border-color: var(--cyan); background: rgba(0,212,255,0.07); }
-  .char-emoji { font-size: 1.5rem; margin-bottom: 3px; }
-  .char-name  { font-size: 0.75rem; font-weight: 600; }
-  .char-sub   { font-size: 0.58rem; color: var(--dim); margin-top: 2px; }
-  .char-card.ai-ready .char-name::after { content: " ✦"; color: var(--cyan); font-size: 0.6rem; }
+  #sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--gray);
+    border-left: 1px solid #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sec-title {
+    font-size: 0.58rem; letter-spacing: 3px; color: var(--dim);
+    text-transform: uppercase; padding: 12px 16px 8px;
+    border-bottom: 1px solid #222; flex-shrink: 0;
+  }
+  #char-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    padding: 10px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .cc {
+    background: var(--mid); border: 2px solid #333; border-radius: 8px;
+    padding: 10px 6px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .cc:hover  { border-color: #555; background: #333; }
+  .cc.active { border-color: var(--cyan); background: rgba(0,212,255,0.08); }
+  .cc-emoji { font-size: 1.5rem; margin-bottom: 4px; }
+  .cc-name  { font-size: 0.73rem; font-weight: 600; }
+  .cc-sub   { font-size: 0.57rem; color: var(--dim); margin-top: 2px; }
+  .cc.ready .cc-name::after { content: " ✦"; color: var(--cyan); font-size: 0.58rem; }
 
-  #transform-section { padding: 12px; border-top: 1px solid #222; margin-top: auto; }
-  #transform-btn { width: 100%; padding: 14px; background: var(--red); color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700; letter-spacing: 2px; cursor: pointer; text-transform: uppercase; transition: opacity 0.15s; }
-  #transform-btn:hover { opacity: 0.88; }
-  #transform-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  #selection-status { font-size: 0.7rem; color: var(--cyan); text-align: center; padding: 7px 0 3px; min-height: 20px; }
-  #selection-status.all { color: var(--dim); }
+  #xform-section {
+    padding: 12px; border-top: 1px solid #222; flex-shrink: 0;
+  }
+  #sel-status {
+    font-size: 0.68rem; color: var(--dim);
+    text-align: center; padding: 6px 0 4px; min-height: 20px;
+  }
+  #sel-status.has { color: var(--cyan); }
+  #xform-btn {
+    width: 100%; padding: 14px;
+    background: var(--red); color: #fff; border: none;
+    border-radius: 8px; font-size: 0.92rem; font-weight: 700;
+    letter-spacing: 2px; cursor: pointer; text-transform: uppercase;
+    transition: opacity 0.15s;
+  }
+  #xform-btn:hover    { opacity: 0.88; }
+  #xform-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #c0392b; color: white; padding: 9px 22px; border-radius: 8px; font-size: 0.83rem; display: none; z-index: 99; }
+  /* toast */
+  #toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    color: #fff; padding: 9px 22px; border-radius: 8px;
+    font-size: 0.82rem; display: none; z-index: 99; white-space: nowrap;
+  }
   #toast.on { display: block; }
 </style>
 </head>
@@ -217,188 +285,170 @@
 <!-- Ticker -->
 <div id="ticker-wrap">
   <div class="ticker-label">AMD STACK</div>
-  <div id="ticker-inner"><!-- filled by JS --></div>
+  <div id="ticker-track"></div>
 </div>
 
+<!-- Header -->
 <header>
   <div class="logo">
     <span class="logo-amd">AMD</span>
     <span class="logo-text">ADAPT KIOSK</span>
   </div>
-  <div id="comfy-badge">AI ENGINE ●</div>
+  <div id="ai-badge">AI ENGINE ●</div>
 </header>
 
-<main>
+<!-- Main body -->
+<div id="body">
+
+  <!-- Camera -->
   <div id="cam-panel">
     <img id="feed" src="/video_feed" alt="Live Feed">
 
-    <div id="selected-badge"></div>
-    <button id="clear-sel-btn" onclick="clearSelection()">✕ Clear</button>
-
-    <!-- Known faces tags -->
+    <div id="sel-badge"></div>
+    <button id="clear-btn" onclick="clearSel()">✕ Clear</button>
     <div id="known-panel"></div>
 
-    <!-- Name dialog -->
-    <div id="name-dialog">
-      <h4>NAME THIS PERSON</h4>
-      <input id="name-input" type="text" placeholder="Enter name..." maxlength="30"
-             onkeydown="if(event.key==='Enter')saveName()">
-      <div class="name-dialog-btns">
-        <button id="name-save-btn"   onclick="saveName()">Save</button>
-        <button id="name-cancel-btn" onclick="closeName()">Cancel</button>
-      </div>
-    </div>
-
-    <div id="gen-overlay">
+    <!-- Generating -->
+    <div id="gen-overlay" class="abs-overlay">
       <div class="spinner"></div>
       <div id="gen-msg">Transforming...</div>
     </div>
 
-    <div id="result-overlay">
-      <img id="result-img" src="" alt="AI Result">
+    <!-- Result -->
+    <div id="result-overlay" class="abs-overlay">
+      <img id="result-img" src="" alt="Result">
       <button id="result-close" onclick="closeResult()">← Back to Camera</button>
     </div>
   </div>
 
-  <aside>
-    <div class="section-title">Choose Character</div>
-    <div id="char-grid"></div>
-    <div id="transform-section">
-      <div id="selection-status" class="all">All people will be transformed</div>
-      <button id="transform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sec-title">Choose Character</div>
+    <div id="char-grid">
+      <!-- Hardcoded fallback cards — JS will enhance with ai-ready state -->
     </div>
-  </aside>
-</main>
+    <div id="xform-section">
+      <div id="sel-status">Select a person to transform</div>
+      <button id="xform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Name modal -->
+<div id="name-modal-bg">
+  <div id="name-dialog">
+    <h4>👤 NAME THIS PERSON</h4>
+    <input id="name-input" type="text" placeholder="Enter their name..." maxlength="30"
+           onkeydown="if(event.key==='Enter') saveName()">
+    <div class="nd-btns">
+      <button id="nd-save"   onclick="saveName()">✓ Save</button>
+      <button id="nd-cancel" onclick="closeName()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
 <script>
-// ── Ticker data ───────────────────────────────────────────────────────────────
-const TICKER_ITEMS = [
-  { cat:"CPU",      name:"AMD Threadripper PRO 9995X  ·  96 Cores / 192 Threads  ·  5.1 GHz Boost" },
-  { cat:"GPU",      name:"AMD Radeon PRO W7900  ·  48 GB GDDR6  ·  gfx1100 RDNA3" },
-  { cat:"PLATFORM", name:"ROCm 6.2  ·  HIP Runtime  ·  DirectML" },
-  { cat:"AI MODEL", name:"SDXL-Turbo  ·  Stable Diffusion XL 1.0 FP16  ·  4-step inference" },
-  { cat:"AI MODEL", name:"ControlNet LoRA Canny Rank-128  ·  Pose-guided generation" },
-  { cat:"ENGINE",   name:"ComfyUI  ·  v0.3.10  ·  Custom AMD-optimized pipeline" },
-  { cat:"VISION",   name:"OpenCV  ·  Face Detection  ·  Haar Cascade  ·  LBPH Recognition" },
-  { cat:"VISION",   name:"rembg  ·  u2net-human-seg  ·  Real-time body segmentation" },
-  { cat:"VISION",   name:"MediaPipe  ·  Pose Landmarks  ·  33-point skeleton tracking" },
-  { cat:"BACKEND",  name:"FastAPI  ·  Uvicorn ASGI  ·  MJPEG stream  ·  REST API" },
-  { cat:"OS",       name:"Ubuntu 24.04 LTS  ·  ROCm 6.2 kernel driver  ·  HSA Runtime" },
-  { cat:"CAMERA",   name:"Logitech Brio 4K  ·  1920×1080 @ 30fps  ·  USB 3.0" },
+// ── Ticker ────────────────────────────────────────────────────────────────────
+const STACK = [
+  ["CPU",      "AMD Threadripper PRO 9995X  ·  96 Cores / 192 Threads  ·  5.1 GHz Boost"],
+  ["GPU",      "AMD Radeon PRO W7900  ·  48 GB GDDR6  ·  RDNA3  ·  gfx1100"],
+  ["PLATFORM", "ROCm 6.2  ·  HIP Runtime  ·  HSA  ·  DirectML"],
+  ["AI MODEL", "SDXL-Turbo  ·  Stable Diffusion XL 1.0 FP16  ·  4-step inference"],
+  ["AI MODEL", "ControlNet LoRA Canny Rank-128  ·  Pose-guided generation"],
+  ["ENGINE",   "ComfyUI v0.3.10  ·  AMD-optimized pipeline  ·  REST API"],
+  ["VISION",   "OpenCV  ·  Haar Cascade Face Detection  ·  LBPH Face Recognition"],
+  ["VISION",   "rembg  ·  u2net-human-seg  ·  Real-time body segmentation"],
+  ["VISION",   "MediaPipe  ·  33-point pose skeleton tracking"],
+  ["BACKEND",  "FastAPI  ·  Uvicorn ASGI  ·  MJPEG stream  ·  60fps"],
+  ["OS",       "Ubuntu 24.04 LTS  ·  ROCm 6.2 kernel driver  ·  HSA Runtime"],
+  ["CAMERA",   "Logitech Brio 4K  ·  1080p @ 60fps  ·  USB 3.0"],
+];
+(function buildTicker() {
+  const t = [...STACK, ...STACK].map(([cat, name]) =>
+    `<span class="ti"><span class="ti-cat">${cat}</span><span class="ti-sep">▸</span><span class="ti-name">${name}</span></span><span class="ti-dot">◆</span>`
+  ).join("");
+  document.getElementById("ticker-track").innerHTML = t;
+})();
+
+// ── Characters (hardcoded so UI works even if API is slow) ────────────────────
+const CHARS = [
+  { key:"navi",     emoji:"🔵", name:"Na'vi",    sub:"Avatar · Pandora" },
+  { key:"hulk",     emoji:"💚", name:"Hulk",      sub:"Gamma · Avengers" },
+  { key:"thanos",   emoji:"💜", name:"Thanos",    sub:"Infinity · Titan" },
+  { key:"predator", emoji:"👁️", name:"Predator",  sub:"Thermal · Cloaked" },
+  { key:"ghost",    emoji:"👻", name:"Ghost",     sub:"Spectral · Ethereal" },
+  { key:"groot",    emoji:"🌿", name:"Groot",     sub:"Guardians · Flora" },
 ];
 
-function buildTicker() {
-  const inner = document.getElementById("ticker-inner");
-  // Duplicate for seamless loop
-  const all = [...TICKER_ITEMS, ...TICKER_ITEMS];
-  inner.innerHTML = all.map(item =>
-    `<span class="ticker-item">
-       <span class="ti-cat">${item.cat}</span>
-       <span class="ti-sep">▸</span>
-       <span class="ti-name">${item.name}</span>
-     </span>
-     <span class="ticker-dot">◆</span>`
-  ).join("");
-}
-
-// ── State ─────────────────────────────────────────────────────────────────────
 let selectedChar  = "navi";
-let pollTimer     = null;
 let selCount      = 0;
 let faceCount     = 0;
-let pendingNameIdx = null;  // face index waiting to be named
+let pendingNameIdx = null;
+let pollTimer     = null;
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-async function init() {
-  buildTicker();
-  await loadCharacters();
-  checkComfy();
-  setInterval(checkComfy, 8000);
-  refreshKnownNames();
+function buildCharGrid(aiReady) {
+  const grid = document.getElementById("char-grid");
+  grid.innerHTML = CHARS.map(c => `
+    <div class="cc${c.key === selectedChar ? " active" : ""}${aiReady ? " ready" : ""}"
+         onclick="selectChar('${c.key}', this)" data-key="${c.key}">
+      <div class="cc-emoji">${c.emoji}</div>
+      <div class="cc-name">${c.name}</div>
+      <div class="cc-sub">${c.sub}</div>
+    </div>`).join("");
 }
 
-async function loadCharacters() {
-  try {
-    const r    = await fetch("/characters");
-    const data = await r.json();
-    const grid = document.getElementById("char-grid");
-    grid.innerHTML = "";
-    data.characters.forEach(c => {
-      const card = document.createElement("div");
-      card.className = `char-card${c.ai_ready?" ai-ready":""}${c.key===selectedChar?" active":""}`;
-      card.dataset.key = c.key;
-      card.innerHTML = `<div class="char-emoji">${c.emoji}</div>
-                        <div class="char-name">${c.label}</div>
-                        <div class="char-sub">${c.subtitle}</div>`;
-      card.onclick = () => { selectedChar = c.key; document.querySelectorAll(".char-card").forEach(x=>x.classList.remove("active")); card.classList.add("active"); };
-      grid.appendChild(card);
-    });
-  } catch(e) {}
+function selectChar(key, el) {
+  selectedChar = key;
+  document.querySelectorAll(".cc").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
 }
 
 async function checkComfy() {
   try {
     const r = await fetch("/comfy_status");
     const d = await r.json();
-    const b = document.getElementById("comfy-badge");
+    const b = document.getElementById("ai-badge");
     b.textContent = d.available ? "AI ENGINE ●" : "AI ENGINE ○";
-    b.classList.toggle("online", d.available);
-  } catch(e) {}
+    b.classList.toggle("online", !!d.available);
+    return d.available;
+  } catch(e) { return false; }
 }
 
-// ── Camera click: select person OR name ───────────────────────────────────────
-// object-fit:contain adds letterbox bars — we must map click into actual image coords
+// ── Click to select person ────────────────────────────────────────────────────
 function getImageCoords(e) {
   const feed = document.getElementById("feed");
   const rect = feed.getBoundingClientRect();
-
-  // Natural size of the video stream (use reported frame size if available)
   const natW = feed.naturalWidth  || 1280;
   const natH = feed.naturalHeight || 720;
-
-  // Rendered size
   const renW = rect.width;
   const renH = rect.height;
-
-  // Aspect ratios
   const imgAR = natW / natH;
   const boxAR = renW / renH;
-
   let imgW, imgH, offX, offY;
   if (imgAR > boxAR) {
-    // Pillarbox: image fills width, black bars top/bottom
-    imgW = renW;
-    imgH = renW / imgAR;
-    offX = 0;
-    offY = (renH - imgH) / 2;
+    imgW = renW; imgH = renW / imgAR;
+    offX = 0;    offY = (renH - imgH) / 2;
   } else {
-    // Letterbox: image fills height, black bars left/right
-    imgH = renH;
-    imgW = renH * imgAR;
-    offX = (renW - imgW) / 2;
-    offY = 0;
+    imgH = renH; imgW = renH * imgAR;
+    offX = (renW - imgW) / 2; offY = 0;
   }
-
   const cx = e.clientX - rect.left - offX;
   const cy = e.clientY - rect.top  - offY;
-
-  // Reject clicks in the black bars
   if (cx < 0 || cy < 0 || cx > imgW || cy > imgH) return null;
-
   return { clickX: cx, clickY: cy, frameW: imgW, frameH: imgH };
 }
 
 document.getElementById("cam-panel").addEventListener("click", async function(e) {
-  if (e.target.closest("button")) return;
-  if (e.target.id === "result-img") return;
+  if (e.target.closest("button") || e.target.id === "result-img") return;
   if (document.getElementById("result-overlay").classList.contains("on")) return;
   if (document.getElementById("gen-overlay").classList.contains("on")) return;
   if (document.getElementById("name-modal-bg").classList.contains("on")) { closeName(); return; }
 
   const coords = getImageCoords(e);
-  if (!coords) return;  // clicked in letterbox bar, ignore
+  if (!coords) return;
 
   const fd = new FormData();
   fd.append("click_x", coords.clickX);
@@ -406,50 +456,46 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
   fd.append("frame_w", coords.frameW);
   fd.append("frame_h", coords.frameH);
 
-  const r    = await fetch("/select_person", {method:"POST", body:fd});
-  const data = await r.json();
-  updateSelectionUI(data.faces);
-
-  // If a newly selected face has no name, offer to name them
-  const newlySelected = data.faces.find(f => f.selected && !f.name);
-  if (newlySelected) {
-    openNameDialog(newlySelected, e.clientX, e.clientY);
-  }
+  try {
+    const r    = await fetch("/select_person", { method:"POST", body:fd });
+    const data = await r.json();
+    updateSelUI(data.faces);
+    const newSel = data.faces.find(f => f.selected && !f.name);
+    if (newSel) openNameDialog(newSel, e.clientX, e.clientY);
+  } catch(err) {}
 });
 
-function updateSelectionUI(faces) {
-  faceCount = faces.length;
-  selCount  = faces.filter(f => f.selected).length;
-  const badge    = document.getElementById("selected-badge");
-  const clearBtn = document.getElementById("clear-sel-btn");
-  const status   = document.getElementById("selection-status");
+function updateSelUI(faces) {
+  faceCount = faces ? faces.length : 0;
+  selCount  = faces ? faces.filter(f => f.selected).length : 0;
+  const badge  = document.getElementById("sel-badge");
+  const clrBtn = document.getElementById("clear-btn");
+  const status = document.getElementById("sel-status");
   if (selCount > 0) {
     badge.textContent = `${selCount} selected`;
     badge.classList.add("on");
-    clearBtn.classList.add("on");
-    status.textContent = `Transforming ${selCount} of ${faceCount} person${faceCount>1?"s":""}`;
-    status.className = "";
+    clrBtn.classList.add("on");
+    status.textContent = `Transforming ${selCount} of ${faceCount} person${faceCount > 1 ? "s" : ""}`;
+    status.className = "has";
   } else {
     badge.classList.remove("on");
-    clearBtn.classList.remove("on");
-    status.textContent = faceCount > 0 ? "Tap someone to select · or transform all" : "All people will be transformed";
-    status.className = "all";
+    clrBtn.classList.remove("on");
+    status.textContent = faceCount > 0 ? "Tap a person to select" : "Select a person to transform";
+    status.className = "";
   }
 }
 
-async function clearSelection() {
-  await fetch("/clear_selection", {method:"POST"});
-  updateSelectionUI([]);
-  closeName();
+async function clearSel() {
+  await fetch("/clear_selection", { method:"POST" });
+  updateSelUI([]);
 }
 
 // ── Name dialog ───────────────────────────────────────────────────────────────
-function openNameDialog(face, clientX, clientY) {
+function openNameDialog(face) {
   pendingNameIdx = face.index;
-  const inp = document.getElementById("name-input");
-  inp.value = face.name || "";
+  document.getElementById("name-input").value = face.name || "";
   document.getElementById("name-modal-bg").classList.add("on");
-  setTimeout(() => inp.focus(), 80);
+  setTimeout(() => document.getElementById("name-input").focus(), 80);
 }
 
 function closeName() {
@@ -464,10 +510,10 @@ async function saveName() {
   fd.append("index", pendingNameIdx);
   fd.append("name",  name);
   try {
-    await fetch("/name_face", {method:"POST", body:fd});
-    showToast(`✓ ${name} saved — will be recognized automatically`, "ok");
+    await fetch("/name_face", { method:"POST", body:fd });
+    toast(`✓ ${name} saved`, "ok");
     refreshKnownNames();
-  } catch(e) { showToast("Could not save name"); }
+  } catch(e) { toast("Could not save name"); }
   closeName();
 }
 
@@ -476,12 +522,8 @@ async function refreshKnownNames() {
     const r    = await fetch("/known_names");
     const data = await r.json();
     const panel = document.getElementById("known-panel");
-    const names = Object.values(data.names);
-    panel.innerHTML = names.map(n =>
-      `<div class="known-tag" title="Click ✕ to forget ${n}">
-         👤 ${n}
-         <span class="forget-x" onclick="forgetFace('${n}',event)">✕</span>
-       </div>`
+    panel.innerHTML = Object.values(data.names).map(n =>
+      `<div class="known-tag">👤 ${n}<span class="ktx" onclick="forgetFace('${n}',event)">✕</span></div>`
     ).join("");
   } catch(e) {}
 }
@@ -490,35 +532,40 @@ async function forgetFace(name, e) {
   e.stopPropagation();
   const fd = new FormData();
   fd.append("name", name);
-  await fetch("/forget_face", {method:"POST", body:fd});
-  showToast(`Removed ${name}`);
+  await fetch("/forget_face", { method:"POST", body:fd });
+  toast(`Removed ${name}`);
   refreshKnownNames();
 }
 
+document.getElementById("name-modal-bg").addEventListener("click", function(e) {
+  if (e.target === this) closeName();
+});
+
 // ── Transform ─────────────────────────────────────────────────────────────────
 async function doTransform() {
-  const btn = document.getElementById("transform-btn");
+  const btn = document.getElementById("xform-btn");
   btn.disabled = true;
-  closeName();
-  try {
-    const r = await fetch("/comfy_status");
-    const d = await r.json();
-    if (!d.available) { showToast("AI Engine offline — run ~/start_comfyui.sh"); btn.disabled=false; return; }
-  } catch(e) { btn.disabled=false; return; }
+
+  const online = await checkComfy();
+  if (!online) {
+    toast("AI Engine offline — run ~/start_comfyui.sh");
+    btn.disabled = false;
+    return;
+  }
 
   document.getElementById("gen-overlay").classList.add("on");
   document.getElementById("gen-msg").textContent = selCount > 0
-    ? `Transforming ${selCount} selected person${selCount>1?"s":""}...`
-    : "Transforming everyone...";
+    ? `Transforming ${selCount} person${selCount > 1 ? "s" : ""}...`
+    : "Transforming...";
 
   const fd = new FormData();
   fd.append("character", selectedChar);
   try {
-    const r    = await fetch("/generate", {method:"POST", body:fd});
+    const r = await fetch("/generate", { method:"POST", body:fd });
     if (r.status === 400) {
       const d = await r.json();
       hideSpinner();
-      showToast(d.detail || "Select at least one person first");
+      toast(d.detail || "Select at least one person first");
       btn.disabled = false;
       return;
     }
@@ -526,9 +573,9 @@ async function doTransform() {
     if (data.status === "generating" || data.status === "busy") {
       pollTimer = setInterval(pollStatus, 1000);
     } else {
-      hideSpinner(); showToast(data.message||"Error"); btn.disabled=false;
+      hideSpinner(); toast(data.message || "Error starting"); btn.disabled = false;
     }
-  } catch(e) { hideSpinner(); showToast("Connection error"); btn.disabled=false; }
+  } catch(e) { hideSpinner(); toast("Connection error"); btn.disabled = false; }
 }
 
 async function pollStatus() {
@@ -537,11 +584,11 @@ async function pollStatus() {
     const data = await r.json();
     if (data.status === "done" && data.image) {
       clearInterval(pollTimer); hideSpinner(); showResult(data.image);
-      document.getElementById("transform-btn").disabled = false;
+      document.getElementById("xform-btn").disabled = false;
     } else if (data.status === "error") {
       clearInterval(pollTimer); hideSpinner();
-      showToast("Error: " + (data.message||"unknown"));
-      document.getElementById("transform-btn").disabled = false;
+      toast("Error: " + (data.message || "unknown"));
+      document.getElementById("xform-btn").disabled = false;
     } else if (data.message) {
       document.getElementById("gen-msg").textContent = data.message;
     }
@@ -549,18 +596,16 @@ async function pollStatus() {
 }
 
 function hideSpinner() { document.getElementById("gen-overlay").classList.remove("on"); }
-
 function showResult(src) {
   document.getElementById("result-img").src = src;
   document.getElementById("result-overlay").classList.add("on");
 }
-
 function closeResult() {
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
 }
 
-function showToast(msg, type="err") {
+function toast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
   t.style.background = type === "ok" ? "#1a7a3a" : "#c0392b";
@@ -568,9 +613,18 @@ function showToast(msg, type="err") {
   setTimeout(() => t.classList.remove("on"), 4000);
 }
 
-document.getElementById("name-modal-bg").addEventListener("click", function(e) {
-  if (e.target === this) closeName();
-});
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  // Build character grid immediately from hardcoded data — no API dependency
+  buildCharGrid(false);
+
+  // Then check if ComfyUI is up and mark cards as AI-ready
+  const online = await checkComfy();
+  buildCharGrid(online);
+
+  setInterval(checkComfy, 10000);
+  refreshKnownNames();
+}
 
 init();
 </script>
