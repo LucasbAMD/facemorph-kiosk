@@ -1,32 +1,29 @@
 #!/bin/bash
-# start_comfyui.sh — Launch ComfyUI for AMD Adapt Kiosk
+# start_comfyui.sh — ComfyUI for AMD Adapt Kiosk
 
 COMFY_DIR="${COMFYUI_PATH:-$HOME/ComfyUI}"
 COMFY_VENV="$HOME/comfyui-venv"
 
 if [ ! -d "$COMFY_DIR" ] || [ ! -d "$COMFY_VENV" ]; then
-    echo "[ERR] ComfyUI not installed. Run bash setup_ubuntu.sh first."
+    echo "[ERR] ComfyUI not installed. Run: bash setup_ubuntu.sh"
     exit 1
 fi
 
-# Fix GPU device permissions every launch
+# GPU device permissions every launch
 sudo chmod 666 /dev/kfd 2>/dev/null || true
 sudo chmod 666 /dev/dri/renderD128 2>/dev/null || true
 
 source "$COMFY_VENV/bin/activate"
 
-# Fix torchvision if missing
+# Fix any missing packages
 python3 -c "import torchvision" 2>/dev/null || {
-    echo "[..] torchvision missing — installing now..."
-    pip install torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/rocm6.2 -q
+    echo "[..] Installing torchvision..."
+    pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2 -q
 }
-
-# Ensure all required packages present
 pip install torchsde kornia spandrel requests -q 2>/dev/null || true
 pip uninstall -y comfy-aimdo 2>/dev/null || true
 
-# AMD W7900 ROCm environment
+# AMD W7900 ROCm env vars
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
 export PYTORCH_TUNABLEOP_ENABLED=1
 export DISABLE_ADDMM_CUDA_LT=1
@@ -44,15 +41,13 @@ echo "======================================================"
 python3 -c "
 import torch
 ok = torch.cuda.is_available()
-print(f'[{\"OK\" if ok else \"WARN\"}] GPU visible: {ok}')
-if ok: print(f'[OK] GPU: {torch.cuda.get_device_name(0)}')
+print(f'[{\"OK\" if ok else \"WARN\"}] GPU: {torch.cuda.get_device_name(0) if ok else \"not visible\"}')
 "
 
-echo ""
 mkdir -p "$HOME/ComfyUI/output"
 cd "$COMFY_DIR"
 
-python main.py \
+python3 main.py \
     --port 8188 \
     --listen 127.0.0.1 \
     --disable-auto-launch \
