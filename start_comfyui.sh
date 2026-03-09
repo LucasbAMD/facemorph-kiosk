@@ -9,11 +9,21 @@ if [ ! -d "$COMFY_DIR" ] || [ ! -d "$COMFY_VENV" ]; then
     exit 1
 fi
 
-# Fix GPU device permissions every launch (survives without full logout)
+# Fix GPU device permissions every launch
 sudo chmod 666 /dev/kfd 2>/dev/null || true
 sudo chmod 666 /dev/dri/renderD128 2>/dev/null || true
 
 source "$COMFY_VENV/bin/activate"
+
+# Fix torchvision if missing
+python3 -c "import torchvision" 2>/dev/null || {
+    echo "[..] torchvision missing — installing now..."
+    pip install torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/rocm6.2 -q
+}
+
+# Fix comfy-aimdo if present
+pip uninstall -y comfy-aimdo 2>/dev/null || true
 
 # AMD W7900 ROCm environment
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
@@ -30,7 +40,6 @@ echo "  ComfyUI — AMD Adapt Kiosk AI Engine"
 echo "  http://127.0.0.1:8188"
 echo "======================================================"
 
-# Quick GPU check
 python3 -c "
 import torch
 ok = torch.cuda.is_available()
