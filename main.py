@@ -57,7 +57,7 @@ def start_capture(camera_index: int = 0):
         if cap.isOpened():
             cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1920)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-            cap.set(cv2.CAP_PROP_FPS, 30)
+            cap.set(cv2.CAP_PROP_FPS, 60)
 
     def loop():
         global latest_frame
@@ -95,7 +95,7 @@ def generate_frames():
         _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 82])
         yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
                + buf.tobytes() + b"\r\n")
-        time.sleep(1/30)
+        time.sleep(1/60)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
@@ -157,9 +157,15 @@ async def generate(character: str = Form(...)):
     if not comfy.check_available():
         raise HTTPException(503, "ComfyUI not running — start ~/start_comfyui.sh")
 
-    # Get mask for selected people only
-    selected_mask = processor.get_selected_mask(frame)
+    # Get selection info
+    detected = processor.get_detected_faces()
+    sel_count = sum(1 for f in detected if f["selected"])
 
+    # If people are detected but none selected, block generation
+    if len(detected) > 0 and sel_count == 0:
+        raise HTTPException(400, "Please select at least one person before transforming")
+
+    selected_mask = processor.get_selected_mask(frame)
     started = comfy.generate(frame, character, selected_mask)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
@@ -218,6 +224,30 @@ async def status():
             "face_key": processor.face_key,
             "face_count": len(processor.catalog),
             "ai_ready": comfy.available}
+
+
+@app.post("/name_face")
+async def name_face(index: int = Form(...), name: str = Form(...)):
+    """Name a detected face at given index using current camera frame."""
+    with frame_lock:
+        frame = latest_frame.copy() if latest_frame is not None else None
+    if frame is None:
+        raise HTTPException(400, "No camera frame")
+    name = name.strip()
+    if not name:
+        raise HTTPException(400, "Name cannot be empty")
+    success = processor.name_selected_face(index, name, frame)
+    return JSONResponse({"status": "ok" if success else "error",
+                         "name": name, "index": index})
+
+@app.get("/known_names")
+async def known_names():
+    return JSONResponse({"names": processor.get_known_names()})
+
+@app.post("/forget_face")
+async def forget_face(name: str = Form(...)):
+    processor.forget_face(name)
+    return JSONResponse({"status": "ok"})
 
 @app.on_event("startup")
 async def on_startup():
