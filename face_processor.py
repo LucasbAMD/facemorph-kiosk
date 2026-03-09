@@ -332,7 +332,7 @@ class FaceProcessor:
         self._selected_people  = set()
         self._frame_size       = (0, 0)
         # Store face crops at selection time for reliable naming
-        self._selected_crops   = {}
+        self._pending_crops   = {}
 
         self._recog_frame = None
         self._recog_lock  = threading.Lock()
@@ -402,7 +402,7 @@ class FaceProcessor:
                 with self._lock:
                     if i in self._selected_people:
                         self._selected_people.discard(i)
-                        self._selected_crops.pop(i, None)
+                        self._pending_crops.pop(i, None)
                     else:
                         self._selected_people.add(i)
                         # Store face crop immediately at selection time
@@ -413,13 +413,13 @@ class FaceProcessor:
                             y2 = min(frame.shape[0], y+h+p)
                             crop = frame[y1:y2, x1:x2]
                             if crop.size > 0:
-                                self._selected_crops[i] = crop.copy()
+                                self._pending_crops[i] = crop.copy()
                 return
 
     def clear_selection(self):
         with self._lock:
             self._selected_people.clear()
-            self._selected_crops.clear()
+            self._pending_crops.clear()
 
     def get_selected_mask(self, frame):
         """Use pose landmarks for accurate body mask, fall back to face box."""
@@ -452,11 +452,10 @@ class FaceProcessor:
     # ── Face naming — uses stored crop, no dependency on current detection ────
     def name_face(self, index, name):
         with self._lock:
-            crop = self._selected_crops.get(index)
+            crop = self._pending_crops.get(index)
+            all_keys = list(self._pending_crops.keys())
+        print(f"[NAME] index={index} saved crops={all_keys} found={'yes' if crop is not None else 'NO'}")
         if crop is None:
-            # Fall back to current detection
-            with self._lock:
-                faces = list(self._detected_faces)
             return False
         self.recognizer.learn(crop, name)
         print(f"[OK] Learned: {name}")
