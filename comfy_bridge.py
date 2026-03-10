@@ -240,12 +240,8 @@ INSTANTID_CNET  = os.path.join(COMFY_DIR, "models", "controlnet", "instantid-con
 INSTANTID_NODE  = os.path.join(COMFY_DIR, "custom_nodes", "ComfyUI_InstantID")
 
 def _instantid_available():
-    """True only when all three InstantID components are present on disk."""
-    return (
-        os.path.exists(INSTANTID_MODEL) and
-        os.path.exists(INSTANTID_CNET)  and
-        os.path.exists(INSTANTID_NODE)
-    )
+    """Disabled -- InsightFace antelopev2 model not configured. Using Canny workflow."""
+    return False
 
 
 def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
