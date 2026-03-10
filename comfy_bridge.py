@@ -4,6 +4,7 @@ img2img + ControlNet Canny. Supports per-person selection mask.
 """
 
 import json
+import os
 import uuid
 import time
 import urllib.request
@@ -17,36 +18,152 @@ COMFY_URL = "http://127.0.0.1:8188"
 # Prompts instruct transformation of the subject, not generation of new characters.
 # denoise 0.72-0.78 is needed to actually transform the person's appearance.
 # cnet_strength 0.85 preserves pose without over-constraining the transformation.
+# Prompts use img2img transformation approach:
+# - Keep denoise 0.68-0.72 so original hair, face structure and clothing silhouette are preserved
+# - Explicitly instruct the model to TRANSFORM the subject, not replace them
+# - Negative prompts prevent hallucinated extra people from background noise
 CHARACTER_PROMPTS = {
-    "navi":     {
-        "positive": "full body portrait of a single Na'vi from Avatar movie, blue skin, bioluminescent cyan stripes on face and body, large amber eyes, Pandora jungle background with glowing plants, cinematic lighting, photorealistic, 8k, one person only",
-        "negative": "human skin, multiple people, two people, three people, ugly, blurry, cartoon, duplicate, extra person, background figures, human face",
-        "denoise": 0.75, "cnet_strength": 0.85,
+    "navi": {
+        "positive": (
+            "the same person transformed into a Na'vi from Avatar, "
+            "keeping their exact hair color and length, keeping their clothing silhouette, "
+            "face replaced with blue Na'vi skin, bioluminescent cyan facial markings, "
+            "large amber eyes, pointed ears, same body pose and proportions, "
+            "lush Pandora jungle background with bioluminescent plants and floating mountains, "
+            "cinematic lighting, photorealistic, 8k, single subject"
+        ),
+        "negative": (
+            "human skin tone, pink skin, multiple people, extra person, "
+            "different hair, bald, changed clothing, ugly, blurry, cartoon, "
+            "low quality, duplicate, background figures"
+        ),
+        "denoise": 0.70, "cnet_strength": 0.88,
     },
-    "hulk":     {
-        "positive": "full body portrait of the Incredible Hulk, massive green muscles, green skin all over body, torn purple pants, single subject, angry expression, dramatic sky background, cinematic, photorealistic, 8k",
-        "negative": "normal skin, multiple people, two people, cartoon, ugly, blurry, duplicate, extra person",
-        "denoise": 0.76, "cnet_strength": 0.85,
+    "hulk": {
+        "positive": (
+            "the same person transformed into the Incredible Hulk, "
+            "keeping their hair color and style, keeping their clothing transformed to torn purple pants, "
+            "skin replaced with massive green gamma-radiated muscles, hulk face with same facial structure, "
+            "same body pose, dramatic stormy sky background, "
+            "cinematic, photorealistic, 8k, single subject"
+        ),
+        "negative": (
+            "normal skin, multiple people, extra person, different hair, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "denoise": 0.72, "cnet_strength": 0.88,
     },
-    "thanos":   {
-        "positive": "full body portrait of Thanos Marvel villain, purple textured skin, gold and black armor, strong jaw and chin, single subject, cosmic space background, cinematic, photorealistic, 8k",
-        "negative": "human skin, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
-        "denoise": 0.75, "cnet_strength": 0.85,
+    "thanos": {
+        "positive": (
+            "the same person transformed into Thanos the Marvel villain, "
+            "keeping their facial bone structure and proportions, "
+            "skin replaced with purple Titan skin and wrinkles, "
+            "gold and black infinity gauntlet armor over their clothing, "
+            "same body pose and height, cosmic space nebula background, "
+            "cinematic, photorealistic, 8k, single subject"
+        ),
+        "negative": (
+            "human skin, pink skin, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "denoise": 0.70, "cnet_strength": 0.88,
     },
     "predator": {
-        "positive": "full body portrait of the Predator alien warrior, mandibles, dreadlocks, biomask, single subject, dense jungle background, thermal vision overlay, cinematic, detailed, 8k",
-        "negative": "human face, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
-        "denoise": 0.74, "cnet_strength": 0.85,
+        "positive": (
+            "the same person transformed into a Predator alien warrior, "
+            "keeping their body size and pose, "
+            "face replaced with Predator mandibles and dreadlocks, "
+            "biomask helmet, wrist blades, same clothing replaced with Predator mesh armor, "
+            "dense dark jungle background with thermal vision HUD, "
+            "cinematic, highly detailed, 8k, single subject"
+        ),
+        "negative": (
+            "human face, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "denoise": 0.70, "cnet_strength": 0.88,
     },
-    "ghost":    {
-        "positive": "full body portrait of a ghost, pale translucent spectral body, white ethereal aura, glowing edges, single subject, dark moody background, cinematic, 8k",
-        "negative": "solid opaque body, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
-        "denoise": 0.72, "cnet_strength": 0.82,
+    "ghost": {
+        "positive": (
+            "the same person transformed into a spectral ghost, "
+            "keeping their clothing and hair as translucent ethereal versions, "
+            "body becomes pale glowing translucent, white spectral aura, "
+            "same pose and proportions, particles of light floating off body, "
+            "dark atmospheric background, cinematic, 8k, single subject"
+        ),
+        "negative": (
+            "solid opaque body, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "denoise": 0.68, "cnet_strength": 0.85,
     },
-    "groot":    {
-        "positive": "full body portrait of Groot from Guardians of the Galaxy, living tree humanoid, bark textured skin, wooden arms and body, green leaves growing from body, single subject, forest background, cinematic, photorealistic, 8k",
-        "negative": "human skin, multiple people, two people, ugly, blurry, cartoon, duplicate, extra person",
-        "denoise": 0.75, "cnet_strength": 0.85,
+    "groot": {
+        "positive": (
+            "the same person transformed into Groot from Guardians of the Galaxy, "
+            "keeping their body pose and proportions, "
+            "skin replaced with living brown bark texture, "
+            "hair replaced with twigs and green leaves, "
+            "clothing replaced with bark and vines, "
+            "ancient forest background with shafts of light, "
+            "cinematic, photorealistic, 8k, single subject"
+        ),
+        "negative": (
+            "human skin, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "denoise": 0.70, "cnet_strength": 0.88,
+    },
+    "cyberpunk": {
+        "positive": (
+            "the same person transformed into a cyberpunk character, "
+            "keeping their hair color with added neon streaks, "
+            "clothing augmented with glowing circuit patterns and chrome plating, "
+            "cybernetic eye implants glowing cyan, chrome jaw augmentation, "
+            "same face structure and pose, "
+            "rain-soaked neon-lit cyberpunk city background, "
+            "cinematic, photorealistic, 8k, single subject"
+        ),
+        "negative": (
+            "fantasy, medieval, multiple people, extra person, "
+            "completely different appearance, ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "denoise": 0.71, "cnet_strength": 0.88,
+    },
+    "claymation": {
+        "positive": (
+            "the same person transformed into a claymation clay figurine, "
+            "keeping their exact hair color and clothing colors, "
+            "entire body made of smooth matte clay, visible fingerprint texture on clay surface, "
+            "Aardman Animations style, Wallace and Gromit aesthetic, "
+            "slightly exaggerated proportions, warm studio lighting on clay, "
+            "same pose and body shape preserved, "
+            "cheerful colorful stop-motion animation background, "
+            "claymation, clay model, plasticine, handcrafted, single subject"
+        ),
+        "negative": (
+            "photorealistic skin, human skin, CGI, digital art, anime, "
+            "multiple people, extra person, ugly, blurry, low quality, duplicate, "
+            "smooth plastic, rubber, glossy"
+        ),
+        "denoise": 0.78, "cnet_strength": 0.82,
+    },
+    "anime": {
+        "positive": (
+            "the same person transformed into an anime character illustration, "
+            "keeping their exact hair color and length, same clothing colors and style, "
+            "large expressive anime eyes, clean smooth cel-shaded skin, "
+            "sharp clean line art, vibrant saturated colors, "
+            "same facial structure and body pose preserved, "
+            "Studio Ghibli quality, professional anime key visual, "
+            "detailed anime background with soft bokeh, "
+            "anime art style, manga illustration, single subject"
+        ),
+        "negative": (
+            "photorealistic, photograph, 3d render, western cartoon, "
+            "multiple people, extra person, ugly, blurry, low quality, duplicate, "
+            "deformed eyes, bad anatomy, poorly drawn"
+        ),
+        "denoise": 0.76, "cnet_strength": 0.84,
     },
 }
 
@@ -66,7 +183,7 @@ def is_comfy_running():
         return False
 
 def _upload_frame(frame, filename="kiosk.png"):
-    max_dim = 768
+    max_dim = 896
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
@@ -92,7 +209,7 @@ def _make_control_image(frame, selection_mask=None, skeleton=None):
     - If skeleton (MediaPipe pose) is available: use it — best pose fidelity
     - Otherwise: fall back to Canny edges masked to person silhouette
     """
-    max_dim = 768
+    max_dim = 896
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
@@ -138,20 +255,183 @@ def _apply_selection_mask(frame, mask):
     result  = np.where(m3 > 0.5, frame, dim).astype(np.uint8)
     return result
 
-def _build_workflow(char_key, image_name, canny_name):
-    cfg = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
+# ── InstantID model paths ──────────────────────────────────────────────────────
+COMFY_DIR       = os.path.expanduser("~/ComfyUI")
+INSTANTID_MODEL = os.path.join(COMFY_DIR, "models", "instantid", "ip-adapter_instantid.bin")
+INSTANTID_CNET  = os.path.join(COMFY_DIR, "models", "controlnet", "instantid-controlnet.safetensors")
+INSTANTID_NODE  = os.path.join(COMFY_DIR, "custom_nodes", "ComfyUI_InstantID")
+
+def _instantid_available():
+    """True only when all three InstantID components are present on disk."""
+    return (
+        os.path.exists(INSTANTID_MODEL) and
+        os.path.exists(INSTANTID_CNET)  and
+        os.path.exists(INSTANTID_NODE)
+    )
+
+
+def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
+    """
+    InstantID two-pass workflow.
+
+    Layers the face identity embedding (via InsightFace + ip-adapter_instantid)
+    on top of the existing Canny structural guidance. The result is that the
+    generated character genuinely looks like the specific person standing at
+    the kiosk, not just a generic member of that species/style.
+
+    Node map:
+      1  CheckpointLoaderSimple  SDXL-Turbo fp16
+      2  InstantIDModelLoader    ip-adapter_instantid.bin
+      3  ControlNetLoader        instantid-controlnet.safetensors  (face keypoints)
+      4  InstantIDFaceAnalysis   InsightFace buffalo_l (runs on CPU — stable on ROCm)
+      5  LoadImage               full source frame  (structure reference)
+      6  LoadImage               face-crop reference (identity reference)
+      7  LoadImage               canny edge map
+      8  ControlNetLoader        control-lora-canny-rank128 (pose/structure layer)
+      9  VAEEncode               encode source frame
+      10 CLIPTextEncode positive
+      11 CLIPTextEncode negative
+      12 ApplyInstantID          inject face identity → patched model + conditionings
+      13 ControlNetApply         add Canny pose on top of InstantID conditionings
+      14 KSampler Pass 1         768px, 10 steps
+      15 LatentUpscale           bislerp 768→1024
+      16 KSampler Pass 2         1024px, 6 steps, denoise 0.35
+      17 VAEDecode
+      18 SaveImage
+    """
+    cfg  = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
+    seed = int(time.time()) % 2**32
     return {
-        "1":  {"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":"sd_xl_turbo_1.0_fp16.safetensors"}},
-        "2":  {"class_type":"ControlNetLoader","inputs":{"control_net_name":"control-lora-canny-rank128.safetensors"}},
+        "1":  {"class_type": "CheckpointLoaderSimple",
+               "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
+        "2":  {"class_type": "InstantIDModelLoader",
+               "inputs": {"instantid_file": "ip-adapter_instantid.bin"}},
+        "3":  {"class_type": "ControlNetLoader",
+               "inputs": {"control_net_name": "instantid-controlnet.safetensors"}},
+        "4":  {"class_type": "InstantIDFaceAnalysis",
+               "inputs": {"provider": "CPU"}},
+        "5":  {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "6":  {"class_type": "LoadImage", "inputs": {"image": face_name}},
+        "7":  {"class_type": "LoadImage", "inputs": {"image": canny_name}},
+        "8":  {"class_type": "ControlNetLoader",
+               "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
+        "9":  {"class_type": "VAEEncode",
+               "inputs": {"pixels": ["5", 0], "vae": ["1", 2]}},
+        "10": {"class_type": "CLIPTextEncode",
+               "inputs": {"text": cfg["positive"], "clip": ["1", 1]}},
+        "11": {"class_type": "CLIPTextEncode",
+               "inputs": {"text": cfg["negative"],  "clip": ["1", 1]}},
+        "12": {"class_type": "ApplyInstantID",
+               "inputs": {
+                   "instantid":   ["2", 0],
+                   "insightface": ["4", 0],
+                   "control_net": ["3", 0],
+                   "image":       ["5", 0],   # full frame for facial keypoints
+                   "image_kps":   ["6", 0],   # face crop for identity embedding
+                   "model":       ["1", 0],
+                   "positive":    ["10", 0],
+                   "negative":    ["11", 0],
+                   "ip_weight":   0.80,        # face identity strength (0.7-0.9 sweet spot)
+                   "cn_strength": 0.65,        # InstantID's own ControlNet strength
+                   "start_at":    0.0,
+                   "end_at":      1.0,
+               }},
+        "13": {"class_type": "ControlNetApply",
+               "inputs": {
+                   "conditioning": ["12", 0],          # positive from ApplyInstantID
+                   "control_net":  ["8", 0],
+                   "image":        ["7", 0],
+                   "strength":     cfg["cnet_strength"] * 0.75,  # slightly softer — InstantID handles pose
+               }},
+        "14": {"class_type": "KSampler",
+               "inputs": {
+                   "model":        ["12", 2],           # patched model from ApplyInstantID
+                   "positive":     ["13", 0],
+                   "negative":     ["12", 1],
+                   "latent_image": ["9",  0],
+                   "seed":         seed,
+                   "steps":        10,
+                   "cfg":          1.5,
+                   "sampler_name": "dpmpp_2m",
+                   "scheduler":    "karras",
+                   "denoise":      cfg["denoise"],
+               }},
+        "15": {"class_type": "LatentUpscale",
+               "inputs": {"samples": ["14", 0], "upscale_method": "bislerp",
+                          "width": 1024, "height": 1024, "crop": "disabled"}},
+        "16": {"class_type": "KSampler",
+               "inputs": {
+                   "model":        ["12", 2],
+                   "positive":     ["13", 0],
+                   "negative":     ["12", 1],
+                   "latent_image": ["15", 0],
+                   "seed":         seed + 1,
+                   "steps":        6,
+                   "cfg":          1.5,
+                   "sampler_name": "dpmpp_2m",
+                   "scheduler":    "karras",
+                   "denoise":      0.35,
+               }},
+        "17": {"class_type": "VAEDecode",
+               "inputs": {"samples": ["16", 0], "vae": ["1", 2]}},
+        "18": {"class_type": "SaveImage",
+               "inputs": {"images": ["17", 0],
+                          "filename_prefix": f"kiosk_iid_{char_key}"}},
+    }
+
+
+def _build_workflow(char_key, image_name, canny_name):
+    """
+    Two-pass hi-res workflow:
+      Pass 1 — img2img + ControlNet at 768px, 10 steps  → base transformation
+      Pass 2 — latent upscale to 1024px, 6 refine steps → sharper details
+    """
+    cfg  = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
+    seed = int(time.time()) % 2**32
+    return {
+        # ── Loaders ──────────────────────────────────────────────────────────
+        "1":  {"class_type":"CheckpointLoaderSimple",
+               "inputs":{"ckpt_name":"sd_xl_turbo_1.0_fp16.safetensors"}},
+        "2":  {"class_type":"ControlNetLoader",
+               "inputs":{"control_net_name":"control-lora-canny-rank128.safetensors"}},
+        # ── Input images ─────────────────────────────────────────────────────
         "3":  {"class_type":"LoadImage","inputs":{"image":image_name}},
         "4":  {"class_type":"LoadImage","inputs":{"image":canny_name}},
+        # ── Encode source image ───────────────────────────────────────────────
         "5":  {"class_type":"VAEEncode","inputs":{"pixels":["3",0],"vae":["1",2]}},
-        "6":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["positive"],"clip":["1",1]}},
-        "7":  {"class_type":"CLIPTextEncode","inputs":{"text":cfg["negative"],"clip":["1",1]}},
-        "8":  {"class_type":"ControlNetApply","inputs":{"conditioning":["6",0],"control_net":["2",0],"image":["4",0],"strength":cfg["cnet_strength"]}},
-        "9":  {"class_type":"KSampler","inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],"latent_image":["5",0],"seed":int(time.time())%2**32,"steps":6,"cfg":1.0,"sampler_name":"euler_ancestral","scheduler":"karras","denoise":cfg["denoise"]}},
-        "10": {"class_type":"VAEDecode","inputs":{"samples":["9",0],"vae":["1",2]}},
-        "11": {"class_type":"SaveImage","inputs":{"images":["10",0],"filename_prefix":f"kiosk_{char_key}"}},
+        # ── Text prompts ──────────────────────────────────────────────────────
+        "6":  {"class_type":"CLIPTextEncode",
+               "inputs":{"text":cfg["positive"],"clip":["1",1]}},
+        "7":  {"class_type":"CLIPTextEncode",
+               "inputs":{"text":cfg["negative"],"clip":["1",1]}},
+        # ── ControlNet ────────────────────────────────────────────────────────
+        "8":  {"class_type":"ControlNetApply",
+               "inputs":{"conditioning":["6",0],"control_net":["2",0],
+                         "image":["4",0],"strength":cfg["cnet_strength"]}},
+        # ── Pass 1: base transformation ───────────────────────────────────────
+        "9":  {"class_type":"KSampler",
+               "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
+                         "latent_image":["5",0],"seed":seed,
+                         "steps":10,"cfg":1.5,
+                         "sampler_name":"dpmpp_2m","scheduler":"karras",
+                         "denoise":cfg["denoise"]}},
+        # ── Upscale latent to 1024 ────────────────────────────────────────────
+        "10": {"class_type":"LatentUpscale",
+               "inputs":{"samples":["9",0],
+                         "upscale_method":"bislerp",
+                         "width":1024,"height":1024,
+                         "crop":"disabled"}},
+        # ── Pass 2: hi-res refine (low denoise to sharpen without changing look) ─
+        "11": {"class_type":"KSampler",
+               "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
+                         "latent_image":["10",0],"seed":seed+1,
+                         "steps":6,"cfg":1.5,
+                         "sampler_name":"dpmpp_2m","scheduler":"karras",
+                         "denoise":0.35}},
+        # ── Decode and save ───────────────────────────────────────────────────
+        "12": {"class_type":"VAEDecode","inputs":{"samples":["11",0],"vae":["1",2]}},
+        "13": {"class_type":"SaveImage",
+               "inputs":{"images":["12",0],"filename_prefix":f"kiosk_{char_key}"}},
     }
 
 def _blur_background(frame, selection_mask=None):
@@ -180,18 +460,50 @@ def _blur_background(frame, selection_mask=None):
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
+def _extract_face_crop(frame, selection_mask=None):
+    """
+    Return a tight face-crop from the frame for InstantID identity embedding.
+    Falls back to the full frame if no face is detected.
+    Uses OpenCV Haar Cascade — no extra dependencies.
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    detector = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
+    if len(faces) == 0:
+        return frame  # no face detected — use full frame
+    # Pick the largest face
+    x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
+    pad = int(max(w, h) * 0.35)
+    fh, fw = frame.shape[:2]
+    x1 = max(0, x - pad);  y1 = max(0, y - pad)
+    x2 = min(fw, x + w + pad); y2 = min(fh, y + h + pad)
+    crop = frame[y1:y2, x1:x2]
+    return crop if crop.size > 0 else frame
+
+
 def generate_character(frame, char_key, selection_mask=None, timeout=180):
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
-        # Blur background so model focuses on the person
         prepped      = _blur_background(frame, selection_mask)
-        img_name     = _upload_frame(prepped)
         control_name = _make_control_image(prepped, selection_mask)
-        workflow     = _build_workflow(char_key, img_name, control_name)
-        client_id  = uuid.uuid4().hex
-        result     = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
-        prompt_id  = result["prompt_id"]
+
+        use_iid = _instantid_available()
+        if use_iid:
+            print(f"[InstantID] Using identity-preserving workflow for {char_key}")
+            img_name  = _upload_frame(prepped)
+            face_crop = _extract_face_crop(frame, selection_mask)  # use original (sharp) for identity
+            face_name = _upload_frame(face_crop, "kiosk_face.png")
+            workflow  = _build_instantid_workflow(char_key, img_name, face_name, control_name)
+        else:
+            print(f"[Canny] Using standard workflow for {char_key} (InstantID not installed)")
+            img_name = _upload_frame(prepped)
+            workflow = _build_workflow(char_key, img_name, control_name)
+
+        client_id = uuid.uuid4().hex
+        result    = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
+        prompt_id = result["prompt_id"]
 
         start = time.time()
         while time.time() - start < timeout:
@@ -225,8 +537,11 @@ class ComfyBridge:
         self._thread        = None
         self._selection_mask = None
         self.available      = is_comfy_running()
+        self.instantid      = _instantid_available()
         print(f"[{'OK' if self.available else 'WARN'}] ComfyUI "
               f"{'connected' if self.available else 'not running — start ~/start_comfyui.sh'}")
+        print(f"[{'OK' if self.instantid else 'INFO'}] InstantID "
+              f"{'available — identity-preserving mode active' if self.instantid else 'not installed — run install_instantid.sh to enable'}")
 
     def check_available(self):
         self.available = is_comfy_running()
