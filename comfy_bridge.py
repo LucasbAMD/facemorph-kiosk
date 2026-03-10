@@ -131,37 +131,32 @@ CHARACTER_PROMPTS = {
     },
     "claymation": {
         "positive": (
-            "the same person transformed into a claymation clay figurine, "
-            "keeping their exact hair color and clothing colors, "
-            "entire body made of smooth matte clay, visible fingerprint texture on clay surface, "
-            "Aardman Animations style, Wallace and Gromit aesthetic, "
-            "slightly exaggerated proportions, warm studio lighting on clay, "
-            "same pose and body shape preserved, "
-            "cheerful colorful stop-motion animation background, "
-            "claymation, clay model, plasticine, handcrafted, single subject"
+            "the same person as a claymation clay figurine, "
+            "keeping their hair color and clothing colors, "
+            "smooth matte clay texture, visible fingerprint marks, "
+            "Aardman Wallace and Gromit style, slightly exaggerated proportions, "
+            "warm studio lighting, same pose preserved, "
+            "colorful stop-motion background, plasticine, single subject"
         ),
         "negative": (
-            "photorealistic skin, human skin, CGI, digital art, anime, "
+            "photorealistic skin, CGI, digital art, anime, "
             "multiple people, extra person, ugly, blurry, low quality, duplicate, "
-            "smooth plastic, rubber, glossy"
+            "glossy, rubber, plastic"
         ),
         "denoise": 0.78, "cnet_strength": 0.82,
     },
     "anime": {
         "positive": (
-            "the same person transformed into an anime character illustration, "
-            "keeping their exact hair color and length, same clothing colors and style, "
-            "large expressive anime eyes, clean smooth cel-shaded skin, "
-            "sharp clean line art, vibrant saturated colors, "
-            "same facial structure and body pose preserved, "
-            "Studio Ghibli quality, professional anime key visual, "
-            "detailed anime background with soft bokeh, "
-            "anime art style, manga illustration, single subject"
+            "the same person as an anime character, "
+            "keeping their exact hair color and clothing style, "
+            "large expressive anime eyes, cel-shaded smooth skin, "
+            "clean line art, vibrant colors, same pose preserved, "
+            "Studio Ghibli quality, soft bokeh background, single subject"
         ),
         "negative": (
             "photorealistic, photograph, 3d render, western cartoon, "
-            "multiple people, extra person, ugly, blurry, low quality, duplicate, "
-            "deformed eyes, bad anatomy, poorly drawn"
+            "multiple people, extra person, ugly, blurry, low quality, "
+            "deformed eyes, bad anatomy"
         ),
         "denoise": 0.76, "cnet_strength": 0.84,
     },
