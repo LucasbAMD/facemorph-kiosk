@@ -407,13 +407,25 @@ class FaceProcessor:
                         self._selected_people.add(i)
                         # Store face crop immediately at selection time
                         if frame is not None:
-                            p = 15
-                            x1 = max(0, x-p); y1 = max(0, y-p)
-                            x2 = min(frame.shape[1], x+w+p)
-                            y2 = min(frame.shape[0], y+h+p)
-                            crop = frame[y1:y2, x1:x2]
-                            if crop.size > 0:
-                                self._pending_crops[i] = crop.copy()
+                            # Search for a face within the body box
+                            bx1 = max(0, x); by1 = max(0, y)
+                            bx2 = min(frame.shape[1], x+w)
+                            by2 = min(frame.shape[0], y+h)
+                            body_roi = frame[by1:by2, bx1:bx2]
+                            face_crop = None
+                            if body_roi.size > 0:
+                                gray_roi = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
+                                sub_faces = self.face_det.detectMultiScale(
+                                    gray_roi, 1.1, 4, minSize=(30, 30))
+                                if len(sub_faces) > 0:
+                                    fx, fy, fw2, fh2 = sub_faces[0]
+                                    face_crop = body_roi[fy:fy+fh2, fx:fx+fw2]
+                            # Fallback: use top 25% of body box as face estimate
+                            if face_crop is None or face_crop.size == 0:
+                                face_top = min(by1 + h//4, frame.shape[0])
+                                face_crop = frame[by1:face_top, bx1:bx2]
+                            if face_crop is not None and face_crop.size > 0:
+                                self._pending_crops[i] = face_crop.copy()
                 return
 
     def clear_selection(self):
