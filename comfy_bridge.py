@@ -314,19 +314,19 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
                    "start_at":    0.0,
                    "end_at":      1.0,
                }},
-        # ApplyInstantID outputs: [0]=positive, [1]=negative, [2]=MODEL
+        # ApplyInstantID outputs: [0]=MODEL, [1]=positive, [2]=negative
         "13": {"class_type": "ControlNetApply",
                "inputs": {
-                   "conditioning": ["12", 0],          # positive conditioning
+                   "conditioning": ["12", 1],          # positive conditioning
                    "control_net":  ["8", 0],
                    "image":        ["7", 0],
                    "strength":     cfg["cnet_strength"] * 0.75,
                }},
         "14": {"class_type": "KSampler",
                "inputs": {
-                   "model":        ["12", 2],           # patched MODEL
+                   "model":        ["12", 0],           # patched MODEL
                    "positive":     ["13", 0],
-                   "negative":     ["12", 1],           # negative conditioning
+                   "negative":     ["12", 2],           # negative conditioning
                    "latent_image": ["9",  0],
                    "seed":         seed,
                    "steps":        20,
