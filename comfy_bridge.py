@@ -34,7 +34,7 @@ CHARACTER_PROMPTS = {
             "human skin, pink skin, multiple people, extra person, "
             "bald, changed clothing, ugly, blurry, cartoon, low quality"
         ),
-        "denoise": 0.70, "cnet_strength": 0.88,
+        "denoise": 0.62, "cnet_strength": 0.75,
     },
     "hulk": {
         "positive": (
@@ -47,7 +47,7 @@ CHARACTER_PROMPTS = {
             "normal skin, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.72, "cnet_strength": 0.88,
+        "denoise": 0.64, "cnet_strength": 0.75,
     },
     "thanos": {
         "positive": (
@@ -60,7 +60,7 @@ CHARACTER_PROMPTS = {
             "human skin, pink skin, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.70, "cnet_strength": 0.88,
+        "denoise": 0.62, "cnet_strength": 0.75,
     },
     "predator": {
         "positive": (
@@ -73,7 +73,7 @@ CHARACTER_PROMPTS = {
             "human face, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.70, "cnet_strength": 0.88,
+        "denoise": 0.62, "cnet_strength": 0.75,
     },
     "ghost": {
         "positive": (
@@ -86,7 +86,7 @@ CHARACTER_PROMPTS = {
             "solid opaque body, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.68, "cnet_strength": 0.85,
+        "denoise": 0.60, "cnet_strength": 0.72,
     },
     "groot": {
         "positive": (
@@ -99,7 +99,7 @@ CHARACTER_PROMPTS = {
             "human skin, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.70, "cnet_strength": 0.88,
+        "denoise": 0.62, "cnet_strength": 0.75,
     },
     "cyberpunk": {
         "positive": (
@@ -112,7 +112,7 @@ CHARACTER_PROMPTS = {
             "fantasy, medieval, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.75, "cnet_strength": 0.85,
+        "denoise": 0.65, "cnet_strength": 0.75,
     },
     "claymation": {
         "positive": (
@@ -125,20 +125,23 @@ CHARACTER_PROMPTS = {
             "photorealistic skin, CGI, anime, multiple people, "
             "extra person, ugly, blurry, low quality, glossy, rubber"
         ),
-        "denoise": 0.65, "cnet_strength": 0.65, "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
+        "denoise": 0.72, "cnet_strength": 0.65, "steps": 20,
     },
     "anime": {
         "positive": (
-            "person as an anime character, same hair color and clothing, "
-            "large expressive anime eyes, cel-shaded skin, clean line art, "
+            "male anime character, man, same face as the person, "
+            "same hair color and style, masculine jawline, "
+            "sharp anime eyes, cel-shaded skin, clean line art, "
             "vibrant colors, same pose, Studio Ghibli style, "
             "soft bokeh background, single subject"
         ),
         "negative": (
-            "photorealistic, photograph, 3d render, western cartoon, "
-            "multiple people, extra person, ugly, blurry, bad anatomy"
+            "female, woman, girl, feminine, photorealistic, photograph, "
+            "3d render, western cartoon, multiple people, extra person, "
+            "ugly, blurry, bad anatomy, deformed eyes, cross-eyed, "
+            "asymmetric eyes, mismatched eyes"
         ),
-        "denoise": 0.65, "cnet_strength": 0.65, "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
+        "denoise": 0.70, "cnet_strength": 0.78, "steps": 20,
     },
 }
 
@@ -237,8 +240,12 @@ INSTANTID_CNET  = os.path.join(COMFY_DIR, "models", "controlnet", "instantid-con
 INSTANTID_NODE  = os.path.join(COMFY_DIR, "custom_nodes", "ComfyUI_InstantID")
 
 def _instantid_available():
-    """Disabled until node API is confirmed -- using standard Canny workflow."""
-    return False
+    """True only when all three InstantID components are present on disk."""
+    return (
+        os.path.exists(INSTANTID_MODEL) and
+        os.path.exists(INSTANTID_CNET)  and
+        os.path.exists(INSTANTID_NODE)
+    )
 
 
 def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
@@ -274,7 +281,7 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
     seed = int(time.time()) % 2**32
     return {
         "1":  {"class_type": "CheckpointLoaderSimple",
-               "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
+               "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
         "2":  {"class_type": "InstantIDModelLoader",
                "inputs": {"instantid_file": "ip-adapter_instantid.bin"}},
         "3":  {"class_type": "ControlNetLoader",
@@ -297,72 +304,56 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
                    "instantid":   ["2", 0],
                    "insightface": ["4", 0],
                    "control_net": ["3", 0],
-                   "image":       ["5", 0],   # full frame for facial keypoints
-                   "image_kps":   ["6", 0],   # face crop for identity embedding
+                   "image":       ["5", 0],
+                   "image_kps":   ["6", 0],
                    "model":       ["1", 0],
                    "positive":    ["10", 0],
                    "negative":    ["11", 0],
-                   "ip_weight":   0.80,        # face identity strength (0.7-0.9 sweet spot)
-                   "cn_strength": 0.65,        # InstantID's own ControlNet strength
+                   "weight":      0.80,        # fixed: was ip_weight
+                   "cn_strength": 0.65,
                    "start_at":    0.0,
                    "end_at":      1.0,
                }},
+        # ApplyInstantID outputs: [0]=positive, [1]=negative, [2]=MODEL
         "13": {"class_type": "ControlNetApply",
                "inputs": {
-                   "conditioning": ["12", 0],          # positive from ApplyInstantID
+                   "conditioning": ["12", 0],          # positive conditioning
                    "control_net":  ["8", 0],
                    "image":        ["7", 0],
-                   "strength":     cfg["cnet_strength"] * 0.75,  # slightly softer -- InstantID handles pose
+                   "strength":     cfg["cnet_strength"] * 0.75,
                }},
         "14": {"class_type": "KSampler",
                "inputs": {
-                   "model":        ["12", 2],           # patched model from ApplyInstantID
+                   "model":        ["12", 2],           # patched MODEL
                    "positive":     ["13", 0],
-                   "negative":     ["12", 1],
+                   "negative":     ["12", 1],           # negative conditioning
                    "latent_image": ["9",  0],
                    "seed":         seed,
-                   "steps":        4,
-                   "cfg":          1.0,
-                   "sampler_name": "euler_ancestral",
-                   "scheduler":    "sgm_uniform",
+                   "steps":        20,
+                   "cfg":          7.0,
+                   "sampler_name": "dpmpp_2m",
+                   "scheduler":    "karras",
                    "denoise":      cfg["denoise"],
                }},
-        "15": {"class_type": "LatentUpscale",
-               "inputs": {"samples": ["14", 0], "upscale_method": "bislerp",
-                          "width": 1024, "height": 1024, "crop": "disabled"}},
-        "16": {"class_type": "KSampler",
-               "inputs": {
-                   "model":        ["12", 2],
-                   "positive":     ["13", 0],
-                   "negative":     ["12", 1],
-                   "latent_image": ["15", 0],
-                   "seed":         seed + 1,
-                   "steps":        3,
-                   "cfg":          1.0,
-                   "sampler_name": "euler_ancestral",
-                   "scheduler":    "sgm_uniform",
-                   "denoise":      0.30,
-               }},
-        "17": {"class_type": "VAEDecode",
-               "inputs": {"samples": ["16", 0], "vae": ["1", 2]}},
-        "18": {"class_type": "SaveImage",
-               "inputs": {"images": ["17", 0],
+        "15": {"class_type": "VAEDecode",
+               "inputs": {"samples": ["14", 0], "vae": ["1", 2]}},
+        "16": {"class_type": "SaveImage",
+               "inputs": {"images": ["15", 0],
                           "filename_prefix": f"kiosk_iid_{char_key}"}},
     }
 
 
 def _build_workflow(char_key, image_name, canny_name):
-    """Single-pass img2img + ControlNet at 896px."""
+    """Single-pass img2img + ControlNet at 896px using SDXL base 1.0."""
     cfg       = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed      = int(time.time()) % 2**32
-    steps     = cfg.get("steps", 8)
-    # euler_ancestral + sgm_uniform is the correct pairing for SDXL-Turbo
-    # (sgm_uniform is the scheduler it was actually trained with -- karras causes smearing)
-    sampler   = cfg.get("sampler",    "euler_ancestral")
-    scheduler = cfg.get("scheduler",  "sgm_uniform")
+    steps     = cfg.get("steps", 20)
+    # SDXL base uses dpmpp_2m + karras -- correct for this model
+    sampler   = cfg.get("sampler",    "dpmpp_2m")
+    scheduler = cfg.get("scheduler",  "karras")
     return {
         "1": {"class_type": "CheckpointLoaderSimple",
-              "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
+              "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
         "2": {"class_type": "ControlNetLoader",
               "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
         "3": {"class_type": "LoadImage", "inputs": {"image": image_name}},
@@ -379,7 +370,7 @@ def _build_workflow(char_key, image_name, canny_name):
         "9": {"class_type": "KSampler",
               "inputs": {"model": ["1", 0], "positive": ["8", 0], "negative": ["7", 0],
                          "latent_image": ["5", 0], "seed": seed,
-                         "steps": steps, "cfg": 1.0,
+                         "steps": steps, "cfg": 7.0,
                          "sampler_name": sampler, "scheduler": scheduler,
                          "denoise": cfg["denoise"]}},
         "10": {"class_type": "VAEDecode",
