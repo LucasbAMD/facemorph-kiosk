@@ -158,7 +158,7 @@ def is_comfy_running():
         return False
 
 def _upload_frame(frame, filename="kiosk.png"):
-    max_dim = 1024
+    max_dim = 896
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
@@ -184,7 +184,7 @@ def _make_control_image(frame, selection_mask=None, skeleton=None):
     - If skeleton (MediaPipe pose) is available: use it — best pose fidelity
     - Otherwise: fall back to Canny edges masked to person silhouette
     """
-    max_dim = 1024
+    max_dim = 896
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
