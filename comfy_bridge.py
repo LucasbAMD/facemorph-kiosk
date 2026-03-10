@@ -325,8 +325,8 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
                    "negative":     ["12", 1],
                    "latent_image": ["9",  0],
                    "seed":         seed,
-                   "steps":        10,
-                   "cfg":          1.5,
+                   "steps":        4,
+                   "cfg":          1.0,
                    "sampler_name": "dpmpp_2m",
                    "scheduler":    "karras",
                    "denoise":      cfg["denoise"],
@@ -341,11 +341,11 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
                    "negative":     ["12", 1],
                    "latent_image": ["15", 0],
                    "seed":         seed + 1,
-                   "steps":        6,
-                   "cfg":          1.5,
+                   "steps":        3,
+                   "cfg":          1.0,
                    "sampler_name": "dpmpp_2m",
                    "scheduler":    "karras",
-                   "denoise":      0.35,
+                   "denoise":      0.30,
                }},
         "17": {"class_type": "VAEDecode",
                "inputs": {"samples": ["16", 0], "vae": ["1", 2]}},
@@ -387,7 +387,7 @@ def _build_workflow(char_key, image_name, canny_name):
         "9":  {"class_type":"KSampler",
                "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
                          "latent_image":["5",0],"seed":seed,
-                         "steps":10,"cfg":1.5,
+                         "steps":4,"cfg":1.0,
                          "sampler_name":"dpmpp_2m","scheduler":"karras",
                          "denoise":cfg["denoise"]}},
         # ── Upscale latent to 1024 ────────────────────────────────────────────
@@ -396,13 +396,13 @@ def _build_workflow(char_key, image_name, canny_name):
                          "upscale_method":"bislerp",
                          "width":1024,"height":1024,
                          "crop":"disabled"}},
-        # ── Pass 2: hi-res refine (low denoise to sharpen without changing look) ─
+        # ── Pass 2: hi-res refine ─────────────────────────────────────────────
         "11": {"class_type":"KSampler",
                "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
                          "latent_image":["10",0],"seed":seed+1,
-                         "steps":6,"cfg":1.5,
+                         "steps":3,"cfg":1.0,
                          "sampler_name":"dpmpp_2m","scheduler":"karras",
-                         "denoise":0.35}},
+                         "denoise":0.30}},
         # ── Decode and save ───────────────────────────────────────────────────
         "12": {"class_type":"VAEDecode","inputs":{"samples":["11",0],"vae":["1",2]}},
         "13": {"class_type":"SaveImage",
@@ -457,7 +457,7 @@ def _extract_face_crop(frame, selection_mask=None):
     return crop if crop.size > 0 else frame
 
 
-def generate_character(frame, char_key, selection_mask=None, timeout=180):
+def generate_character(frame, char_key, selection_mask=None, timeout=400):
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
