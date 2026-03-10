@@ -112,7 +112,7 @@ CHARACTER_PROMPTS = {
             "fantasy, medieval, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
-        "denoise": 0.71, "cnet_strength": 0.88,
+        "denoise": 0.75, "cnet_strength": 0.85,
     },
     "claymation": {
         "positive": (
@@ -158,7 +158,7 @@ def is_comfy_running():
         return False
 
 def _upload_frame(frame, filename="kiosk.png"):
-    max_dim = 896
+    max_dim = 1024
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
@@ -184,7 +184,7 @@ def _make_control_image(frame, selection_mask=None, skeleton=None):
     - If skeleton (MediaPipe pose) is available: use it — best pose fidelity
     - Otherwise: fall back to Canny edges masked to person silhouette
     """
-    max_dim = 896
+    max_dim = 1024
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
@@ -359,7 +359,7 @@ def _build_workflow(char_key, image_name, canny_name):
     """Single-pass img2img + ControlNet at 768px. Fast, no hipBLAS upscale hang."""
     cfg     = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed    = int(time.time()) % 2**32
-    steps   = cfg.get("steps", 4)
+    steps   = cfg.get("steps", 8)
     sampler = cfg.get("sampler", "dpmpp_2m")
     return {
         "1": {"class_type": "CheckpointLoaderSimple",
