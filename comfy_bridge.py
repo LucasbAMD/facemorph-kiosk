@@ -125,7 +125,7 @@ CHARACTER_PROMPTS = {
             "photorealistic skin, CGI, anime, multiple people, "
             "extra person, ugly, blurry, low quality, glossy, rubber"
         ),
-        "denoise": 0.72, "cnet_strength": 0.65, "steps": 20,
+        "denoise": 0.65, "cnet_strength": 0.65, "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
     },
     "anime": {
         "positive": (
@@ -141,7 +141,7 @@ CHARACTER_PROMPTS = {
             "ugly, blurry, bad anatomy, deformed eyes, cross-eyed, "
             "asymmetric eyes, mismatched eyes"
         ),
-        "denoise": 0.70, "cnet_strength": 0.78, "steps": 20,
+        "denoise": 0.65, "cnet_strength": 0.78, "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
     },
 }
 
@@ -281,7 +281,7 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
     seed = int(time.time()) % 2**32
     return {
         "1":  {"class_type": "CheckpointLoaderSimple",
-               "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
+               "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
         "2":  {"class_type": "InstantIDModelLoader",
                "inputs": {"instantid_file": "ip-adapter_instantid.bin"}},
         "3":  {"class_type": "ControlNetLoader",
@@ -329,10 +329,10 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
                    "negative":     ["12", 2],           # negative conditioning
                    "latent_image": ["9",  0],
                    "seed":         seed,
-                   "steps":        20,
-                   "cfg":          7.0,
-                   "sampler_name": "dpmpp_2m",
-                   "scheduler":    "karras",
+                   "steps":        8,
+                   "cfg":          1.0,
+                   "sampler_name": "euler_ancestral",
+                   "scheduler":    "sgm_uniform",
                    "denoise":      cfg["denoise"],
                }},
         "15": {"class_type": "VAEDecode",
@@ -347,13 +347,13 @@ def _build_workflow(char_key, image_name, canny_name):
     """Single-pass img2img + ControlNet at 896px using SDXL base 1.0."""
     cfg       = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed      = int(time.time()) % 2**32
-    steps     = cfg.get("steps", 20)
-    # SDXL base uses dpmpp_2m + karras -- correct for this model
-    sampler   = cfg.get("sampler",    "dpmpp_2m")
-    scheduler = cfg.get("scheduler",  "karras")
+    steps     = cfg.get("steps", 8)
+    # SDXL-Turbo uses euler_ancestral + sgm_uniform
+    sampler   = cfg.get("sampler",    "euler_ancestral")
+    scheduler = cfg.get("scheduler",  "sgm_uniform")
     return {
         "1": {"class_type": "CheckpointLoaderSimple",
-              "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
+              "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
         "2": {"class_type": "ControlNetLoader",
               "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
         "3": {"class_type": "LoadImage", "inputs": {"image": image_name}},
@@ -370,7 +370,7 @@ def _build_workflow(char_key, image_name, canny_name):
         "9": {"class_type": "KSampler",
               "inputs": {"model": ["1", 0], "positive": ["8", 0], "negative": ["7", 0],
                          "latent_image": ["5", 0], "seed": seed,
-                         "steps": steps, "cfg": 7.0,
+                         "steps": steps, "cfg": 1.0,
                          "sampler_name": sampler, "scheduler": scheduler,
                          "denoise": cfg["denoise"]}},
         "10": {"class_type": "VAEDecode",
