@@ -125,7 +125,7 @@ CHARACTER_PROMPTS = {
             "photorealistic skin, CGI, anime, multiple people, "
             "extra person, ugly, blurry, low quality, glossy, rubber"
         ),
-        "denoise": 0.78, "cnet_strength": 0.82,
+        "denoise": 0.65, "cnet_strength": 0.65, "steps": 6, "sampler": "euler",
     },
     "anime": {
         "positive": (
@@ -138,7 +138,7 @@ CHARACTER_PROMPTS = {
             "photorealistic, photograph, 3d render, western cartoon, "
             "multiple people, extra person, ugly, blurry, bad anatomy"
         ),
-        "denoise": 0.76, "cnet_strength": 0.84,
+        "denoise": 0.65, "cnet_strength": 0.65, "steps": 6, "sampler": "euler",
     },
 }
 
@@ -361,8 +361,11 @@ def _build_workflow(char_key, image_name, canny_name):
       Pass 1 — img2img + ControlNet at 768px, 10 steps  → base transformation
       Pass 2 — latent upscale to 1024px, 6 refine steps → sharper details
     """
-    cfg  = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
-    seed = int(time.time()) % 2**32
+    cfg     = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
+    seed    = int(time.time()) % 2**32
+    steps1  = cfg.get("steps", 4)
+    steps2  = max(2, steps1 - 2)
+    sampler = cfg.get("sampler", "dpmpp_2m")
     return {
         # ── Loaders ──────────────────────────────────────────────────────────
         "1":  {"class_type":"CheckpointLoaderSimple",
@@ -387,8 +390,8 @@ def _build_workflow(char_key, image_name, canny_name):
         "9":  {"class_type":"KSampler",
                "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
                          "latent_image":["5",0],"seed":seed,
-                         "steps":4,"cfg":1.0,
-                         "sampler_name":"dpmpp_2m","scheduler":"karras",
+                         "steps":steps1,"cfg":1.0,
+                         "sampler_name":sampler,"scheduler":"karras",
                          "denoise":cfg["denoise"]}},
         # ── Upscale latent to 1024 ────────────────────────────────────────────
         "10": {"class_type":"LatentUpscale",
@@ -400,9 +403,9 @@ def _build_workflow(char_key, image_name, canny_name):
         "11": {"class_type":"KSampler",
                "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
                          "latent_image":["10",0],"seed":seed+1,
-                         "steps":3,"cfg":1.0,
-                         "sampler_name":"dpmpp_2m","scheduler":"karras",
-                         "denoise":0.30}},
+                         "steps":steps2,"cfg":1.0,
+                         "sampler_name":sampler,"scheduler":"karras",
+                         "denoise":0.25}},
         # ── Decode and save ───────────────────────────────────────────────────
         "12": {"class_type":"VAEDecode","inputs":{"samples":["11",0],"vae":["1",2]}},
         "13": {"class_type":"SaveImage",
