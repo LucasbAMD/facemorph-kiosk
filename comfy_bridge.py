@@ -356,60 +356,37 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
 
 
 def _build_workflow(char_key, image_name, canny_name):
-    """
-    Two-pass hi-res workflow:
-      Pass 1 — img2img + ControlNet at 768px, 10 steps  → base transformation
-      Pass 2 — latent upscale to 1024px, 6 refine steps → sharper details
-    """
+    """Single-pass img2img + ControlNet at 768px. Fast, no hipBLAS upscale hang."""
     cfg     = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed    = int(time.time()) % 2**32
-    steps1  = cfg.get("steps", 4)
-    steps2  = max(2, steps1 - 2)
+    steps   = cfg.get("steps", 4)
     sampler = cfg.get("sampler", "dpmpp_2m")
     return {
-        # ── Loaders ──────────────────────────────────────────────────────────
-        "1":  {"class_type":"CheckpointLoaderSimple",
-               "inputs":{"ckpt_name":"sd_xl_turbo_1.0_fp16.safetensors"}},
-        "2":  {"class_type":"ControlNetLoader",
-               "inputs":{"control_net_name":"control-lora-canny-rank128.safetensors"}},
-        # ── Input images ─────────────────────────────────────────────────────
-        "3":  {"class_type":"LoadImage","inputs":{"image":image_name}},
-        "4":  {"class_type":"LoadImage","inputs":{"image":canny_name}},
-        # ── Encode source image ───────────────────────────────────────────────
-        "5":  {"class_type":"VAEEncode","inputs":{"pixels":["3",0],"vae":["1",2]}},
-        # ── Text prompts ──────────────────────────────────────────────────────
-        "6":  {"class_type":"CLIPTextEncode",
-               "inputs":{"text":cfg["positive"],"clip":["1",1]}},
-        "7":  {"class_type":"CLIPTextEncode",
-               "inputs":{"text":cfg["negative"],"clip":["1",1]}},
-        # ── ControlNet ────────────────────────────────────────────────────────
-        "8":  {"class_type":"ControlNetApply",
-               "inputs":{"conditioning":["6",0],"control_net":["2",0],
-                         "image":["4",0],"strength":cfg["cnet_strength"]}},
-        # ── Pass 1: base transformation ───────────────────────────────────────
-        "9":  {"class_type":"KSampler",
-               "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
-                         "latent_image":["5",0],"seed":seed,
-                         "steps":steps1,"cfg":1.0,
-                         "sampler_name":sampler,"scheduler":"karras",
-                         "denoise":cfg["denoise"]}},
-        # ── Upscale latent to 1024 ────────────────────────────────────────────
-        "10": {"class_type":"LatentUpscale",
-               "inputs":{"samples":["9",0],
-                         "upscale_method":"bislerp",
-                         "width":1024,"height":1024,
-                         "crop":"disabled"}},
-        # ── Pass 2: hi-res refine ─────────────────────────────────────────────
-        "11": {"class_type":"KSampler",
-               "inputs":{"model":["1",0],"positive":["8",0],"negative":["7",0],
-                         "latent_image":["10",0],"seed":seed+1,
-                         "steps":steps2,"cfg":1.0,
-                         "sampler_name":sampler,"scheduler":"karras",
-                         "denoise":0.25}},
-        # ── Decode and save ───────────────────────────────────────────────────
-        "12": {"class_type":"VAEDecode","inputs":{"samples":["11",0],"vae":["1",2]}},
-        "13": {"class_type":"SaveImage",
-               "inputs":{"images":["12",0],"filename_prefix":f"kiosk_{char_key}"}},
+        "1": {"class_type": "CheckpointLoaderSimple",
+              "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
+        "2": {"class_type": "ControlNetLoader",
+              "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
+        "3": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "4": {"class_type": "LoadImage", "inputs": {"image": canny_name}},
+        "5": {"class_type": "VAEEncode",
+              "inputs": {"pixels": ["3", 0], "vae": ["1", 2]}},
+        "6": {"class_type": "CLIPTextEncode",
+              "inputs": {"text": cfg["positive"], "clip": ["1", 1]}},
+        "7": {"class_type": "CLIPTextEncode",
+              "inputs": {"text": cfg["negative"], "clip": ["1", 1]}},
+        "8": {"class_type": "ControlNetApply",
+              "inputs": {"conditioning": ["6", 0], "control_net": ["2", 0],
+                         "image": ["4", 0], "strength": cfg["cnet_strength"]}},
+        "9": {"class_type": "KSampler",
+              "inputs": {"model": ["1", 0], "positive": ["8", 0], "negative": ["7", 0],
+                         "latent_image": ["5", 0], "seed": seed,
+                         "steps": steps, "cfg": 1.0,
+                         "sampler_name": sampler, "scheduler": "karras",
+                         "denoise": cfg["denoise"]}},
+        "10": {"class_type": "VAEDecode",
+               "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
+        "11": {"class_type": "SaveImage",
+               "inputs": {"images": ["10", 0], "filename_prefix": f"kiosk_{char_key}"}},
     }
 
 def _blur_background(frame, selection_mask=None):
