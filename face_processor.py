@@ -331,12 +331,43 @@ class FaceProcessor:
         self._recognized_names = {}
         self._selected_people  = set()
         self._frame_size       = (0, 0)
-        # Store face crops at selection time for reliable naming
-        self._pending_crops   = {}
+        self._pending_crops    = {}
 
+        # Detection runs in its own thread at ~10fps — never blocks the stream
+        self._det_frame  = None
+        self._det_lock   = threading.Lock()
         self._recog_frame = None
         self._recog_lock  = threading.Lock()
-        threading.Thread(target=self._recog_loop, daemon=True).start()
+        threading.Thread(target=self._detect_loop, daemon=True).start()
+        threading.Thread(target=self._recog_loop,  daemon=True).start()
+
+    def _detect_loop(self):
+        """Haar Cascade + body box expansion at ~10fps in background."""
+        while True:
+            with self._det_lock:
+                frame = self._det_frame
+            if frame is not None:
+                try:
+                    h, w = frame.shape[:2]
+                    gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    faces = self.face_det.detectMultiScale(
+                        gray, scaleFactor=1.1, minNeighbors=6, minSize=(50, 50))
+                    body_boxes = []
+                    for (fx, fy, fw, fh) in (faces if len(faces) > 0 else []):
+                        bx = max(0, fx - int(fw * 0.6))
+                        by = max(0, fy - int(fh * 0.3))
+                        bw = min(w - bx, int(fw * 2.2))
+                        bh = min(h - by, int(fh * 5.5))
+                        body_boxes.append((bx, by, bw, bh))
+                    with self._lock:
+                        self._detected_faces  = body_boxes
+                        self._selected_people = {
+                            i for i in self._selected_people
+                            if i < len(body_boxes)}
+                        self._frame_size = (w, h)
+                except Exception:
+                    pass
+            time.sleep(0.10)  # 10fps detection — plenty for a kiosk
 
     def _load_catalog(self):
         if not self.faces_dir.exists():
@@ -524,51 +555,23 @@ class FaceProcessor:
         if frame is None: return frame
         h, w = frame.shape[:2]
 
-        # Update background workers
+        # Feed background workers (non-blocking — they copy internally)
         self.seg.update(frame)
         self.poser.update(frame)
 
+        # Feed detection + recognition threads
+        with self._det_lock:
+            self._det_frame = frame  # no copy — detection thread reads at its own pace
+        with self._recog_lock:
+            self._recog_frame = frame
+
+        # Snapshot cached state — no detection here
         with self._lock:
-            self._frame_size = (w, h)
-
-        # Detect faces
-        gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self.face_det.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=6, minSize=(50, 50))
-
-        # Expand each face box to cover the full body
-        body_boxes = []
-        for (fx, fy, fw, fh) in (faces if len(faces) > 0 else []):
-            bx = max(0, fx - int(fw * 0.6))
-            by = max(0, fy - int(fh * 0.3))
-            bw = min(w - bx, int(fw * 2.2))
-            bh = min(h - by, int(fh * 5.5))
-            body_boxes.append((bx, by, bw, bh))
-
-        with self._lock:
-            self._detected_faces  = body_boxes
-            self._selected_people = {i for i in self._selected_people if i < len(self._detected_faces)}
             sel        = set(self._selected_people)
             names      = dict(self._recognized_names)
             faces_snap = list(self._detected_faces)
 
-        with self._recog_lock:
-            self._recog_frame = frame.copy()
-
         result = frame.copy()
-
-        # Draw pose skeleton overlay on live feed
-        skel = self.poser.get_skeleton(h, w)
-        if skel is not None:
-            # Blend skeleton lightly onto feed so user can see tracking
-            skel_mask = (skel.sum(axis=2) > 0).astype(np.float32)
-            for c in range(3):
-                result[:,:,c] = np.where(
-                    skel_mask > 0,
-                    np.clip(result[:,:,c].astype(np.float32) * 0.5 + skel[:,:,c] * 0.5, 0, 255),
-                    result[:,:,c]
-                ).astype(np.uint8)
-
         self._draw_overlay(result, faces_snap, sel, names)
         return result
 
