@@ -141,7 +141,10 @@ async def select_person(click_x: float = Form(...), click_y: float = Form(...),
     """Toggle selection of person at click coordinates."""
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
-    processor.toggle_person(click_x, click_y, frame_w, frame_h, frame)
+    # Run blocking CV work in a thread so we don't freeze the event loop
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None, processor.toggle_person, click_x, click_y, frame_w, frame_h, frame)
     return JSONResponse({"faces": processor.get_detected_faces()})
 
 @app.post("/clear_selection")
