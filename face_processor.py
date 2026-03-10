@@ -331,7 +331,8 @@ class FaceProcessor:
         self._recognized_names = {}
         self._selected_people  = set()
         self._frame_size       = (0, 0)
-        self._pending_crops    = {}
+        # Single stable crop for naming — set on any click-to-select, cleared after learn()
+        self._crop_for_naming  = None
 
         # Detection runs in its own thread at ~10fps — never blocks the stream
         self._det_frame  = None
@@ -433,36 +434,35 @@ class FaceProcessor:
                 with self._lock:
                     if i in self._selected_people:
                         self._selected_people.discard(i)
-                        self._pending_crops.pop(i, None)
                     else:
                         self._selected_people.add(i)
-                        # Store face crop immediately at selection time
+                        # Extract and store face crop for naming
                         if frame is not None:
-                            # Search for a face within the body box
                             bx1 = max(0, x); by1 = max(0, y)
-                            bx2 = min(frame.shape[1], x+w)
-                            by2 = min(frame.shape[0], y+h)
-                            body_roi = frame[by1:by2, bx1:bx2]
-                            face_crop = None
+                            bx2 = min(frame.shape[1], x + w)
+                            by2 = min(frame.shape[0], y + h)
+                            body_roi   = frame[by1:by2, bx1:bx2]
+                            face_crop  = None
                             if body_roi.size > 0:
-                                gray_roi = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
+                                gray_roi  = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
                                 sub_faces = self.face_det.detectMultiScale(
                                     gray_roi, 1.1, 4, minSize=(30, 30))
                                 if len(sub_faces) > 0:
                                     fx, fy, fw2, fh2 = sub_faces[0]
                                     face_crop = body_roi[fy:fy+fh2, fx:fx+fw2]
-                            # Fallback: use top 25% of body box as face estimate
+                            # Fallback: top 30% of body box
                             if face_crop is None or face_crop.size == 0:
-                                face_top = min(by1 + h//4, frame.shape[0])
+                                face_top  = min(by1 + int(h * 0.30), frame.shape[0])
                                 face_crop = frame[by1:face_top, bx1:bx2]
                             if face_crop is not None and face_crop.size > 0:
-                                self._pending_crops[i] = face_crop.copy()
+                                self._crop_for_naming = face_crop.copy()
+                                print(f"[CROP] Saved face crop {face_crop.shape} for naming")
                 return
 
     def clear_selection(self):
         with self._lock:
             self._selected_people.clear()
-            self._pending_crops.clear()
+            self._crop_for_naming = None
 
     def get_selected_mask(self, frame):
         """Use pose landmarks for accurate body mask, fall back to face box."""
@@ -494,33 +494,39 @@ class FaceProcessor:
 
     # ── Face naming — uses stored crop, no dependency on current detection ────
     def name_face(self, index, name):
+        """Name using the crop saved at last click-to-select. Index is ignored — crop is stable."""
         with self._lock:
-            crop = self._pending_crops.get(index)
-            all_keys = list(self._pending_crops.keys())
-        print(f"[NAME] index={index} saved crops={all_keys} found={'yes' if crop is not None else 'NO'}")
+            crop = self._crop_for_naming
         if crop is None:
+            print(f"[NAME] No crop saved — user must click to select themselves first")
             return False
         self.recognizer.learn(crop, name)
-        print(f"[OK] Learned: {name}")
+        with self._lock:
+            self._crop_for_naming = None  # clear after successful learn
+        print(f"[NAME] Learned: {name} from crop {crop.shape}")
         return True
 
     def name_selected_face(self, index, name, frame):
-        """Compatibility method — tries stored crop first, then frame."""
-        ok = self.name_face(index, name)
-        if ok: return True
-        # Last resort: crop from current frame
+        """Try stored crop first, fall back to detecting face in current frame."""
+        if self.name_face(index, name):
+            return True
+        # Last resort: find any selected face in the current frame directly
+        print(f"[NAME] No stored crop — falling back to live frame detection")
         with self._lock:
             faces = list(self._detected_faces)
-        if index < len(faces):
-            x, y, w, h = faces[index]
-            p = 10
-            x1 = max(0,x-p); y1 = max(0,y-p)
-            x2 = min(frame.shape[1],x+w+p); y2 = min(frame.shape[0],y+h+p)
+            sel   = set(self._selected_people)
+        targets = [faces[i] for i in sel if i < len(faces)] or (faces[:1] if faces else [])
+        for (x, y, w, h) in targets:
+            pad = 10
+            x1 = max(0, x - pad); y1 = max(0, y - pad)
+            x2 = min(frame.shape[1], x + w + pad)
+            y2 = min(frame.shape[0], y + h + pad)
             crop = frame[y1:y2, x1:x2]
             if crop.size > 0:
                 self.recognizer.learn(crop, name)
-                print(f"[OK] Learned (fallback): {name}")
+                print(f"[NAME] Learned (fallback): {name}")
                 return True
+        print(f"[NAME] Failed — no face crop available")
         return False
 
     def get_known_names(self):
