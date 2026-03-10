@@ -25,42 +25,36 @@ COMFY_URL = "http://127.0.0.1:8188"
 CHARACTER_PROMPTS = {
     "navi": {
         "positive": (
-            "the same person transformed into a Na'vi from Avatar, "
-            "keeping their exact hair color and length, keeping their clothing silhouette, "
-            "face replaced with blue Na'vi skin, bioluminescent cyan facial markings, "
-            "large amber eyes, pointed ears, same body pose and proportions, "
-            "lush Pandora jungle background with bioluminescent plants and floating mountains, "
-            "cinematic lighting, photorealistic, 8k, single subject"
+            "person as a Na'vi from Avatar, blue alien skin, "
+            "cyan face markings, large amber eyes, pointed ears, "
+            "same hair color and clothing silhouette, same body pose, "
+            "Pandora jungle background, cinematic, photorealistic, 8k"
         ),
         "negative": (
-            "human skin tone, pink skin, multiple people, extra person, "
-            "different hair, bald, changed clothing, ugly, blurry, cartoon, "
-            "low quality, duplicate, background figures"
+            "human skin, pink skin, multiple people, extra person, "
+            "bald, changed clothing, ugly, blurry, cartoon, low quality"
         ),
         "denoise": 0.70, "cnet_strength": 0.88,
     },
     "hulk": {
         "positive": (
-            "the same person transformed into the Incredible Hulk, "
-            "keeping their hair color and style, keeping their clothing transformed to torn purple pants, "
-            "skin replaced with massive green gamma-radiated muscles, hulk face with same facial structure, "
-            "same body pose, dramatic stormy sky background, "
-            "cinematic, photorealistic, 8k, single subject"
+            "person as the Incredible Hulk, massive green muscles, "
+            "green skin, same hair and facial structure, torn purple pants, "
+            "same body pose, stormy sky background, "
+            "cinematic, photorealistic, 8k"
         ),
         "negative": (
-            "normal skin, multiple people, extra person, different hair, "
+            "normal skin, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.72, "cnet_strength": 0.88,
     },
     "thanos": {
         "positive": (
-            "the same person transformed into Thanos the Marvel villain, "
-            "keeping their facial bone structure and proportions, "
-            "skin replaced with purple Titan skin and wrinkles, "
-            "gold and black infinity gauntlet armor over their clothing, "
-            "same body pose and height, cosmic space nebula background, "
-            "cinematic, photorealistic, 8k, single subject"
+            "person as Thanos the Marvel villain, purple Titan skin, "
+            "same facial structure, infinity gauntlet armor, "
+            "same body pose, cosmic nebula background, "
+            "cinematic, photorealistic, 8k"
         ),
         "negative": (
             "human skin, pink skin, multiple people, extra person, "
@@ -70,12 +64,10 @@ CHARACTER_PROMPTS = {
     },
     "predator": {
         "positive": (
-            "the same person transformed into a Predator alien warrior, "
-            "keeping their body size and pose, "
-            "face replaced with Predator mandibles and dreadlocks, "
-            "biomask helmet, wrist blades, same clothing replaced with Predator mesh armor, "
-            "dense dark jungle background with thermal vision HUD, "
-            "cinematic, highly detailed, 8k, single subject"
+            "person as a Predator alien warrior, mandibles, dreadlocks, "
+            "biomask helmet, mesh armor, wrist blades, same body pose, "
+            "dark jungle with thermal HUD overlay, "
+            "cinematic, highly detailed, 8k"
         ),
         "negative": (
             "human face, multiple people, extra person, "
@@ -85,11 +77,10 @@ CHARACTER_PROMPTS = {
     },
     "ghost": {
         "positive": (
-            "the same person transformed into a spectral ghost, "
-            "keeping their clothing and hair as translucent ethereal versions, "
-            "body becomes pale glowing translucent, white spectral aura, "
-            "same pose and proportions, particles of light floating off body, "
-            "dark atmospheric background, cinematic, 8k, single subject"
+            "person as a spectral ghost, translucent glowing body, "
+            "pale ethereal skin, white aura, floating light particles, "
+            "same clothing and hair shape, same pose, "
+            "dark atmospheric background, cinematic, 8k"
         ),
         "negative": (
             "solid opaque body, multiple people, extra person, "
@@ -99,13 +90,10 @@ CHARACTER_PROMPTS = {
     },
     "groot": {
         "positive": (
-            "the same person transformed into Groot from Guardians of the Galaxy, "
-            "keeping their body pose and proportions, "
-            "skin replaced with living brown bark texture, "
-            "hair replaced with twigs and green leaves, "
-            "clothing replaced with bark and vines, "
-            "ancient forest background with shafts of light, "
-            "cinematic, photorealistic, 8k, single subject"
+            "person as Groot from Guardians of the Galaxy, "
+            "brown bark skin, twig hair with green leaves, vine clothing, "
+            "same body pose, forest background with light shafts, "
+            "cinematic, photorealistic, 8k"
         ),
         "negative": (
             "human skin, multiple people, extra person, "
@@ -115,48 +103,40 @@ CHARACTER_PROMPTS = {
     },
     "cyberpunk": {
         "positive": (
-            "the same person transformed into a cyberpunk character, "
-            "keeping their hair color with added neon streaks, "
-            "clothing augmented with glowing circuit patterns and chrome plating, "
-            "cybernetic eye implants glowing cyan, chrome jaw augmentation, "
-            "same face structure and pose, "
-            "rain-soaked neon-lit cyberpunk city background, "
-            "cinematic, photorealistic, 8k, single subject"
+            "person as a cyberpunk character, same hair with neon streaks, "
+            "glowing circuit clothing, cybernetic eye implants, chrome jaw, "
+            "same face and pose, neon rain-soaked city background, "
+            "cinematic, photorealistic, 8k"
         ),
         "negative": (
             "fantasy, medieval, multiple people, extra person, "
-            "completely different appearance, ugly, blurry, cartoon, low quality, duplicate"
+            "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.71, "cnet_strength": 0.88,
     },
     "claymation": {
         "positive": (
-            "the same person as a claymation clay figurine, "
-            "keeping their hair color and clothing colors, "
-            "smooth matte clay texture, visible fingerprint marks, "
-            "Aardman Wallace and Gromit style, slightly exaggerated proportions, "
-            "warm studio lighting, same pose preserved, "
-            "colorful stop-motion background, plasticine, single subject"
+            "person as a claymation figurine, smooth matte clay texture, "
+            "same hair color and clothing colors, fingerprint marks on clay, "
+            "Aardman style, same pose, stop-motion background, "
+            "plasticine, handcrafted, single subject"
         ),
         "negative": (
-            "photorealistic skin, CGI, digital art, anime, "
-            "multiple people, extra person, ugly, blurry, low quality, duplicate, "
-            "glossy, rubber, plastic"
+            "photorealistic skin, CGI, anime, multiple people, "
+            "extra person, ugly, blurry, low quality, glossy, rubber"
         ),
         "denoise": 0.78, "cnet_strength": 0.82,
     },
     "anime": {
         "positive": (
-            "the same person as an anime character, "
-            "keeping their exact hair color and clothing style, "
-            "large expressive anime eyes, cel-shaded smooth skin, "
-            "clean line art, vibrant colors, same pose preserved, "
-            "Studio Ghibli quality, soft bokeh background, single subject"
+            "person as an anime character, same hair color and clothing, "
+            "large expressive anime eyes, cel-shaded skin, clean line art, "
+            "vibrant colors, same pose, Studio Ghibli style, "
+            "soft bokeh background, single subject"
         ),
         "negative": (
             "photorealistic, photograph, 3d render, western cartoon, "
-            "multiple people, extra person, ugly, blurry, low quality, "
-            "deformed eyes, bad anatomy"
+            "multiple people, extra person, ugly, blurry, bad anatomy"
         ),
         "denoise": 0.76, "cnet_strength": 0.84,
     },
@@ -499,26 +479,48 @@ def generate_character(frame, char_key, selection_mask=None, timeout=180):
         client_id = uuid.uuid4().hex
         result    = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
         prompt_id = result["prompt_id"]
+        print(f"[Comfy] prompt_id={prompt_id}")
 
         start = time.time()
         while time.time() - start < timeout:
-            time.sleep(0.5)
+            time.sleep(1.0)
+            elapsed = int(time.time() - start)
             try:
+                # Primary: fetch this specific prompt's history
                 history = _api(f"history/{prompt_id}")
-                if prompt_id in history:
-                    for _, node_out in history[prompt_id]["outputs"].items():
-                        if "images" in node_out:
-                            info    = node_out["images"][0]
+                entry = history.get(prompt_id)
+
+                # Fallback: search full history if specific entry missing
+                if entry is None:
+                    all_history = _api("history")
+                    entry = all_history.get(prompt_id)
+
+                if entry is not None:
+                    outputs = entry.get("outputs", {})
+                    print(f"[Comfy] {elapsed}s — found history, nodes with output: {list(outputs.keys())}")
+                    for node_id, node_out in outputs.items():
+                        if "images" in node_out and len(node_out["images"]) > 0:
+                            info = node_out["images"][0]
+                            print(f"[Comfy] Fetching image from node {node_id}: {info['filename']}")
                             img_url = (f"{COMFY_URL}/view?"
                                       f"filename={urllib.parse.quote(info['filename'])}"
                                       f"&subfolder={urllib.parse.quote(info.get('subfolder',''))}"
                                       f"&type={info.get('type','output')}")
-                            with urllib.request.urlopen(img_url, timeout=10) as r:
+                            with urllib.request.urlopen(img_url, timeout=15) as r:
                                 img_bytes = r.read()
                             arr = np.frombuffer(img_bytes, dtype=np.uint8)
-                            return cv2.imdecode(arr, cv2.IMREAD_COLOR), None
-            except Exception:
-                pass
+                            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                            if img is not None:
+                                print(f"[Comfy] Image decoded OK: {img.shape}")
+                                return img, None
+                            else:
+                                print(f"[Comfy] WARNING: imdecode returned None for {info['filename']}")
+                else:
+                    if elapsed % 10 == 0:
+                        print(f"[Comfy] {elapsed}s — waiting for prompt_id in history...")
+            except Exception as e:
+                print(f"[Comfy] Poll error at {elapsed}s: {e}")
+
         return None, "Timeout waiting for result"
     except Exception as e:
         return None, str(e)
