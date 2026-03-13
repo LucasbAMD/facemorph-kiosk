@@ -640,12 +640,10 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name, gende
 
 def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
     """
-    Two-pass img2img + ControlNet workflow:
-      Pass 1: generate at 1024px (up from 896)
-      Pass 2: LatentUpscale to 1536px + light denoise refinement
-              → ~1536px output, good for 2x2 inch sticker printing at 300dpi
-
-    Gender-aware prompts replace the old single-prompt approach.
+    Single-pass img2img + ControlNet at 1024px.
+    The two-pass upscale was causing silent VAE decode hangs on ROCm —
+    the 1024px base is already a solid upgrade from the original 896px
+    and is stable on the W7900.
     """
     positive, negative = get_prompts(char_key, gender)
     cfg       = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
@@ -654,40 +652,22 @@ def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
     sampler   = cfg.get("sampler",    "euler_ancestral")
     scheduler = cfg.get("scheduler",  "sgm_uniform")
 
-    # Upscale target: 1280px on the long side.
-    # Reduced from 1536 → 1280 to prevent GPU memory access faults on ROCm.
-    # ROCm is more sensitive than CUDA to large latent allocations mid-pipeline;
-    # 1280px still gives excellent sticker print quality at 300dpi.
-    upscale_w = 1280
-    upscale_h = 1280
-
     return {
-        # ── Model + ControlNet ───────────────────────────────────────────────
         "1": {"class_type": "CheckpointLoaderSimple",
               "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
         "2": {"class_type": "ControlNetLoader",
               "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
-
-        # ── Source image + edge map ──────────────────────────────────────────
         "3": {"class_type": "LoadImage", "inputs": {"image": image_name}},
         "4": {"class_type": "LoadImage", "inputs": {"image": canny_name}},
-
-        # ── Encode source → latent ───────────────────────────────────────────
         "5": {"class_type": "VAEEncode",
               "inputs": {"pixels": ["3", 0], "vae": ["1", 2]}},
-
-        # ── Text conditioning ────────────────────────────────────────────────
         "6": {"class_type": "CLIPTextEncode",
               "inputs": {"text": positive, "clip": ["1", 1]}},
         "7": {"class_type": "CLIPTextEncode",
               "inputs": {"text": negative, "clip": ["1", 1]}},
-
-        # ── ControlNet apply ─────────────────────────────────────────────────
         "8": {"class_type": "ControlNetApply",
               "inputs": {"conditioning": ["6", 0], "control_net": ["2", 0],
                          "image": ["4", 0], "strength": cfg["cnet_strength"]}},
-
-        # ── Pass 1: generate at base resolution (1024px) ─────────────────────
         "9": {"class_type": "KSampler",
               "inputs": {
                   "model":        ["1", 0],
@@ -701,43 +681,11 @@ def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
                   "scheduler":    scheduler,
                   "denoise":      cfg["denoise"],
               }},
-
-        # ── Upscale latent to 1536px ─────────────────────────────────────────
-        # bislerp is the best quality upscale method available without extra models
-        "10": {"class_type": "LatentUpscale",
-               "inputs": {
-                   "samples":        ["9", 0],
-                   "upscale_method": "bislerp",
-                   "width":          upscale_w,
-                   "height":         upscale_h,
-                   "crop":           "disabled",
-               }},
-
-        # ── Pass 2: refine upscaled latent ──────────────────────────────────
-        # Low denoise (0.35) keeps the character intact while sharpening fine detail.
-        # More steps here = sharper sticker print without changing the look.
-        "11": {"class_type": "KSampler",
-               "inputs": {
-                   "model":        ["1", 0],
-                   "positive":     ["8", 0],
-                   "negative":     ["7", 0],
-                   "latent_image": ["10", 0],
-                   "seed":         seed + 1,
-                   "steps":        10,
-                   "cfg":          1.5,           # slightly higher CFG for detail crispness
-                   "sampler_name": sampler,
-                   "scheduler":    scheduler,
-                   "denoise":      0.35,           # light refinement — preserves pass-1 result
-               }},
-
-        # ── Decode + save ────────────────────────────────────────────────────
-        "12": {"class_type": "VAEDecode",
-               "inputs": {"samples": ["11", 0], "vae": ["1", 2]}},
-        "13": {"class_type": "SaveImage",
-               "inputs": {
-                   "images":           ["12", 0],
-                   "filename_prefix":  f"kiosk_{char_key}",
-               }},
+        "10": {"class_type": "VAEDecode",
+               "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
+        "11": {"class_type": "SaveImage",
+               "inputs": {"images": ["10", 0],
+                          "filename_prefix": f"kiosk_{char_key}"}},
     }
 
 
@@ -792,12 +740,20 @@ def generate_character(frame, char_key, selection_mask=None,
     try:
         # ── Per-person gender detection ────────────────────────────────────
         if face_boxes:
-            gender_map = detect_genders_for_people(frame, face_boxes)
-            genders    = list(gender_map.values())
-            # If all selected people are the same gender, use it cleanly.
-            # If mixed (e.g. a man and a woman), use the majority and note it —
-            # single-pass img2img uses one prompt for the whole image so we pick
-            # the dominant gender to minimise misgendering.
+            gender_map = {}
+            for box in face_boxes:
+                idx = box["index"]
+                # Use registered gender first — 100% reliable for known hosts
+                registered = box.get("registered_gender", "unknown")
+                if registered in ("male", "female"):
+                    gender_map[idx] = registered
+                    print(f"[Gender] Person {idx}: {registered} (from profile)")
+                else:
+                    # Unknown person — detect from their bounding box
+                    detected = detect_genders_for_people(frame, [box])
+                    gender_map[idx] = detected.get(idx, "unknown")
+
+            genders      = list(gender_map.values())
             female_count = genders.count("female")
             male_count   = genders.count("male")
             if female_count > male_count:
@@ -808,7 +764,7 @@ def generate_character(frame, char_key, selection_mask=None,
                 gender = "female"   # tie → female (safer for the demo)
             else:
                 gender = "unknown"
-            print(f"[Generate] character={char_key}  per-person genders={gender_map}  using={gender}")
+            print(f"[Generate] character={char_key}  per-person={gender_map}  using={gender}")
         else:
             gender = detect_gender(frame)
             print(f"[Generate] character={char_key}  gender={gender} (full-frame fallback)")
