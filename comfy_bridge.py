@@ -570,11 +570,12 @@ def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
     sampler   = cfg.get("sampler",    "euler_ancestral")
     scheduler = cfg.get("scheduler",  "sgm_uniform")
 
-    # Upscale target: 1536px on the long side.
-    # For a portrait shot at ~1024x768 base, this gives ~1536x1152 output
-    # → printable at ~5x3.8 inches at 300dpi, or 2x1.5 inches at 768dpi (sticker quality).
-    upscale_w = 1536
-    upscale_h = 1536
+    # Upscale target: 1280px on the long side.
+    # Reduced from 1536 → 1280 to prevent GPU memory access faults on ROCm.
+    # ROCm is more sensitive than CUDA to large latent allocations mid-pipeline;
+    # 1280px still gives excellent sticker print quality at 300dpi.
+    upscale_w = 1280
+    upscale_h = 1280
 
     return {
         # ── Model + ControlNet ───────────────────────────────────────────────
