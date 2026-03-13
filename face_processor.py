@@ -55,9 +55,10 @@ CHAR_CONFIG = {
 }
 CHARACTER_ORDER = ["navi","hulk","thanos","predator","ghost","groot"]
 
-KNOWN_FACES_DIR = Path("known_faces")
-KNOWN_FACES_DB  = Path("known_faces/faces.json")
-RECOGNIZER_FILE = Path("known_faces/recognizer.pkl")
+KNOWN_FACES_DIR  = Path("known_faces")
+KNOWN_FACES_DB   = Path("known_faces/faces.json")
+RECOGNIZER_FILE  = Path("known_faces/recognizer.pkl")
+KNOWN_GENDER_DB  = Path("known_faces/genders.json")   # name → gender mapping
 
 
 # ── PoseTracker ───────────────────────────────────────────────────────────────
@@ -304,7 +305,8 @@ class FaceRecognizer:
     def __init__(self):
         KNOWN_FACES_DIR.mkdir(exist_ok=True)
         self._lock       = threading.Lock()
-        self._names      = {}
+        self._names      = {}   # label_int → name str
+        self._genders    = {}   # name str  → 'male'|'female'|'unknown'
         self._samples    = {}
         self._recognizer = _make_recognizer()
         self._load()
@@ -316,11 +318,15 @@ class FaceRecognizer:
                 self._names = {int(k): v for k, v in data.items()}
             except Exception:
                 pass
+        if KNOWN_GENDER_DB.exists():
+            try:
+                self._genders = json.loads(KNOWN_GENDER_DB.read_text())
+            except Exception:
+                pass
         if RECOGNIZER_FILE.exists() and self._names:
             try:
                 with open(RECOGNIZER_FILE, "rb") as f:
                     loaded = pickle.load(f)
-                # Accept pickled wrapper objects from either backend
                 if hasattr(loaded, "predict") and hasattr(loaded, "trained"):
                     self._recognizer = loaded
                     print(f"[OK] Face recognizer loaded — {len(self._names)} known face(s)")
@@ -332,6 +338,7 @@ class FaceRecognizer:
     def _save(self):
         KNOWN_FACES_DIR.mkdir(exist_ok=True)
         KNOWN_FACES_DB.write_text(json.dumps(self._names))
+        KNOWN_GENDER_DB.write_text(json.dumps(self._genders))
         try:
             with open(RECOGNIZER_FILE, "wb") as f:
                 pickle.dump(self._recognizer, f)
@@ -341,10 +348,11 @@ class FaceRecognizer:
     def _next_id(self):
         return max(self._names.keys(), default=-1) + 1
 
-    def learn(self, face_img, name):
+    def learn(self, face_img, name, gender="unknown"):
         """
-        Learn a face. Generates 8 augmented samples from the single crop
-        so the recognizer generalizes across lighting and slight angle changes.
+        Learn a face and store the person's gender.
+        gender should be 'male', 'female', or 'unknown'.
+        Generates 8 augmented samples from the single crop for reliable recognition.
         """
         with self._lock:
             label = next((k for k, v in self._names.items() if v == name), None)
@@ -352,6 +360,13 @@ class FaceRecognizer:
                 label = self._next_id()
                 self._names[label] = name
                 self._samples[label] = []
+
+            # Store gender against name — used at generation time so we never
+            # have to guess gender for registered hosts
+            if gender != "unknown":
+                self._genders[name] = gender
+            elif name not in self._genders:
+                self._genders[name] = "unknown"
 
             gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
             gray = cv2.resize(gray, (100, 100))
@@ -374,6 +389,7 @@ class FaceRecognizer:
             self._retrain()
             self._save()
             print(f"[Recognizer] Saved {len(augmented)} samples for '{name}' "
+                  f"gender={self._genders.get(name)} "
                   f"(total={len(self._samples[label])})")
             return label
 
@@ -401,6 +417,11 @@ class FaceRecognizer:
                 pass
         return None, None
 
+    def get_gender_for_name(self, name):
+        """Return stored gender for a registered person, or 'unknown'."""
+        with self._lock:
+            return self._genders.get(name, "unknown")
+
     def get_known_names(self):
         with self._lock:
             return dict(self._names)
@@ -410,6 +431,7 @@ class FaceRecognizer:
             label = next((k for k, v in self._names.items() if v == name), None)
             if label is not None:
                 del self._names[label]
+                self._genders.pop(name, None)
                 self._samples.pop(label, None)
                 self._retrain()
                 self._save()
@@ -623,27 +645,23 @@ class FaceProcessor:
         return self.poser.get_skeleton(h, w)
 
     # ── Face naming ───────────────────────────────────────────────────────────
-    def name_face(self, index, name):
-        """
-        Name using the crop saved at last click-to-select.
-        Index is accepted for API compatibility but the stored crop is used.
-        """
+    def name_face(self, index, name, gender="unknown"):
+        """Name using the crop saved at last click-to-select."""
         with self._lock:
             crop = self._crop_for_naming
         if crop is None:
             print("[NAME] No crop saved — user must click to select themselves first")
             return False
-        self.recognizer.learn(crop, name)
+        self.recognizer.learn(crop, name, gender)
         with self._lock:
             self._crop_for_naming = None
-        print(f"[NAME] Learned: {name} from crop {crop.shape}")
+        print(f"[NAME] Learned: {name} gender={gender}")
         return True
 
-    def name_selected_face(self, index, name, frame):
+    def name_selected_face(self, index, name, frame, gender="unknown"):
         """Try stored crop first, fall back to live detection in current frame."""
-        if self.name_face(index, name):
+        if self.name_face(index, name, gender):
             return True
-        # Fallback: detect face in the current live frame directly
         print("[NAME] No stored crop — falling back to live frame detection")
         with self._lock:
             faces = list(self._detected_faces)
@@ -656,14 +674,18 @@ class FaceProcessor:
             y2 = min(frame.shape[0], y + h + pad)
             crop = frame[y1:y2, x1:x2]
             if crop.size > 0:
-                self.recognizer.learn(crop, name)
-                print(f"[NAME] Learned (fallback): {name}")
+                self.recognizer.learn(crop, name, gender)
+                print(f"[NAME] Learned (fallback): {name} gender={gender}")
                 return True
         print("[NAME] Failed — click your face on screen first, then use the Name button")
         return False
 
     def get_known_names(self):
         return self.recognizer.get_known_names()
+
+    def get_gender_for_name(self, name):
+        """Return the registered gender for a known host, or 'unknown'."""
+        return self.recognizer.get_gender_for_name(name)
 
     def forget_face(self, name):
         self.recognizer.forget(name)
