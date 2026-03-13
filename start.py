@@ -166,6 +166,24 @@ def main():
 
     print("\n[OK] Starting kiosk at http://localhost:8000\n")
 
+    # Check kiosk dependencies before starting — gives a clear error instead
+    # of a confusing traceback if the wrong venv is active
+    missing = []
+    for pkg in ("uvicorn", "fastapi", "cv2"):
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        print(f"[ERR] Missing packages in current venv: {', '.join(missing)}")
+        print("      Activate the kiosk venv first:")
+        print("        source ~/facemorph-kiosk/venv/bin/activate")
+        print("      Then install missing packages:")
+        print(f"        pip install {' '.join(pkg for pkg in missing if pkg != 'cv2')}")
+        if "cv2" in missing:
+            print("        pip install opencv-python")
+        sys.exit(1)
+
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, workers=1)
 
