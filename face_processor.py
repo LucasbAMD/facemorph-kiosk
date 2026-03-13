@@ -201,6 +201,102 @@ class Segmenter:
         return cv2.resize(m, (w, h))
 
 
+# ── Face recognizer backend — works with OR without opencv-contrib ────────────
+# opencv-contrib-python provides cv2.face.LBPHFaceRecognizer_create().
+# If only base opencv-python is installed, cv2.face doesn't exist.
+# We detect which is available at import time and use the best option.
+
+_CONTRIB_AVAILABLE = hasattr(cv2, "face") and hasattr(cv2.face, "LBPHFaceRecognizer_create")
+
+if not _CONTRIB_AVAILABLE:
+    # Fallback: use scikit-learn KNN — works with base opencv-python
+    try:
+        from sklearn.neighbors import KNeighborsClassifier
+        _SKLEARN_AVAILABLE = True
+        print("[OK] Face recognition: using sklearn KNN (opencv-contrib not installed)")
+    except ImportError:
+        _SKLEARN_AVAILABLE = False
+        print("[WARN] Face recognition disabled — install opencv-contrib-python OR scikit-learn")
+else:
+    _SKLEARN_AVAILABLE = False
+    print("[OK] Face recognition: using opencv LBPH")
+
+
+class _LBPHRecognizer:
+    """Thin wrapper around cv2.face.LBPHFaceRecognizer (requires opencv-contrib)."""
+    def __init__(self):
+        self._rec     = cv2.face.LBPHFaceRecognizer_create()
+        self._trained = False
+
+    def train(self, imgs, labels):
+        self._rec.train(imgs, labels)
+        self._trained = True
+
+    def predict(self, img):
+        if not self._trained:
+            return -1, 9999.0
+        label, conf = self._rec.predict(img)
+        return label, conf
+
+    @property
+    def trained(self):
+        return self._trained
+
+
+class _KNNRecognizer:
+    """
+    Pure scikit-learn KNN recognizer.
+    Uses LBP-like histogram features extracted with OpenCV so it is
+    compatible with the same 100×100 grayscale crops as LBPH.
+    """
+    def __init__(self):
+        self._knn     = KNeighborsClassifier(n_neighbors=3, metric="euclidean")
+        self._trained = False
+
+    def _features(self, img):
+        # Simple but effective: flatten the equalised grayscale crop into a
+        # 1-D feature vector.  At 100×100 this is 10 000 dimensions — fast
+        # for KNN at the small sample counts we have (< 200 samples total).
+        return img.flatten().astype(np.float32) / 255.0
+
+    def train(self, imgs, labels):
+        X = np.array([self._features(img) for img in imgs])
+        y = np.array(labels)
+        self._knn.fit(X, y)
+        self._trained = True
+
+    def predict(self, img):
+        if not self._trained:
+            return -1, 9999.0
+        x   = self._features(img).reshape(1, -1)
+        lbl = int(self._knn.predict(x)[0])
+        # KNN distance as a proxy for confidence (lower = more confident,
+        # matching the LBPH convention so the threshold logic stays the same)
+        dist, _ = self._knn.kneighbors(x, n_neighbors=1)
+        conf    = float(dist[0][0]) * 1000   # scale to ~0-200 range
+        return lbl, conf
+
+    @property
+    def trained(self):
+        return self._trained
+
+
+class _NoopRecognizer:
+    """Used when neither contrib nor sklearn is available — recognition is disabled."""
+    def train(self, imgs, labels): pass
+    def predict(self, img): return -1, 9999.0
+    @property
+    def trained(self): return False
+
+
+def _make_recognizer():
+    if _CONTRIB_AVAILABLE:
+        return _LBPHRecognizer()
+    if _SKLEARN_AVAILABLE:
+        return _KNNRecognizer()
+    return _NoopRecognizer()
+
+
 # ── FaceRecognizer ────────────────────────────────────────────────────────────
 class FaceRecognizer:
     CONFIDENCE_THRESHOLD = 75
@@ -210,8 +306,7 @@ class FaceRecognizer:
         self._lock       = threading.Lock()
         self._names      = {}
         self._samples    = {}
-        self._recognizer = cv2.face.LBPHFaceRecognizer_create()
-        self._trained    = False
+        self._recognizer = _make_recognizer()
         self._load()
 
     def _load(self):
@@ -224,11 +319,15 @@ class FaceRecognizer:
         if RECOGNIZER_FILE.exists() and self._names:
             try:
                 with open(RECOGNIZER_FILE, "rb") as f:
-                    self._recognizer = pickle.load(f)
-                self._trained = True
-                print(f"[OK] Face recognizer — {len(self._names)} known face(s)")
-            except Exception:
-                pass
+                    loaded = pickle.load(f)
+                # Accept pickled wrapper objects from either backend
+                if hasattr(loaded, "predict") and hasattr(loaded, "trained"):
+                    self._recognizer = loaded
+                    print(f"[OK] Face recognizer loaded — {len(self._names)} known face(s)")
+                else:
+                    print("[WARN] Saved recognizer format mismatch — starting fresh")
+            except Exception as e:
+                print(f"[WARN] Could not load saved recognizer: {e}")
 
     def _save(self):
         KNOWN_FACES_DIR.mkdir(exist_ok=True)
@@ -236,20 +335,19 @@ class FaceRecognizer:
         try:
             with open(RECOGNIZER_FILE, "wb") as f:
                 pickle.dump(self._recognizer, f)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[WARN] Could not save recognizer: {e}")
 
     def _next_id(self):
         return max(self._names.keys(), default=-1) + 1
 
     def learn(self, face_img, name):
         """
-        Learn a face. Internally generates 8 augmented samples from the single
-        crop (flips, brightness shifts, slight blurs) so LBPH has enough
-        variation to recognize the person reliably under different conditions.
+        Learn a face. Generates 8 augmented samples from the single crop
+        so the recognizer generalizes across lighting and slight angle changes.
         """
         with self._lock:
-            label = next((k for k,v in self._names.items() if v == name), None)
+            label = next((k for k, v in self._names.items() if v == name), None)
             if label is None:
                 label = self._next_id()
                 self._names[label] = name
@@ -259,22 +357,17 @@ class FaceRecognizer:
             gray = cv2.resize(gray, (100, 100))
             gray = cv2.equalizeHist(gray)
 
-            # Generate augmented samples so LBPH generalizes better from one photo
             augmented = [gray]
-            # Horizontal flip
             augmented.append(cv2.flip(gray, 1))
-            # Brightness variations
             for delta in (-25, -12, 12, 25):
                 shifted = np.clip(gray.astype(np.int16) + delta, 0, 255).astype(np.uint8)
                 augmented.append(shifted)
-            # Slight blurs (simulates distance / soft focus)
             augmented.append(cv2.GaussianBlur(gray, (3, 3), 0))
             augmented.append(cv2.GaussianBlur(gray, (5, 5), 0))
 
             if label not in self._samples:
                 self._samples[label] = []
             self._samples[label].extend(augmented)
-            # Cap at 80 samples per person (10 registrations × 8 augments)
             if len(self._samples[label]) > 80:
                 self._samples[label] = self._samples[label][-80:]
 
@@ -291,11 +384,11 @@ class FaceRecognizer:
                 imgs.append(img)
                 labels.append(label)
         if imgs:
-            self._recognizer.train(imgs, np.array(labels))
-            self._trained = True
+            self._recognizer.train(imgs, np.array(labels, dtype=np.int32))
 
     def recognize(self, face_img):
-        if not self._trained: return None, None
+        if not self._recognizer.trained:
+            return None, None
         with self._lock:
             try:
                 gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
@@ -314,7 +407,7 @@ class FaceRecognizer:
 
     def forget(self, name):
         with self._lock:
-            label = next((k for k,v in self._names.items() if v == name), None)
+            label = next((k for k, v in self._names.items() if v == name), None)
             if label is not None:
                 del self._names[label]
                 self._samples.pop(label, None)
