@@ -346,7 +346,7 @@
       <div class="sec-title">👥 Known Hosts</div>
       <div id="hosts-list">
         <div style="font-size:0.68rem;color:#444;padding:6px 2px;">
-          No hosts saved yet — select your face and tap "Name Selected Person" below.
+          No hosts saved yet — click your face on screen, then click "Name Selected Person".
         </div>
       </div>
       <button id="add-host-btn" onclick="nameSelected()">+ Register Your Face</button>
@@ -498,9 +498,9 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
     const r    = await fetch("/select_person", { method:"POST", body:fd });
     const data = await r.json();
     updateSelUI(data.faces);
-    // Auto-open name dialog only if this is a brand-new selection without a name
-    const newSel = data.faces.find(f => f.selected && !f.name);
-    if (newSel) openNameDialog(newSel);
+    // Do NOT auto-open the name dialog here — the crop is saved server-side
+    // during toggle_person(), but the response hasn't fully round-tripped yet.
+    // The user should click "Name Selected Person" after selecting themselves.
   } catch(err) {}
 });
 
@@ -542,7 +542,7 @@ function nameSelected() {
   if (face) {
     openNameDialog(face);
   } else {
-    toast("Tap your face on the camera first, then use this button");
+    toast("Click your face on the camera first, then use this button");
   }
 }
 
@@ -600,7 +600,7 @@ async function refreshKnownHosts() {
 
     if (names.length === 0) {
       list.innerHTML = `<div style="font-size:0.68rem;color:#444;padding:6px 2px;">
-        No hosts saved yet — select your face and tap "Name Selected Person" below.
+        No hosts saved yet — click your face on screen, then click "Name Selected Person".
       </div>`;
       camPanel.innerHTML = "";
       return;
