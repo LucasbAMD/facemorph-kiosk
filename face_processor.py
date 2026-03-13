@@ -1,6 +1,13 @@
 """
 face_processor.py — AMD Adapt Kiosk
 Full-body pose tracking via MediaPipe + face recognition via LBPH.
+
+Fixes vs previous version:
+  - get_detected_faces() now casts all box coords to plain int() so FastAPI
+    can JSON-serialize them (numpy.int32 was causing the iterencode TypeError)
+  - _crop_for_naming is now also saved when a person is ALREADY selected and
+    re-clicked, so the Name button always works after a single click-to-select
+  - name_face() fallback message updated: "tap" → "click"
 """
 
 import cv2
@@ -55,23 +62,12 @@ RECOGNIZER_FILE = Path("known_faces/recognizer.pkl")
 
 # ── PoseTracker ───────────────────────────────────────────────────────────────
 class PoseTracker:
-    """
-    Runs MediaPipe pose in a background thread.
-    Provides landmarks and a skeleton overlay image for ControlNet.
-    """
-    # Connections to draw as skeleton lines
     CONNECTIONS = [
-        # Face
         (0,1),(1,2),(2,3),(3,7),(0,4),(4,5),(5,6),(6,8),
-        # Torso
         (11,12),(11,23),(12,24),(23,24),
-        # Left arm
         (11,13),(13,15),(15,17),(15,19),(15,21),(17,19),
-        # Right arm
         (12,14),(14,16),(16,18),(16,20),(16,22),(18,20),
-        # Left leg
         (23,25),(25,27),(27,29),(27,31),(29,31),
-        # Right leg
         (24,26),(26,28),(28,30),(28,32),(30,32),
     ]
 
@@ -113,7 +109,7 @@ class PoseTracker:
                             self._skeleton  = None
                 except Exception:
                     pass
-            time.sleep(1/15)  # 15fps pose tracking
+            time.sleep(1/15)
 
     def update(self, frame):
         if MP_AVAILABLE:
@@ -121,7 +117,6 @@ class PoseTracker:
                 self._frame = cv2.resize(frame, (640, 480))
 
     def _draw_skeleton(self, pts, h, w):
-        """Draw white skeleton on black background for ControlNet."""
         img = np.zeros((h, w, 3), dtype=np.uint8)
         for a, b in self.CONNECTIONS:
             if a < len(pts) and b < len(pts):
@@ -142,23 +137,18 @@ class PoseTracker:
             return list(self._landmarks) if self._landmarks else None
 
     def get_body_mask(self, h, w):
-        """Return a rough body mask from pose landmarks."""
         lms = self.get_landmarks()
         if not lms:
             return None
-        # Use convex hull of all visible landmarks
         pts = np.array([[x, y] for x, y in lms], dtype=np.int32)
-        # Scale from 640x480 to actual frame size
         pts[:, 0] = (pts[:, 0] * w / 640).astype(int)
         pts[:, 1] = (pts[:, 1] * h / 480).astype(int)
         pts = np.clip(pts, 0, [w-1, h-1])
-        mask = np.zeros((h, w), dtype=np.float32)
-        hull = cv2.convexHull(pts)
-        # Expand hull to capture clothing/body width
+        mask   = np.zeros((h, w), dtype=np.float32)
+        hull   = cv2.convexHull(pts)
         center = hull.mean(axis=0)
         expanded = ((hull - center) * 1.4 + center).astype(np.int32)
         cv2.fillConvexPoly(mask, expanded, 1.0)
-        # Smooth edges
         mask = cv2.GaussianBlur(mask, (31, 31), 0)
         return mask
 
@@ -331,25 +321,22 @@ class FaceProcessor:
         self._recognized_names = {}
         self._selected_people  = set()
         self._frame_size       = (0, 0)
-        # Single stable crop for naming — set on any click-to-select, cleared after learn()
         self._crop_for_naming  = None
 
-        # Detection runs in its own thread at ~10fps — never blocks the stream
-        self._det_frame  = None
-        self._det_lock   = threading.Lock()
+        self._det_frame   = None
+        self._det_lock    = threading.Lock()
         self._recog_frame = None
         self._recog_lock  = threading.Lock()
         threading.Thread(target=self._detect_loop, daemon=True).start()
         threading.Thread(target=self._recog_loop,  daemon=True).start()
 
     def _detect_loop(self):
-        """Haar Cascade + body box expansion at ~10fps in background."""
         while True:
             with self._det_lock:
                 frame = self._det_frame
             if frame is not None:
                 try:
-                    h, w = frame.shape[:2]
+                    h, w  = frame.shape[:2]
                     gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                     faces = self.face_det.detectMultiScale(
                         gray, scaleFactor=1.1, minNeighbors=6, minSize=(50, 50))
@@ -368,7 +355,7 @@ class FaceProcessor:
                         self._frame_size = (w, h)
                 except Exception:
                     pass
-            time.sleep(0.10)  # 10fps detection — plenty for a kiosk
+            time.sleep(0.10)
 
     def _load_catalog(self):
         if not self.faces_dir.exists():
@@ -411,15 +398,60 @@ class FaceProcessor:
 
     # ── Person selection ──────────────────────────────────────────────────────
     def get_detected_faces(self):
+        """
+        Return face list with all coordinates cast to plain Python int.
+        numpy.int32 values are NOT JSON-serializable and caused the
+        'object of type int32 is not JSON serializable' TypeError.
+        """
         with self._lock:
             faces = list(self._detected_faces)
             sel   = set(self._selected_people)
             names = dict(self._recognized_names)
             fw, fh = self._frame_size
-        return [{"index":i,"x":x,"y":y,"w":w,"h":h,
-                 "selected":i in sel, "name":names.get(i),
-                 "frame_w":fw, "frame_h":fh}
-                for i,(x,y,w,h) in enumerate(faces)]
+        return [
+            {
+                "index":    i,
+                "x":        int(x),   # cast np.int32 → int
+                "y":        int(y),
+                "w":        int(w),
+                "h":        int(h),
+                "selected": i in sel,
+                "name":     names.get(i),
+                "frame_w":  int(fw),
+                "frame_h":  int(fh),
+            }
+            for i, (x, y, w, h) in enumerate(faces)
+        ]
+
+    def _extract_and_store_crop(self, frame, x, y, w, h):
+        """
+        Extract a face crop from the body box and store it for naming.
+        Called every time a person is selected (or re-selected) so the
+        Name button always has a fresh crop to work with.
+        """
+        bx1 = max(0, x); by1 = max(0, y)
+        bx2 = min(frame.shape[1], x + w)
+        by2 = min(frame.shape[0], y + h)
+        body_roi  = frame[by1:by2, bx1:bx2]
+        face_crop = None
+
+        if body_roi.size > 0:
+            gray_roi  = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
+            sub_faces = self.face_det.detectMultiScale(
+                gray_roi, 1.1, 4, minSize=(30, 30))
+            if len(sub_faces) > 0:
+                fx2, fy2, fw2, fh2 = sub_faces[0]
+                face_crop = body_roi[fy2:fy2+fh2, fx2:fx2+fw2]
+
+        # Fallback: top 30% of body box
+        if face_crop is None or face_crop.size == 0:
+            face_top  = min(by1 + int(h * 0.30), frame.shape[0])
+            face_crop = frame[by1:face_top, bx1:bx2]
+
+        if face_crop is not None and face_crop.size > 0:
+            with self._lock:
+                self._crop_for_naming = face_crop.copy()
+            print(f"[CROP] Saved face crop {face_crop.shape} for naming")
 
     def toggle_person(self, click_x, click_y, frame_w, frame_h, frame=None):
         with self._lock:
@@ -432,31 +464,17 @@ class FaceProcessor:
         for i, (x, y, w, h) in enumerate(faces):
             if (x-pad) <= sx <= (x+w+pad) and (y-pad) <= sy <= (y+h+pad):
                 with self._lock:
-                    if i in self._selected_people:
+                    already_selected = i in self._selected_people
+                    if already_selected:
                         self._selected_people.discard(i)
                     else:
                         self._selected_people.add(i)
-                        # Extract and store face crop for naming
-                        if frame is not None:
-                            bx1 = max(0, x); by1 = max(0, y)
-                            bx2 = min(frame.shape[1], x + w)
-                            by2 = min(frame.shape[0], y + h)
-                            body_roi   = frame[by1:by2, bx1:bx2]
-                            face_crop  = None
-                            if body_roi.size > 0:
-                                gray_roi  = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
-                                sub_faces = self.face_det.detectMultiScale(
-                                    gray_roi, 1.1, 4, minSize=(30, 30))
-                                if len(sub_faces) > 0:
-                                    fx, fy, fw2, fh2 = sub_faces[0]
-                                    face_crop = body_roi[fy:fy+fh2, fx:fx+fw2]
-                            # Fallback: top 30% of body box
-                            if face_crop is None or face_crop.size == 0:
-                                face_top  = min(by1 + int(h * 0.30), frame.shape[0])
-                                face_crop = frame[by1:face_top, bx1:bx2]
-                            if face_crop is not None and face_crop.size > 0:
-                                self._crop_for_naming = face_crop.copy()
-                                print(f"[CROP] Saved face crop {face_crop.shape} for naming")
+
+                # Always save a fresh crop on any click (select OR re-select).
+                # This ensures the Name button always has a valid crop regardless
+                # of whether the person was previously selected.
+                if frame is not None:
+                    self._extract_and_store_crop(frame, x, y, w, h)
                 return
 
     def clear_selection(self):
@@ -465,7 +483,6 @@ class FaceProcessor:
             self._crop_for_naming = None
 
     def get_selected_mask(self, frame):
-        """Use pose landmarks for accurate body mask, fall back to face box."""
         with self._lock:
             faces = list(self._detected_faces)
             sel   = set(self._selected_people)
@@ -473,45 +490,45 @@ class FaceProcessor:
         if not sel:
             return np.ones((h, w), dtype=np.float32)
 
-        # Try pose-based mask first
         pose_mask = self.poser.get_body_mask(h, w)
         if pose_mask is not None and sel:
             return pose_mask
 
-        # Fallback: expanded face box to cover body
         mask = np.zeros((h, w), dtype=np.float32)
         for i in sel:
             if i < len(faces):
                 x, y, fw, fh = faces[i]
-                y1 = max(0, y - fh//2);    y2 = min(h, y + fh * 4)
-                x1 = max(0, x - fw);       x2 = min(w, x + fw * 2)
+                y1 = max(0, y - fh//2);  y2 = min(h, y + fh * 4)
+                x1 = max(0, x - fw);     x2 = min(w, x + fw * 2)
                 mask[y1:y2, x1:x2] = 1.0
         return mask
 
     def get_pose_skeleton(self, h, w):
-        """Return skeleton image for ControlNet guidance."""
         return self.poser.get_skeleton(h, w)
 
-    # ── Face naming — uses stored crop, no dependency on current detection ────
+    # ── Face naming ───────────────────────────────────────────────────────────
     def name_face(self, index, name):
-        """Name using the crop saved at last click-to-select. Index is ignored — crop is stable."""
+        """
+        Name using the crop saved at last click-to-select.
+        Index is accepted for API compatibility but the stored crop is used.
+        """
         with self._lock:
             crop = self._crop_for_naming
         if crop is None:
-            print(f"[NAME] No crop saved — user must click to select themselves first")
+            print("[NAME] No crop saved — user must click to select themselves first")
             return False
         self.recognizer.learn(crop, name)
         with self._lock:
-            self._crop_for_naming = None  # clear after successful learn
+            self._crop_for_naming = None
         print(f"[NAME] Learned: {name} from crop {crop.shape}")
         return True
 
     def name_selected_face(self, index, name, frame):
-        """Try stored crop first, fall back to detecting face in current frame."""
+        """Try stored crop first, fall back to live detection in current frame."""
         if self.name_face(index, name):
             return True
-        # Last resort: find any selected face in the current frame directly
-        print(f"[NAME] No stored crop — falling back to live frame detection")
+        # Fallback: detect face in the current live frame directly
+        print("[NAME] No stored crop — falling back to live frame detection")
         with self._lock:
             faces = list(self._detected_faces)
             sel   = set(self._selected_people)
@@ -526,7 +543,7 @@ class FaceProcessor:
                 self.recognizer.learn(crop, name)
                 print(f"[NAME] Learned (fallback): {name}")
                 return True
-        print(f"[NAME] Failed — no face crop available")
+        print("[NAME] Failed — click your face on screen first, then use the Name button")
         return False
 
     def get_known_names(self):
@@ -561,17 +578,14 @@ class FaceProcessor:
         if frame is None: return frame
         h, w = frame.shape[:2]
 
-        # Feed background workers (non-blocking — they copy internally)
         self.seg.update(frame)
         self.poser.update(frame)
 
-        # Feed detection + recognition threads
         with self._det_lock:
-            self._det_frame = frame  # no copy — detection thread reads at its own pace
+            self._det_frame = frame
         with self._recog_lock:
             self._recog_frame = frame
 
-        # Snapshot cached state — no detection here
         with self._lock:
             sel        = set(self._selected_people)
             names      = dict(self._recognized_names)
@@ -613,6 +627,6 @@ class FaceProcessor:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.58, label_col, 2, cv2.LINE_AA)
 
         if faces and not selected:
-            cv2.putText(frame, "Tap a person to select",
+            cv2.putText(frame, "Click a person to select",
                         (10, frame.shape[0]-16),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,140,200), 2, cv2.LINE_AA)
