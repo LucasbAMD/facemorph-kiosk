@@ -25,6 +25,10 @@ export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
 export AMD_LOG_LEVEL=0
 export HIP_VISIBLE_DEVICES=0
 export ROCR_VISIBLE_DEVICES=0
+# Expandable memory segments — prevents GPU page fault during VAE decode on ROCm.
+# Without this, the fixed-block allocator can fault when the upscale pass
+# requests a large contiguous allocation that isn't available.
+export PYTORCH_HIP_ALLOC_CONF=expandable_segments:True
 echo ""
 echo "======================================================"
 echo "  ComfyUI — AMD Adapt Kiosk AI Engine"
@@ -42,5 +46,6 @@ python3 main.py \
     --listen 127.0.0.1 \
     --disable-auto-launch \
     --force-fp16 \
+    --bf16-vae \
     --lowvram \
     --output-directory "$HOME/ComfyUI/output"
