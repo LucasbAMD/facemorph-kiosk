@@ -324,8 +324,15 @@
 
     <!-- Generating -->
     <div id="gen-overlay" class="abs-overlay">
-      <div class="spinner"></div>
-      <div id="gen-msg">Transforming...</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;max-width:90%;">
+        <div class="spinner"></div>
+        <div id="gen-msg" style="color:var(--cyan);font-size:0.95rem;letter-spacing:1px;">Transforming...</div>
+        <div style="width:100%;background:#222;border-radius:8px;height:8px;overflow:hidden;">
+          <div id="gen-progress-bar" style="height:100%;width:0%;background:var(--cyan);border-radius:8px;transition:width 0.4s ease;"></div>
+        </div>
+        <div id="gen-progress-label" style="font-size:0.68rem;color:#555;letter-spacing:1px;">Starting AI engine...</div>
+        <div id="gen-elapsed" style="font-size:0.62rem;color:#333;">0s</div>
+      </div>
     </div>
 
     <!-- Result -->
@@ -373,6 +380,15 @@
     <p>Enter your name and the kiosk will recognize you automatically every time you step in front of the camera.</p>
     <input id="name-input" type="text" placeholder="Enter your name..." maxlength="30"
            onkeydown="if(event.key==='Enter') saveName()">
+    <div style="display:flex;gap:8px;align-items:center;margin-top:2px;">
+      <span style="font-size:0.72rem;color:#888;">I am:</span>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;">
+        <input type="radio" name="nd-gender" value="male" id="nd-male"> Male
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;">
+        <input type="radio" name="nd-gender" value="female" id="nd-female"> Female
+      </label>
+    </div>
     <div class="nd-btns">
       <button id="nd-save"   onclick="saveName()">✓ Save</button>
       <button id="nd-cancel" onclick="closeName()">Cancel</button>
@@ -563,19 +579,24 @@ async function saveName() {
   if (!name) { toast("Please enter a name"); return; }
   if (pendingNameIdx === null) { toast("No person selected"); closeName(); return; }
 
+  const genderEl = document.querySelector('input[name="nd-gender"]:checked');
+  const gender   = genderEl ? genderEl.value : "unknown";
+
   const fd = new FormData();
-  fd.append("index", pendingNameIdx);
-  fd.append("name",  name);
+  fd.append("index",  pendingNameIdx);
+  fd.append("name",   name);
+  fd.append("gender", gender);
 
   try {
     const r    = await fetch("/name_face", { method:"POST", body:fd });
     const data = await r.json();
     if (data.status === "ok") {
-      toast(`✓ ${name} saved — will be recognized automatically`, "ok");
+      const gLabel = gender !== "unknown" ? ` (${gender})` : "";
+      toast(`✓ ${name}${gLabel} saved — will be recognized automatically`, "ok");
       refreshKnownHosts();
       closeName();
     } else {
-      toast("Could not save — tap your face on screen first, then try again");
+      toast("Could not save — click your face on screen first, then try again");
     }
   } catch(e) {
     toast("Connection error: " + e.message);
@@ -684,14 +705,69 @@ function savePhoto() {
   }, 600);
 }
 
-// ── Transform ─────────────────────────────────────────────────────────────────
+// ── Transform + progress ──────────────────────────────────────────────────────
+let genStartTime   = 0;
+let progressTimer  = null;
+let elapsedTimer   = null;
+
+// Fake-progress model: generation takes ~30-60s depending on character.
+// We advance a synthetic progress bar and update it with real queue state.
+// Stages: uploading (5%), generating pass1 (5→65%), upscaling (65→80%),
+//         refining pass2 (80→95%), decoding (95→99%), done (100%).
+const PROGRESS_STAGES = [
+  { pct: 5,   label: "Uploading frame..." },
+  { pct: 20,  label: "Pass 1 — generating character..." },
+  { pct: 45,  label: "Pass 1 — refining details..." },
+  { pct: 65,  label: "Pass 1 — finishing..." },
+  { pct: 72,  label: "Upscaling for print quality..." },
+  { pct: 80,  label: "Pass 2 — sharpening..." },
+  { pct: 90,  label: "Pass 2 — final details..." },
+  { pct: 97,  label: "Decoding image..." },
+];
+let stageIdx = 0;
+
+function setProgress(pct, label) {
+  document.getElementById("gen-progress-bar").style.width = pct + "%";
+  if (label) document.getElementById("gen-progress-label").textContent = label;
+}
+
+function startProgressAnimation() {
+  stageIdx  = 0;
+  genStartTime = Date.now();
+  setProgress(0, "Starting AI engine...");
+
+  // Advance through fake stages timed to typical generation duration
+  const stageDurations = [1500, 5000, 8000, 6000, 2000, 5000, 5000, 3000];
+  function advanceStage() {
+    if (stageIdx >= PROGRESS_STAGES.length) return;
+    const s = PROGRESS_STAGES[stageIdx];
+    setProgress(s.pct, s.label);
+    stageIdx++;
+    if (stageIdx < PROGRESS_STAGES.length) {
+      progressTimer = setTimeout(advanceStage, stageDurations[stageIdx - 1] || 4000);
+    }
+  }
+  advanceStage();
+
+  // Elapsed timer
+  elapsedTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - genStartTime) / 1000);
+    document.getElementById("gen-elapsed").textContent = s + "s";
+  }, 1000);
+}
+
+function stopProgressAnimation() {
+  if (progressTimer)  { clearTimeout(progressTimer);   progressTimer = null; }
+  if (elapsedTimer)   { clearInterval(elapsedTimer);   elapsedTimer  = null; }
+}
+
 async function doTransform() {
   const btn = document.getElementById("xform-btn");
   btn.disabled = true;
 
   const online = await checkComfy();
   if (!online) {
-    toast("AI Engine offline — run ~/start_comfyui.sh");
+    toast("AI Engine offline — start the kiosk with python start.py");
     btn.disabled = false;
     return;
   }
@@ -700,6 +776,7 @@ async function doTransform() {
   document.getElementById("gen-msg").textContent = selCount > 0
     ? `Transforming ${selCount} person${selCount > 1 ? "s" : ""}...`
     : "Transforming...";
+  startProgressAnimation();
 
   const fd = new FormData();
   fd.append("character", selectedChar);
@@ -707,6 +784,7 @@ async function doTransform() {
     const r = await fetch("/generate", { method:"POST", body:fd });
     if (r.status === 400) {
       const d = await r.json();
+      stopProgressAnimation();
       hideSpinner();
       toast(d.detail || "Select at least one person first");
       btn.disabled = false;
@@ -714,11 +792,19 @@ async function doTransform() {
     }
     const data = await r.json();
     if (data.status === "generating" || data.status === "busy") {
-      pollTimer = setInterval(pollStatus, 1000);
+      pollTimer = setInterval(pollStatus, 1500);
     } else {
-      hideSpinner(); toast(data.message || "Error starting"); btn.disabled = false;
+      stopProgressAnimation();
+      hideSpinner();
+      toast(data.message || "Error starting");
+      btn.disabled = false;
     }
-  } catch(e) { hideSpinner(); toast("Connection error"); btn.disabled = false; }
+  } catch(e) {
+    stopProgressAnimation();
+    hideSpinner();
+    toast("Connection error");
+    btn.disabled = false;
+  }
 }
 
 async function pollStatus() {
@@ -727,18 +813,22 @@ async function pollStatus() {
     const data = await r.json();
     if (data.status === "done" && data.image) {
       clearInterval(pollTimer);
-      hideSpinner();
-      currentResultDataUrl = data.image;
-      showResult(data.image);
-      document.getElementById("xform-btn").disabled = false;
+      stopProgressAnimation();
+      setProgress(100, "Done!");
+      setTimeout(() => {
+        hideSpinner();
+        currentResultDataUrl = data.image;
+        showResult(data.image);
+        document.getElementById("xform-btn").disabled = false;
+      }, 400);
     } else if (data.status === "error") {
       clearInterval(pollTimer);
+      stopProgressAnimation();
       hideSpinner();
-      toast("Error: " + (data.message || "unknown"));
+      toast("Error: " + (data.message || "unknown — check terminal for details"));
       document.getElementById("xform-btn").disabled = false;
-    } else if (data.message) {
-      document.getElementById("gen-msg").textContent = data.message;
     }
+    // message updates are handled by the stage animation — no need to overwrite
   } catch(e) {}
 }
 
