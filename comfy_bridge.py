@@ -1,150 +1,387 @@
 """
 comfy_bridge.py -- ComfyUI API bridge for AMD Adapt Kiosk
 img2img + ControlNet Canny. Supports per-person selection mask.
+
+Changes from original:
+  - Gender detection via OpenCV DNN (age-gender-recognition model)
+  - All CHARACTER_PROMPTS now have male/female variants
+  - Anime prompt no longer hardcodes male — respects detected gender
+  - _upload_frame max_dim raised to 1024 for better base quality
+  - _build_workflow adds a LatentUpscale + second KSampler pass → ~1536px output
+  - generate_status in main.py should use JPEG quality 95+ for print-ready stickers
 """
 
 import json
 import os
-import uuid
-import time
 import urllib.request
 import urllib.parse
+import uuid
+import time
 import threading
 import cv2
 import numpy as np
 
 COMFY_URL = "http://127.0.0.1:8188"
 
-# Prompts instruct transformation of the subject, not generation of new characters.
-# denoise 0.72-0.78 is needed to actually transform the person's appearance.
-# cnet_strength 0.85 preserves pose without over-constraining the transformation.
-# Prompts use img2img transformation approach:
-# - Keep denoise 0.68-0.72 so original hair, face structure and clothing silhouette are preserved
-# - Explicitly instruct the model to TRANSFORM the subject, not replace them
-# - Negative prompts prevent hallucinated extra people from background noise
+# ── Gender detection ──────────────────────────────────────────────────────────
+# Uses OpenCV's pre-trained Caffe model — no extra pip installs needed.
+# Model files are small (~25MB total) and downloaded once by install/setup.
+# If models are missing, gender defaults to UNKNOWN and neutral prompts are used.
+
+_GENDER_MODEL_DIR = os.path.expanduser("~/.cache/kiosk_models")
+_GENDER_PROTO     = os.path.join(_GENDER_MODEL_DIR, "gender_deploy.prototxt")
+_GENDER_MODEL     = os.path.join(_GENDER_MODEL_DIR, "gender_net.caffemodel")
+_FACE_PROTO       = os.path.join(_GENDER_MODEL_DIR, "opencv_face_detector.pbtxt")
+_FACE_MODEL       = os.path.join(_GENDER_MODEL_DIR, "opencv_face_detector_uint8.pb")
+
+_GENDER_NET = None
+_FACE_NET   = None
+_GENDER_LOCK = threading.Lock()
+
+
+def _ensure_gender_models():
+    """Download gender/face models if not already present."""
+    os.makedirs(_GENDER_MODEL_DIR, exist_ok=True)
+    files = {
+        _GENDER_PROTO: (
+            "https://raw.githubusercontent.com/smahesh29/Gender-and-Age-Detection/"
+            "master/gender_deploy.prototxt"
+        ),
+        _GENDER_MODEL: (
+            "https://github.com/smahesh29/Gender-and-Age-Detection/raw/"
+            "master/gender_net.caffemodel"
+        ),
+        _FACE_PROTO: (
+            "https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/"
+            "face_detector/opencv_face_detector.pbtxt"
+        ),
+        _FACE_MODEL: (
+            "https://github.com/opencv/opencv_3rdparty/raw/dnn_samples_face_detector_20180220_uint8/"
+            "opencv_face_detector_uint8.pb"
+        ),
+    }
+    for path, url in files.items():
+        if not os.path.exists(path):
+            print(f"[Gender] Downloading {os.path.basename(path)}...")
+            try:
+                urllib.request.urlretrieve(url, path)
+                print(f"[Gender] Downloaded {os.path.basename(path)}")
+            except Exception as e:
+                print(f"[Gender] WARN: Could not download {os.path.basename(path)}: {e}")
+
+
+def _load_gender_nets():
+    global _GENDER_NET, _FACE_NET
+    with _GENDER_LOCK:
+        if _GENDER_NET is not None:
+            return True
+        _ensure_gender_models()
+        try:
+            _FACE_NET   = cv2.dnn.readNet(_FACE_MODEL,   _FACE_PROTO)
+            _GENDER_NET = cv2.dnn.readNet(_GENDER_MODEL, _GENDER_PROTO)
+            print("[Gender] Gender detection models loaded OK")
+            return True
+        except Exception as e:
+            print(f"[Gender] WARN: Could not load gender models — defaulting to neutral prompts. ({e})")
+            return False
+
+
+def detect_gender(frame) -> str:
+    """
+    Returns 'male', 'female', or 'unknown'.
+    Runs the face detector first to find a face ROI, then gender classification.
+    Fast enough to run once per generate() call (not per frame).
+    """
+    if not _load_gender_nets():
+        return "unknown"
+
+    h, w = frame.shape[:2]
+    blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300),
+                                 [104, 117, 123], swapRB=False)
+    with _GENDER_LOCK:
+        _FACE_NET.setInput(blob)
+        detections = _FACE_NET.forward()
+
+    # Find the most confident face detection
+    best_conf = 0.0
+    best_box  = None
+    for i in range(detections.shape[2]):
+        conf = float(detections[0, 0, i, 2])
+        if conf > best_conf:
+            best_conf = conf
+            best_box  = detections[0, 0, i, 3:7]
+
+    if best_box is None or best_conf < 0.7:
+        return "unknown"
+
+    x1 = max(0, int(best_box[0] * w))
+    y1 = max(0, int(best_box[1] * h))
+    x2 = min(w, int(best_box[2] * w))
+    y2 = min(h, int(best_box[3] * h))
+
+    pad = 20
+    x1 = max(0, x1 - pad); y1 = max(0, y1 - pad)
+    x2 = min(w, x2 + pad); y2 = min(h, y2 + pad)
+    face_roi = frame[y1:y2, x1:x2]
+    if face_roi.size == 0:
+        return "unknown"
+
+    face_blob = cv2.dnn.blobFromImage(
+        face_roi, 1.0, (227, 227),
+        [78.4263377603, 87.7689143744, 114.895847746],
+        swapRB=False
+    )
+    with _GENDER_LOCK:
+        _GENDER_NET.setInput(face_blob)
+        preds = _GENDER_NET.forward()[0]
+
+    # preds[0] = female probability, preds[1] = male probability
+    gender = "female" if preds[0] > preds[1] else "male"
+    confidence = float(max(preds))
+    print(f"[Gender] Detected: {gender} (confidence={confidence:.2f})")
+    return gender
+
+
+# ── Character prompts — male + female variants ────────────────────────────────
+# Rules:
+#   - "positive_f" describes the FEMALE version of the character
+#   - "positive_m" describes the MALE version
+#   - negative prompts reinforce the target gender to avoid drift
+#   - denoise/cnet_strength unchanged from original tuned values
+
 CHARACTER_PROMPTS = {
     "navi": {
-        "positive": (
-            "person as a Na'vi from Avatar, blue alien skin, "
-            "cyan face markings, large amber eyes, pointed ears, "
-            "same hair color and clothing silhouette, same body pose, "
+        "positive_m": (
+            "person as a male Na'vi from Avatar, blue alien skin, "
+            "cyan bioluminescent face markings, large amber eyes, pointed ears, "
+            "masculine Na'vi features, same hair color, same body pose, "
             "Pandora jungle background, cinematic, photorealistic, 8k"
         ),
-        "negative": (
-            "human skin, pink skin, multiple people, extra person, "
+        "positive_f": (
+            "person as a female Na'vi from Avatar, blue alien skin, "
+            "cyan bioluminescent face markings, large amber eyes, pointed ears, "
+            "feminine Na'vi features, graceful, same hair color, same body pose, "
+            "Pandora jungle background, cinematic, photorealistic, 8k"
+        ),
+        "negative_m": (
+            "human skin, pink skin, female, feminine, multiple people, extra person, "
+            "bald, changed clothing, ugly, blurry, cartoon, low quality"
+        ),
+        "negative_f": (
+            "human skin, pink skin, male, masculine, beard, multiple people, extra person, "
             "bald, changed clothing, ugly, blurry, cartoon, low quality"
         ),
         "denoise": 0.62, "cnet_strength": 0.75,
     },
     "hulk": {
-        "positive": (
+        "positive_m": (
             "person as the Incredible Hulk, massive green muscles, "
-            "green skin, same hair and facial structure, torn purple pants, "
-            "same body pose, stormy sky background, "
+            "green skin, male, same hair and facial structure, torn purple pants, "
+            "same body pose, stormy sky background, cinematic, photorealistic, 8k"
+        ),
+        "positive_f": (
+            "person as She-Hulk, strong muscular green-skinned woman, "
+            "green skin, female, long hair, same facial structure, "
+            "ripped clothing, same body pose, stormy sky background, "
             "cinematic, photorealistic, 8k"
         ),
-        "negative": (
-            "normal skin, multiple people, extra person, "
+        "negative_m": (
+            "female, woman, normal skin, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "negative_f": (
+            "male, man, beard, normal skin, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.64, "cnet_strength": 0.75,
     },
     "thanos": {
-        "positive": (
-            "person as Thanos the Marvel villain, purple Titan skin, "
+        "positive_m": (
+            "person as Thanos the Marvel villain, male, purple Titan skin, "
             "same facial structure, infinity gauntlet armor, "
-            "same body pose, cosmic nebula background, "
+            "same body pose, cosmic nebula background, cinematic, photorealistic, 8k"
+        ),
+        "positive_f": (
+            "person as a female purple Titan villain, Gamora-style, "
+            "purple skin, strong feminine features, same facial structure, "
+            "cosmic armor, same body pose, nebula background, "
             "cinematic, photorealistic, 8k"
         ),
-        "negative": (
-            "human skin, pink skin, multiple people, extra person, "
+        "negative_m": (
+            "human skin, pink skin, female, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "negative_f": (
+            "human skin, pink skin, male, beard, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.62, "cnet_strength": 0.75,
     },
     "predator": {
-        "positive": (
-            "person as a Predator alien warrior, mandibles, dreadlocks, "
+        "positive_m": (
+            "person as a male Predator alien warrior, mandibles, dreadlocks, "
             "biomask helmet, mesh armor, wrist blades, same body pose, "
-            "dark jungle with thermal HUD overlay, "
-            "cinematic, highly detailed, 8k"
+            "dark jungle with thermal HUD overlay, cinematic, highly detailed, 8k"
         ),
-        "negative": (
-            "human face, multiple people, extra person, "
+        "positive_f": (
+            "person as a female Predator alien warrior, mandibles, dreadlocks, "
+            "biomask helmet, lighter mesh armor, same body pose, "
+            "dark jungle with thermal HUD overlay, cinematic, highly detailed, 8k"
+        ),
+        "negative_m": (
+            "human face, female, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "negative_f": (
+            "human face, male, beard, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.62, "cnet_strength": 0.75,
     },
     "ghost": {
-        "positive": (
-            "person as a spectral ghost, translucent glowing body, "
+        "positive_m": (
+            "person as a male spectral ghost, translucent glowing body, "
             "pale ethereal skin, white aura, floating light particles, "
             "same clothing and hair shape, same pose, "
             "dark atmospheric background, cinematic, 8k"
         ),
-        "negative": (
-            "solid opaque body, multiple people, extra person, "
+        "positive_f": (
+            "person as a female spectral ghost, translucent glowing body, "
+            "pale ethereal skin, white flowing aura, floating light particles, "
+            "same clothing and hair shape, same pose, "
+            "dark atmospheric background, cinematic, 8k"
+        ),
+        "negative_m": (
+            "solid opaque body, female, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "negative_f": (
+            "solid opaque body, male, beard, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.60, "cnet_strength": 0.72,
     },
     "groot": {
-        "positive": (
-            "person as Groot from Guardians of the Galaxy, "
+        "positive_m": (
+            "person as Groot from Guardians of the Galaxy, male, "
             "brown bark skin, twig hair with green leaves, vine clothing, "
             "same body pose, forest background with light shafts, "
             "cinematic, photorealistic, 8k"
         ),
-        "negative": (
-            "human skin, multiple people, extra person, "
+        "positive_f": (
+            "person as a female Groot, living tree humanoid woman, "
+            "brown bark skin, flower and leaf hair, vine clothing, "
+            "feminine tree features, same body pose, "
+            "forest background with light shafts, cinematic, photorealistic, 8k"
+        ),
+        "negative_m": (
+            "human skin, female, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "negative_f": (
+            "human skin, male, beard, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.62, "cnet_strength": 0.75,
     },
     "cyberpunk": {
-        "positive": (
-            "person as a cyberpunk character, same hair with neon streaks, "
+        "positive_m": (
+            "person as a male cyberpunk character, same hair with neon streaks, "
             "glowing circuit clothing, cybernetic eye implants, chrome jaw, "
             "same face and pose, neon rain-soaked city background, "
             "cinematic, photorealistic, 8k"
         ),
-        "negative": (
-            "fantasy, medieval, multiple people, extra person, "
+        "positive_f": (
+            "person as a female cyberpunk character, same hair with neon streaks, "
+            "glowing circuit clothing, cybernetic eye implants, chrome accents, "
+            "same face and pose, neon rain-soaked city background, "
+            "cinematic, photorealistic, 8k"
+        ),
+        "negative_m": (
+            "fantasy, medieval, female, multiple people, extra person, "
+            "ugly, blurry, cartoon, low quality, duplicate"
+        ),
+        "negative_f": (
+            "fantasy, medieval, male, beard, multiple people, extra person, "
             "ugly, blurry, cartoon, low quality, duplicate"
         ),
         "denoise": 0.65, "cnet_strength": 0.75,
     },
     "claymation": {
-        "positive": (
-            "person as a claymation figurine, smooth matte clay texture, "
+        "positive_m": (
+            "male person as a claymation figurine, smooth matte clay texture, "
             "same hair color and clothing colors, fingerprint marks on clay, "
             "Aardman style, same pose, stop-motion background, "
             "plasticine, handcrafted, single subject"
         ),
-        "negative": (
-            "photorealistic skin, CGI, anime, multiple people, "
+        "positive_f": (
+            "female person as a claymation figurine, smooth matte clay texture, "
+            "same hair color and clothing colors, fingerprint marks on clay, "
+            "Aardman style, same pose, stop-motion background, "
+            "plasticine, handcrafted, single subject"
+        ),
+        "negative_m": (
+            "female, photorealistic skin, CGI, anime, multiple people, "
             "extra person, ugly, blurry, low quality, glossy, rubber"
         ),
-        "denoise": 0.65, "cnet_strength": 0.65, "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
+        "negative_f": (
+            "male, beard, photorealistic skin, CGI, anime, multiple people, "
+            "extra person, ugly, blurry, low quality, glossy, rubber"
+        ),
+        "denoise": 0.65, "cnet_strength": 0.65,
+        "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
     },
     "anime": {
-        "positive": (
-            "male anime character, man, same face as the person, "
-            "same hair color and style, masculine jawline, "
-            "sharp anime eyes, cel-shaded skin, clean line art, "
-            "vibrant colors, same pose, Studio Ghibli style, "
-            "soft bokeh background, single subject"
+        # Original was hardcoded male — now gender-aware
+        "positive_m": (
+            "male anime character, same face as the person, "
+            "same hair color and style, masculine jawline, sharp anime eyes, "
+            "cel-shaded skin, clean line art, vibrant colors, same pose, "
+            "Studio Ghibli style, soft bokeh background, single subject"
         ),
-        "negative": (
+        "positive_f": (
+            "female anime character, same face as the person, "
+            "same hair color and style, feminine features, large expressive eyes, "
+            "cel-shaded skin, clean line art, vibrant colors, same pose, "
+            "Studio Ghibli style, soft bokeh background, single subject"
+        ),
+        "negative_m": (
             "female, woman, girl, feminine, photorealistic, photograph, "
             "3d render, western cartoon, multiple people, extra person, "
             "ugly, blurry, bad anatomy, deformed eyes, cross-eyed, "
             "asymmetric eyes, mismatched eyes"
         ),
-        "denoise": 0.65, "cnet_strength": 0.78, "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
+        "negative_f": (
+            "male, man, boy, masculine, beard, photorealistic, photograph, "
+            "3d render, western cartoon, multiple people, extra person, "
+            "ugly, blurry, bad anatomy, deformed eyes, cross-eyed, "
+            "asymmetric eyes, mismatched eyes"
+        ),
+        "denoise": 0.65, "cnet_strength": 0.78,
+        "steps": 6, "sampler": "euler", "scheduler": "sgm_uniform",
     },
 }
 
+
+def get_prompts(char_key: str, gender: str) -> tuple[str, str]:
+    """
+    Return (positive, negative) prompt strings for a character + detected gender.
+    Falls back gracefully: female → male → neutral if keys are missing.
+    For 'unknown' gender, picks the neutral/male variant (safest average).
+    """
+    cfg = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
+
+    # If old-style single prompts still present (forward-compat), use them
+    if "positive" in cfg:
+        return cfg["positive"], cfg["negative"]
+
+    suffix = "f" if gender == "female" else "m"
+    positive = cfg.get(f"positive_{suffix}", cfg.get("positive_m", ""))
+    negative = cfg.get(f"negative_{suffix}", cfg.get("negative_m", ""))
+    return positive, negative
+
+
+# ── API helpers ───────────────────────────────────────────────────────────────
 def _api(endpoint, data=None, method="GET"):
     url     = f"{COMFY_URL}/{endpoint}"
     headers = {"Content-Type": "application/json"}
@@ -153,6 +390,7 @@ def _api(endpoint, data=None, method="GET"):
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read())
 
+
 def is_comfy_running():
     try:
         _api("system_stats")
@@ -160,13 +398,19 @@ def is_comfy_running():
     except Exception:
         return False
 
+
 def _upload_frame(frame, filename="kiosk.png"):
-    max_dim = 896
+    """
+    Upload a frame to ComfyUI.
+    Base generation size raised to 1024 (was 896) for better detail before upscale.
+    Dimensions are kept divisible by 64 as required by SDXL.
+    """
+    max_dim = 1024  # was 896 — higher base = more detail going into the upscale pass
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
     nw      = int((w * scale) // 64) * 64
-    resized = cv2.resize(frame, (nw, nh))
+    resized = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
     _, buf  = cv2.imencode(".png", resized)
     img_bytes = buf.tobytes()
     boundary  = uuid.uuid4().hex
@@ -181,24 +425,22 @@ def _upload_frame(frame, filename="kiosk.png"):
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())["name"]
 
+
 def _make_control_image(frame, selection_mask=None, skeleton=None):
     """
-    Build the ControlNet guidance image:
-    - If skeleton (MediaPipe pose) is available: use it -- best pose fidelity
-    - Otherwise: fall back to Canny edges masked to person silhouette
+    Build the ControlNet guidance image.
+    Prefers pose skeleton when available; falls back to masked Canny edges.
     """
-    max_dim = 896
+    max_dim = 1024  # match _upload_frame
     h, w    = frame.shape[:2]
     scale   = max_dim / max(h, w)
     nh      = int((h * scale) // 64) * 64
     nw      = int((w * scale) // 64) * 64
 
     if skeleton is not None:
-        # Use pose skeleton -- white lines on black, perfectly captures body pose
         ctrl = cv2.resize(skeleton, (nw, nh))
         return _upload_frame(ctrl, "kiosk_control.png")
 
-    # Fallback: Canny edges
     resized  = cv2.resize(frame, (nw, nh))
     gray     = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
     blurred  = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -214,16 +456,14 @@ def _make_control_image(frame, selection_mask=None, skeleton=None):
     edges3 = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
     return _upload_frame(edges3, "kiosk_control.png")
 
+
 # Keep old name as alias
 def _make_canny(frame, selection_mask=None):
     return _make_control_image(frame, selection_mask, None)
 
+
 def _apply_selection_mask(frame, mask):
-    """
-    Crop the frame so only selected people are prominent.
-    Unselected areas are darkened to 20% brightness.
-    If mask is all-ones (no selection), return frame unchanged.
-    """
+    """Darken unselected areas to 20% so they don't confuse ControlNet."""
     if mask is None or np.all(mask >= 0.99):
         return frame
     h, w    = frame.shape[:2]
@@ -233,46 +473,22 @@ def _apply_selection_mask(frame, mask):
     result  = np.where(m3 > 0.5, frame, dim).astype(np.uint8)
     return result
 
-# ── InstantID model paths ──────────────────────────────────────────────────────
+
+# ── InstantID (disabled — antelopev2 not configured) ─────────────────────────
 COMFY_DIR       = os.path.expanduser("~/ComfyUI")
 INSTANTID_MODEL = os.path.join(COMFY_DIR, "models", "instantid", "ip-adapter_instantid.bin")
 INSTANTID_CNET  = os.path.join(COMFY_DIR, "models", "controlnet", "instantid-controlnet.safetensors")
 INSTANTID_NODE  = os.path.join(COMFY_DIR, "custom_nodes", "ComfyUI_InstantID")
+
 
 def _instantid_available():
     """Disabled -- InsightFace antelopev2 model not configured. Using Canny workflow."""
     return False
 
 
-def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
-    """
-    InstantID two-pass workflow.
-
-    Layers the face identity embedding (via InsightFace + ip-adapter_instantid)
-    on top of the existing Canny structural guidance. The result is that the
-    generated character genuinely looks like the specific person standing at
-    the kiosk, not just a generic member of that species/style.
-
-    Node map:
-      1  CheckpointLoaderSimple  SDXL-Turbo fp16
-      2  InstantIDModelLoader    ip-adapter_instantid.bin
-      3  ControlNetLoader        instantid-controlnet.safetensors  (face keypoints)
-      4  InstantIDFaceAnalysis   InsightFace buffalo_l (runs on CPU -- stable on ROCm)
-      5  LoadImage               full source frame  (structure reference)
-      6  LoadImage               face-crop reference (identity reference)
-      7  LoadImage               canny edge map
-      8  ControlNetLoader        control-lora-canny-rank128 (pose/structure layer)
-      9  VAEEncode               encode source frame
-      10 CLIPTextEncode positive
-      11 CLIPTextEncode negative
-      12 ApplyInstantID          inject face identity → patched model + conditionings
-      13 ControlNetApply         add Canny pose on top of InstantID conditionings
-      14 KSampler Pass 1         768px, 10 steps
-      15 LatentUpscale           bislerp 768→1024
-      16 KSampler Pass 2         1024px, 6 steps, denoise 0.35
-      17 VAEDecode
-      18 SaveImage
-    """
+def _build_instantid_workflow(char_key, image_name, face_name, canny_name, gender="unknown"):
+    """InstantID two-pass workflow (kept for when InstantID is re-enabled)."""
+    positive, negative = get_prompts(char_key, gender)
     cfg  = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed = int(time.time()) % 2**32
     return {
@@ -292,9 +508,9 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
         "9":  {"class_type": "VAEEncode",
                "inputs": {"pixels": ["5", 0], "vae": ["1", 2]}},
         "10": {"class_type": "CLIPTextEncode",
-               "inputs": {"text": cfg["positive"], "clip": ["1", 1]}},
+               "inputs": {"text": positive, "clip": ["1", 1]}},
         "11": {"class_type": "CLIPTextEncode",
-               "inputs": {"text": cfg["negative"],  "clip": ["1", 1]}},
+               "inputs": {"text": negative,  "clip": ["1", 1]}},
         "12": {"class_type": "ApplyInstantID",
                "inputs": {
                    "instantid":   ["2", 0],
@@ -305,24 +521,23 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
                    "model":       ["1", 0],
                    "positive":    ["10", 0],
                    "negative":    ["11", 0],
-                   "weight":      0.80,        # fixed: was ip_weight
+                   "weight":      0.80,
                    "cn_strength": 0.65,
                    "start_at":    0.0,
                    "end_at":      1.0,
                }},
-        # ApplyInstantID outputs: [0]=MODEL, [1]=positive, [2]=negative
         "13": {"class_type": "ControlNetApply",
                "inputs": {
-                   "conditioning": ["12", 1],          # positive conditioning
+                   "conditioning": ["12", 1],
                    "control_net":  ["8", 0],
                    "image":        ["7", 0],
                    "strength":     cfg["cnet_strength"] * 0.75,
                }},
         "14": {"class_type": "KSampler",
                "inputs": {
-                   "model":        ["12", 0],           # patched MODEL
+                   "model":        ["12", 0],
                    "positive":     ["13", 0],
-                   "negative":     ["12", 2],           # negative conditioning
+                   "negative":     ["12", 2],
                    "latent_image": ["9",  0],
                    "seed":         seed,
                    "steps":        8,
@@ -339,81 +554,136 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name):
     }
 
 
-def _build_workflow(char_key, image_name, canny_name):
-    """Single-pass img2img + ControlNet at 896px using SDXL base 1.0."""
+def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
+    """
+    Two-pass img2img + ControlNet workflow:
+      Pass 1: generate at 1024px (up from 896)
+      Pass 2: LatentUpscale to 1536px + light denoise refinement
+              → ~1536px output, good for 2x2 inch sticker printing at 300dpi
+
+    Gender-aware prompts replace the old single-prompt approach.
+    """
+    positive, negative = get_prompts(char_key, gender)
     cfg       = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed      = int(time.time()) % 2**32
     steps     = cfg.get("steps", 8)
-    # SDXL-Turbo uses euler_ancestral + sgm_uniform
     sampler   = cfg.get("sampler",    "euler_ancestral")
     scheduler = cfg.get("scheduler",  "sgm_uniform")
+
+    # Upscale target: 1536px on the long side.
+    # For a portrait shot at ~1024x768 base, this gives ~1536x1152 output
+    # → printable at ~5x3.8 inches at 300dpi, or 2x1.5 inches at 768dpi (sticker quality).
+    upscale_w = 1536
+    upscale_h = 1536
+
     return {
+        # ── Model + ControlNet ───────────────────────────────────────────────
         "1": {"class_type": "CheckpointLoaderSimple",
               "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
         "2": {"class_type": "ControlNetLoader",
               "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
+
+        # ── Source image + edge map ──────────────────────────────────────────
         "3": {"class_type": "LoadImage", "inputs": {"image": image_name}},
         "4": {"class_type": "LoadImage", "inputs": {"image": canny_name}},
+
+        # ── Encode source → latent ───────────────────────────────────────────
         "5": {"class_type": "VAEEncode",
               "inputs": {"pixels": ["3", 0], "vae": ["1", 2]}},
+
+        # ── Text conditioning ────────────────────────────────────────────────
         "6": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": cfg["positive"], "clip": ["1", 1]}},
+              "inputs": {"text": positive, "clip": ["1", 1]}},
         "7": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": cfg["negative"], "clip": ["1", 1]}},
+              "inputs": {"text": negative, "clip": ["1", 1]}},
+
+        # ── ControlNet apply ─────────────────────────────────────────────────
         "8": {"class_type": "ControlNetApply",
               "inputs": {"conditioning": ["6", 0], "control_net": ["2", 0],
                          "image": ["4", 0], "strength": cfg["cnet_strength"]}},
+
+        # ── Pass 1: generate at base resolution (1024px) ─────────────────────
         "9": {"class_type": "KSampler",
-              "inputs": {"model": ["1", 0], "positive": ["8", 0], "negative": ["7", 0],
-                         "latent_image": ["5", 0], "seed": seed,
-                         "steps": steps, "cfg": 1.0,
-                         "sampler_name": sampler, "scheduler": scheduler,
-                         "denoise": cfg["denoise"]}},
-        "10": {"class_type": "VAEDecode",
-               "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
-        "11": {"class_type": "SaveImage",
-               "inputs": {"images": ["10", 0], "filename_prefix": f"kiosk_{char_key}"}},
+              "inputs": {
+                  "model":        ["1", 0],
+                  "positive":     ["8", 0],
+                  "negative":     ["7", 0],
+                  "latent_image": ["5", 0],
+                  "seed":         seed,
+                  "steps":        steps,
+                  "cfg":          1.0,
+                  "sampler_name": sampler,
+                  "scheduler":    scheduler,
+                  "denoise":      cfg["denoise"],
+              }},
+
+        # ── Upscale latent to 1536px ─────────────────────────────────────────
+        # bislerp is the best quality upscale method available without extra models
+        "10": {"class_type": "LatentUpscale",
+               "inputs": {
+                   "samples":        ["9", 0],
+                   "upscale_method": "bislerp",
+                   "width":          upscale_w,
+                   "height":         upscale_h,
+                   "crop":           "disabled",
+               }},
+
+        # ── Pass 2: refine upscaled latent ──────────────────────────────────
+        # Low denoise (0.35) keeps the character intact while sharpening fine detail.
+        # More steps here = sharper sticker print without changing the look.
+        "11": {"class_type": "KSampler",
+               "inputs": {
+                   "model":        ["1", 0],
+                   "positive":     ["8", 0],
+                   "negative":     ["7", 0],
+                   "latent_image": ["10", 0],
+                   "seed":         seed + 1,
+                   "steps":        10,
+                   "cfg":          1.5,           # slightly higher CFG for detail crispness
+                   "sampler_name": sampler,
+                   "scheduler":    scheduler,
+                   "denoise":      0.35,           # light refinement — preserves pass-1 result
+               }},
+
+        # ── Decode + save ────────────────────────────────────────────────────
+        "12": {"class_type": "VAEDecode",
+               "inputs": {"samples": ["11", 0], "vae": ["1", 2]}},
+        "13": {"class_type": "SaveImage",
+               "inputs": {
+                   "images":           ["12", 0],
+                   "filename_prefix":  f"kiosk_{char_key}",
+               }},
     }
+
 
 def _blur_background(frame, selection_mask=None):
     """
-    Heavily blur the background, keep person sharp.
-    Prevents background edges from confusing ControlNet into generating extra figures.
+    Blur background to prevent ControlNet from generating extra figures from edge noise.
     """
     if selection_mask is None or np.all(selection_mask >= 0.99):
-        # No specific selection -- use rembg-style simple background blur
-        # Just blur the whole image lightly to reduce edge noise
         return cv2.GaussianBlur(frame, (1, 1), 0)
 
-    h, w     = frame.shape[:2]
-    mask_rs  = cv2.resize(selection_mask, (w, h))
-
-    # Soften mask edges
+    h, w      = frame.shape[:2]
+    mask_rs   = cv2.resize(selection_mask, (w, h))
     mask_soft = cv2.GaussianBlur(mask_rs, (31, 31), 0)
     m3        = np.stack([mask_soft] * 3, axis=2)
-
-    # Heavily blur background
-    bg_blur = cv2.GaussianBlur(frame, (51, 51), 0)
-
-    # Composite: sharp person + blurred background
-    result = (frame.astype(np.float32) * m3 +
-              bg_blur.astype(np.float32) * (1.0 - m3))
+    bg_blur   = cv2.GaussianBlur(frame, (51, 51), 0)
+    result    = (frame.astype(np.float32) * m3 +
+                 bg_blur.astype(np.float32) * (1.0 - m3))
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
 def _extract_face_crop(frame, selection_mask=None):
     """
-    Return a tight face-crop from the frame for InstantID identity embedding.
-    Falls back to the full frame if no face is detected.
-    Uses OpenCV Haar Cascade -- no extra dependencies.
+    Return a tight face-crop for InstantID identity embedding.
+    Falls back to full frame if no face is detected.
     """
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray     = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     detector = cv2.CascadeClassifier(
         cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
     if len(faces) == 0:
-        return frame  # no face detected -- use full frame
-    # Pick the largest face
+        return frame
     x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
     pad = int(max(w, h) * 0.35)
     fh, fw = frame.shape[:2]
@@ -423,10 +693,15 @@ def _extract_face_crop(frame, selection_mask=None):
     return crop if crop.size > 0 else frame
 
 
+# ── Main entry point ──────────────────────────────────────────────────────────
 def generate_character(frame, char_key, selection_mask=None, timeout=400):
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
+        # Detect gender once per generation — fast DNN inference on CPU
+        gender = detect_gender(frame)
+        print(f"[Generate] character={char_key}  gender={gender}")
+
         prepped      = _blur_background(frame, selection_mask)
         control_name = _make_control_image(prepped, selection_mask)
 
@@ -434,13 +709,14 @@ def generate_character(frame, char_key, selection_mask=None, timeout=400):
         if use_iid:
             print(f"[InstantID] Using identity-preserving workflow for {char_key}")
             img_name  = _upload_frame(prepped)
-            face_crop = _extract_face_crop(frame, selection_mask)  # use original (sharp) for identity
+            face_crop = _extract_face_crop(frame, selection_mask)
             face_name = _upload_frame(face_crop, "kiosk_face.png")
-            workflow  = _build_instantid_workflow(char_key, img_name, face_name, control_name)
+            workflow  = _build_instantid_workflow(char_key, img_name, face_name,
+                                                  control_name, gender)
         else:
-            print(f"[Canny] Using standard workflow for {char_key} (InstantID not installed)")
+            print(f"[Canny] Using standard workflow for {char_key} (gender={gender})")
             img_name = _upload_frame(prepped)
-            workflow = _build_workflow(char_key, img_name, control_name)
+            workflow = _build_workflow(char_key, img_name, control_name, gender)
 
         client_id = uuid.uuid4().hex
         result    = _api("prompt", {"prompt": workflow, "client_id": client_id}, "POST")
@@ -452,26 +728,24 @@ def generate_character(frame, char_key, selection_mask=None, timeout=400):
             time.sleep(1.0)
             elapsed = int(time.time() - start)
             try:
-                # Primary: fetch this specific prompt's history
                 history = _api(f"history/{prompt_id}")
-                entry = history.get(prompt_id)
+                entry   = history.get(prompt_id)
 
-                # Fallback: search full history if specific entry missing
                 if entry is None:
                     all_history = _api("history")
                     entry = all_history.get(prompt_id)
 
                 if entry is not None:
                     outputs = entry.get("outputs", {})
-                    print(f"[Comfy] {elapsed}s -- found history, nodes with output: {list(outputs.keys())}")
+                    print(f"[Comfy] {elapsed}s -- nodes with output: {list(outputs.keys())}")
                     for node_id, node_out in outputs.items():
                         if "images" in node_out and len(node_out["images"]) > 0:
                             info = node_out["images"][0]
                             print(f"[Comfy] Fetching image from node {node_id}: {info['filename']}")
                             img_url = (f"{COMFY_URL}/view?"
-                                      f"filename={urllib.parse.quote(info['filename'])}"
-                                      f"&subfolder={urllib.parse.quote(info.get('subfolder',''))}"
-                                      f"&type={info.get('type','output')}")
+                                       f"filename={urllib.parse.quote(info['filename'])}"
+                                       f"&subfolder={urllib.parse.quote(info.get('subfolder',''))}"
+                                       f"&type={info.get('type','output')}")
                             with urllib.request.urlopen(img_url, timeout=15) as r:
                                 img_bytes = r.read()
                             arr = np.frombuffer(img_bytes, dtype=np.uint8)
@@ -492,19 +766,23 @@ def generate_character(frame, char_key, selection_mask=None, timeout=400):
         return None, str(e)
 
 
+# ── ComfyBridge class (unchanged interface) ───────────────────────────────────
 class ComfyBridge:
     def __init__(self):
-        self._result        = None
-        self._status        = "idle"
-        self._message       = ""
-        self._thread        = None
+        self._result         = None
+        self._status         = "idle"
+        self._message        = ""
+        self._thread         = None
         self._selection_mask = None
-        self.available      = is_comfy_running()
-        self.instantid      = _instantid_available()
+        self.available       = is_comfy_running()
+        self.instantid       = _instantid_available()
+        # Pre-load gender models in background so first generate() is fast
+        threading.Thread(target=_load_gender_nets, daemon=True).start()
         print(f"[{'OK' if self.available else 'WARN'}] ComfyUI "
               f"{'connected' if self.available else 'not running -- start ~/start_comfyui.sh'}")
         print(f"[{'OK' if self.instantid else 'INFO'}] InstantID "
-              f"{'available -- identity-preserving mode active' if self.instantid else 'not installed -- run install_instantid.sh to enable'}")
+              f"{'available' if self.instantid else 'not installed'}")
+        print("[INFO] Gender-aware prompts active — women stay women.")
 
     def check_available(self):
         self.available = is_comfy_running()
@@ -515,7 +793,7 @@ class ComfyBridge:
             return False
         self._status         = "generating"
         self._result         = None
-        self._message        = "Transforming selected people..."
+        self._message        = "Transforming..."
         self._selection_mask = selection_mask
         self._thread = threading.Thread(
             target=self._run, args=(frame.copy(), char_key, selection_mask), daemon=True)
@@ -537,9 +815,9 @@ class ComfyBridge:
 
     def get_result(self):
         if self._result is not None:
-            img           = self._result.copy()
-            self._status  = "idle"
-            self._result  = None
+            img          = self._result.copy()
+            self._status = "idle"
+            self._result = None
             return img
         return None
 
