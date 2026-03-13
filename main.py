@@ -168,9 +168,17 @@ async def generate(character: str = Form(...)):
     if len(detected) > 0 and sel_count == 0:
         raise HTTPException(400, "Please select at least one person before transforming")
 
-    # Only pass the selected people's boxes — gender is detected per bounding box
     selected_boxes = [f for f in detected if f["selected"]]
-    selected_mask  = processor.get_selected_mask(frame)
+
+    # Attach registered gender to each selected box so generate_character
+    # can use it instead of guessing with the Caffe model
+    for box in selected_boxes:
+        if box.get("name"):
+            box["registered_gender"] = processor.get_gender_for_name(box["name"])
+        else:
+            box["registered_gender"] = "unknown"
+
+    selected_mask = processor.get_selected_mask(frame)
     started = comfy.generate(frame, character, selected_mask, selected_boxes)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
@@ -232,7 +240,9 @@ async def status():
             "ai_ready": comfy.available}
 
 @app.post("/name_face")
-async def name_face(index: int = Form(...), name: str = Form(...)):
+async def name_face(index: int = Form(...), name: str = Form(...),
+                    gender: str = Form("unknown")):
+    """Name a detected face. gender should be 'male', 'female', or 'unknown'."""
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
@@ -240,11 +250,35 @@ async def name_face(index: int = Form(...), name: str = Form(...)):
     name = name.strip()
     if not name:
         raise HTTPException(400, "Name cannot be empty")
-    print(f"[NAME] Attempting to name index={index} name={name}")
-    success = processor.name_selected_face(index, name, frame)
+    gender = gender.strip().lower()
+    if gender not in ("male", "female", "unknown"):
+        gender = "unknown"
+    print(f"[NAME] index={index} name={name} gender={gender}")
+    success = processor.name_selected_face(index, name, frame, gender)
     print(f"[NAME] Result: {'ok' if success else 'failed'}")
     return JSONResponse({"status": "ok" if success else "error",
                          "name": name, "index": index})
+
+@app.get("/comfy_progress")
+async def comfy_progress():
+    """
+    Polls ComfyUI's /queue endpoint for live generation progress.
+    Returns running state so the UI can show an active progress indicator.
+    """
+    import json as _json
+    import urllib.request as _ur
+    try:
+        with _ur.urlopen("http://127.0.0.1:8188/queue", timeout=2) as r:
+            queue = _json.loads(r.read())
+        running = queue.get("queue_running", [])
+        pending = queue.get("queue_pending", [])
+        return JSONResponse({
+            "running":  len(running) > 0,
+            "pending":  len(pending),
+            "active":   len(running),
+        })
+    except Exception:
+        return JSONResponse({"running": False, "pending": 0, "active": 0})
 
 @app.get("/known_names")
 async def known_names():
