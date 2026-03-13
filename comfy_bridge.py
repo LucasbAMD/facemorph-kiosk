@@ -86,15 +86,80 @@ def _load_gender_nets():
             return False
 
 
+def _classify_gender_from_crop(face_crop) -> tuple[str, float]:
+    """
+    Run gender classification on an already-cropped face image.
+    Returns (gender, confidence) where gender is 'male', 'female', or 'unknown'.
+    """
+    if face_crop is None or face_crop.size == 0:
+        return "unknown", 0.0
+    face_blob = cv2.dnn.blobFromImage(
+        face_crop, 1.0, (227, 227),
+        [78.4263377603, 87.7689143744, 114.895847746],
+        swapRB=False
+    )
+    with _GENDER_LOCK:
+        _GENDER_NET.setInput(face_blob)
+        preds = _GENDER_NET.forward()[0]
+    # preds[0] = female probability, preds[1] = male probability
+    gender = "female" if preds[0] > preds[1] else "male"
+    return gender, float(max(preds))
+
+
+def _find_face_in_roi(frame, roi_x, roi_y, roi_w, roi_h):
+    """
+    Run the DNN face detector inside a body bounding box and return the
+    best face crop. Falls back to the top-third of the body box if no
+    face is found (e.g. person looking away, poor lighting).
+    """
+    fh, fw = frame.shape[:2]
+    # Expand body box slightly for the face detector
+    pad = 20
+    x1 = max(0, roi_x - pad);      y1 = max(0, roi_y - pad)
+    x2 = min(fw, roi_x + roi_w + pad); y2 = min(fh, roi_y + roi_h + pad)
+    region = frame[y1:y2, x1:x2]
+    if region.size == 0:
+        return None
+
+    rh, rw = region.shape[:2]
+    blob = cv2.dnn.blobFromImage(region, 1.0, (300, 300),
+                                 [104, 117, 123], swapRB=False)
+    with _GENDER_LOCK:
+        _FACE_NET.setInput(blob)
+        dets = _FACE_NET.forward()
+
+    best_conf, best_crop = 0.0, None
+    for i in range(dets.shape[2]):
+        conf = float(dets[0, 0, i, 2])
+        if conf < 0.6:
+            continue
+        bx1 = max(0, int(dets[0, 0, i, 3] * rw))
+        by1 = max(0, int(dets[0, 0, i, 4] * rh))
+        bx2 = min(rw, int(dets[0, 0, i, 5] * rw))
+        by2 = min(rh, int(dets[0, 0, i, 6] * rh))
+        if conf > best_conf and bx2 > bx1 and by2 > by1:
+            best_conf = conf
+            crop = region[by1:by2, bx1:bx2]
+            if crop.size > 0:
+                best_crop = crop
+
+    if best_crop is not None:
+        return best_crop
+
+    # Fallback: top 30% of body box as face region
+    face_y2 = min(fh, roi_y + int(roi_h * 0.30))
+    fallback = frame[roi_y:face_y2, roi_x:roi_x + roi_w]
+    return fallback if fallback.size > 0 else None
+
+
 def detect_gender(frame) -> str:
     """
+    Legacy single-frame gender detection (used when no face boxes are available).
+    Detects the most prominent face in the full frame.
     Returns 'male', 'female', or 'unknown'.
-    Runs the face detector first to find a face ROI, then gender classification.
-    Fast enough to run once per generate() call (not per frame).
     """
     if not _load_gender_nets():
         return "unknown"
-
     h, w = frame.shape[:2]
     blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300),
                                  [104, 117, 123], swapRB=False)
@@ -102,44 +167,63 @@ def detect_gender(frame) -> str:
         _FACE_NET.setInput(blob)
         detections = _FACE_NET.forward()
 
-    # Find the most confident face detection
-    best_conf = 0.0
-    best_box  = None
+    best_conf, best_box = 0.0, None
     for i in range(detections.shape[2]):
         conf = float(detections[0, 0, i, 2])
         if conf > best_conf:
             best_conf = conf
             best_box  = detections[0, 0, i, 3:7]
 
-    if best_box is None or best_conf < 0.7:
+    if best_box is None or best_conf < 0.6:
         return "unknown"
 
-    x1 = max(0, int(best_box[0] * w))
-    y1 = max(0, int(best_box[1] * h))
-    x2 = min(w, int(best_box[2] * w))
-    y2 = min(h, int(best_box[3] * h))
-
-    pad = 20
-    x1 = max(0, x1 - pad); y1 = max(0, y1 - pad)
-    x2 = min(w, x2 + pad); y2 = min(h, y2 + pad)
+    x1 = max(0, int(best_box[0] * w) - 20)
+    y1 = max(0, int(best_box[1] * h) - 20)
+    x2 = min(w, int(best_box[2] * w) + 20)
+    y2 = min(h, int(best_box[3] * h) + 20)
     face_roi = frame[y1:y2, x1:x2]
     if face_roi.size == 0:
         return "unknown"
 
-    face_blob = cv2.dnn.blobFromImage(
-        face_roi, 1.0, (227, 227),
-        [78.4263377603, 87.7689143744, 114.895847746],
-        swapRB=False
-    )
-    with _GENDER_LOCK:
-        _GENDER_NET.setInput(face_blob)
-        preds = _GENDER_NET.forward()[0]
-
-    # preds[0] = female probability, preds[1] = male probability
-    gender = "female" if preds[0] > preds[1] else "male"
-    confidence = float(max(preds))
-    print(f"[Gender] Detected: {gender} (confidence={confidence:.2f})")
+    gender, confidence = _classify_gender_from_crop(face_roi)
+    print(f"[Gender] Full-frame: {gender} (conf={confidence:.2f})")
     return gender
+
+
+def detect_genders_for_people(frame, face_boxes) -> dict:
+    """
+    Run per-person gender detection for each selected body bounding box.
+
+    Args:
+        frame:      Full camera frame (BGR)
+        face_boxes: List of dicts with keys 'index', 'x', 'y', 'w', 'h'
+                    as returned by FaceProcessor.get_detected_faces()
+
+    Returns:
+        dict mapping person index → gender string ('male'/'female'/'unknown')
+
+    If models aren't available, all entries return 'unknown'.
+    Multi-person example:
+        {0: 'female', 1: 'male', 2: 'female'}
+    """
+    if not face_boxes:
+        return {}
+    if not _load_gender_nets():
+        return {f["index"]: "unknown" for f in face_boxes}
+
+    result = {}
+    for face in face_boxes:
+        idx  = face["index"]
+        crop = _find_face_in_roi(frame, face["x"], face["y"],
+                                 face["w"], face["h"])
+        if crop is None:
+            result[idx] = "unknown"
+            continue
+        gender, conf = _classify_gender_from_crop(crop)
+        result[idx]  = gender
+        print(f"[Gender] Person {idx}: {gender} (conf={conf:.2f})")
+
+    return result
 
 
 # ── Character prompts — male + female variants ────────────────────────────────
@@ -695,13 +779,39 @@ def _extract_face_crop(frame, selection_mask=None):
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
-def generate_character(frame, char_key, selection_mask=None, timeout=400):
+def generate_character(frame, char_key, selection_mask=None,
+                       face_boxes=None, timeout=400):
+    """
+    face_boxes: list of selected face dicts from FaceProcessor.get_detected_faces()
+                e.g. [{'index':0,'x':100,'y':50,'w':80,'h':200,'selected':True}, ...]
+                When provided, gender is detected per-person from their bounding box.
+                When None (no selection), falls back to full-frame gender detection.
+    """
     if not is_comfy_running():
         return None, "ComfyUI not running"
     try:
-        # Detect gender once per generation — fast DNN inference on CPU
-        gender = detect_gender(frame)
-        print(f"[Generate] character={char_key}  gender={gender}")
+        # ── Per-person gender detection ────────────────────────────────────
+        if face_boxes:
+            gender_map = detect_genders_for_people(frame, face_boxes)
+            genders    = list(gender_map.values())
+            # If all selected people are the same gender, use it cleanly.
+            # If mixed (e.g. a man and a woman), use the majority and note it —
+            # single-pass img2img uses one prompt for the whole image so we pick
+            # the dominant gender to minimise misgendering.
+            female_count = genders.count("female")
+            male_count   = genders.count("male")
+            if female_count > male_count:
+                gender = "female"
+            elif male_count > female_count:
+                gender = "male"
+            elif female_count == male_count and female_count > 0:
+                gender = "female"   # tie → female (safer for the demo)
+            else:
+                gender = "unknown"
+            print(f"[Generate] character={char_key}  per-person genders={gender_map}  using={gender}")
+        else:
+            gender = detect_gender(frame)
+            print(f"[Generate] character={char_key}  gender={gender} (full-frame fallback)")
 
         prepped      = _blur_background(frame, selection_mask)
         control_name = _make_control_image(prepped, selection_mask)
@@ -789,7 +899,7 @@ class ComfyBridge:
         self.available = is_comfy_running()
         return self.available
 
-    def generate(self, frame, char_key, selection_mask=None):
+    def generate(self, frame, char_key, selection_mask=None, face_boxes=None):
         if self._status == "generating":
             return False
         self._status         = "generating"
@@ -797,12 +907,14 @@ class ComfyBridge:
         self._message        = "Transforming..."
         self._selection_mask = selection_mask
         self._thread = threading.Thread(
-            target=self._run, args=(frame.copy(), char_key, selection_mask), daemon=True)
+            target=self._run,
+            args=(frame.copy(), char_key, selection_mask, face_boxes),
+            daemon=True)
         self._thread.start()
         return True
 
-    def _run(self, frame, char_key, mask):
-        img, err = generate_character(frame, char_key, mask)
+    def _run(self, frame, char_key, mask, face_boxes):
+        img, err = generate_character(frame, char_key, mask, face_boxes)
         if img is not None:
             self._result  = img
             self._status  = "done"
