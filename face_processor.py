@@ -243,22 +243,45 @@ class FaceRecognizer:
         return max(self._names.keys(), default=-1) + 1
 
     def learn(self, face_img, name):
+        """
+        Learn a face. Internally generates 8 augmented samples from the single
+        crop (flips, brightness shifts, slight blurs) so LBPH has enough
+        variation to recognize the person reliably under different conditions.
+        """
         with self._lock:
             label = next((k for k,v in self._names.items() if v == name), None)
             if label is None:
                 label = self._next_id()
                 self._names[label] = name
                 self._samples[label] = []
+
             gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
             gray = cv2.resize(gray, (100, 100))
             gray = cv2.equalizeHist(gray)
+
+            # Generate augmented samples so LBPH generalizes better from one photo
+            augmented = [gray]
+            # Horizontal flip
+            augmented.append(cv2.flip(gray, 1))
+            # Brightness variations
+            for delta in (-25, -12, 12, 25):
+                shifted = np.clip(gray.astype(np.int16) + delta, 0, 255).astype(np.uint8)
+                augmented.append(shifted)
+            # Slight blurs (simulates distance / soft focus)
+            augmented.append(cv2.GaussianBlur(gray, (3, 3), 0))
+            augmented.append(cv2.GaussianBlur(gray, (5, 5), 0))
+
             if label not in self._samples:
                 self._samples[label] = []
-            self._samples[label].append(gray)
-            if len(self._samples[label]) > 20:
-                self._samples[label].pop(0)
+            self._samples[label].extend(augmented)
+            # Cap at 80 samples per person (10 registrations × 8 augments)
+            if len(self._samples[label]) > 80:
+                self._samples[label] = self._samples[label][-80:]
+
             self._retrain()
             self._save()
+            print(f"[Recognizer] Saved {len(augmented)} samples for '{name}' "
+                  f"(total={len(self._samples[label])})")
             return label
 
     def _retrain(self):
