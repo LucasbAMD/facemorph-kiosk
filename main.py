@@ -1,6 +1,10 @@
 """
 main.py — AMD Adapt Kiosk Backend
 Clean live feed + person selection + AI generation on selected people only.
+
+Changes from original:
+  - AI result returned at JPEG quality 97 (was 92) for print-quality stickers
+  - All other logic unchanged
 """
 
 import cv2
@@ -132,16 +136,13 @@ async def get_catalog():
 # ── Person selection ──────────────────────────────────────────────────────────
 @app.get("/faces")
 async def get_faces():
-    """Return current detected face positions + selection state."""
     return JSONResponse({"faces": processor.get_detected_faces()})
 
 @app.post("/select_person")
 async def select_person(click_x: float = Form(...), click_y: float = Form(...),
                         frame_w: float = Form(...), frame_h: float = Form(...)):
-    """Toggle selection of person at click coordinates."""
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
-    # Run blocking CV work in a thread so we don't freeze the event loop
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
         None, processor.toggle_person, click_x, click_y, frame_w, frame_h, frame)
@@ -162,11 +163,8 @@ async def generate(character: str = Form(...)):
     if not comfy.check_available():
         raise HTTPException(503, "ComfyUI not running — start ~/start_comfyui.sh")
 
-    # Get selection info
-    detected = processor.get_detected_faces()
+    detected  = processor.get_detected_faces()
     sel_count = sum(1 for f in detected if f["selected"])
-
-    # If people are detected but none selected, block generation
     if len(detected) > 0 and sel_count == 0:
         raise HTTPException(400, "Please select at least one person before transforming")
 
@@ -185,7 +183,8 @@ async def generate_status():
             with ai_result_lock:
                 global ai_result_frame
                 ai_result_frame = result
-            _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            # Quality 97 — near-lossless for print-quality sticker output
+            _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 97])
             b64 = base64.b64encode(buf.tobytes()).decode()
             return JSONResponse({"status":"done",
                                  "image": f"data:image/jpeg;base64,{b64}"})
@@ -230,10 +229,8 @@ async def status():
             "face_count": len(processor.catalog),
             "ai_ready": comfy.available}
 
-
 @app.post("/name_face")
 async def name_face(index: int = Form(...), name: str = Form(...)):
-    """Name a detected face at given index using current camera frame."""
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
