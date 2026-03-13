@@ -168,8 +168,10 @@ async def generate(character: str = Form(...)):
     if len(detected) > 0 and sel_count == 0:
         raise HTTPException(400, "Please select at least one person before transforming")
 
-    selected_mask = processor.get_selected_mask(frame)
-    started = comfy.generate(frame, character, selected_mask)
+    # Only pass the selected people's boxes — gender is detected per bounding box
+    selected_boxes = [f for f in detected if f["selected"]]
+    selected_mask  = processor.get_selected_mask(frame)
+    started = comfy.generate(frame, character, selected_mask, selected_boxes)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Transforming..."})
