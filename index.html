@@ -716,13 +716,11 @@ let elapsedTimer   = null;
 //         refining pass2 (80→95%), decoding (95→99%), done (100%).
 const PROGRESS_STAGES = [
   { pct: 5,   label: "Uploading frame..." },
-  { pct: 20,  label: "Pass 1 — generating character..." },
-  { pct: 45,  label: "Pass 1 — refining details..." },
-  { pct: 65,  label: "Pass 1 — finishing..." },
-  { pct: 72,  label: "Upscaling for print quality..." },
-  { pct: 80,  label: "Pass 2 — sharpening..." },
-  { pct: 90,  label: "Pass 2 — final details..." },
-  { pct: 97,  label: "Decoding image..." },
+  { pct: 25,  label: "Generating character..." },
+  { pct: 50,  label: "Refining details..." },
+  { pct: 75,  label: "Almost there..." },
+  { pct: 90,  label: "Decoding image..." },
+  { pct: 97,  label: "Finishing up..." },
 ];
 let stageIdx = 0;
 
@@ -732,12 +730,11 @@ function setProgress(pct, label) {
 }
 
 function startProgressAnimation() {
-  stageIdx  = 0;
+  stageIdx     = 0;
   genStartTime = Date.now();
   setProgress(0, "Starting AI engine...");
 
-  // Advance through fake stages timed to typical generation duration
-  const stageDurations = [1500, 5000, 8000, 6000, 2000, 5000, 5000, 3000];
+  const stageDurations = [2000, 6000, 8000, 6000, 4000, 3000];
   function advanceStage() {
     if (stageIdx >= PROGRESS_STAGES.length) return;
     const s = PROGRESS_STAGES[stageIdx];
