@@ -14,6 +14,7 @@
     --cyan: #00d4ff;
     --gold: #ffcc00;
     --dim:  #555;
+    --green: #22dd44;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -24,61 +25,33 @@
     overflow: hidden;
     user-select: none;
   }
-  body {
-    display: flex;
-    flex-direction: column;
-  }
+  body { display: flex; flex-direction: column; }
 
   /* ── Ticker ── */
   #ticker-wrap {
-    height: 28px;
-    min-height: 28px;
-    background: #000;
-    border-bottom: 1px solid #222;
-    overflow: hidden;
-    position: relative;
-    flex-shrink: 0;
+    height: 28px; min-height: 28px;
+    background: #000; border-bottom: 1px solid #222;
+    overflow: hidden; position: relative; flex-shrink: 0;
   }
   #ticker-wrap::before, #ticker-wrap::after {
-    content: '';
-    position: absolute;
-    top: 0; bottom: 0;
-    width: 50px;
-    z-index: 2;
-    pointer-events: none;
+    content: ''; position: absolute; top: 0; bottom: 0;
+    width: 50px; z-index: 2; pointer-events: none;
   }
   #ticker-wrap::before { left: 0;  background: linear-gradient(to right, #000, transparent); }
   #ticker-wrap::after  { right: 0; background: linear-gradient(to left,  #000, transparent); }
   .ticker-label {
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 110px;
-    display: flex;
-    align-items: center;
-    padding-left: 10px;
-    background: var(--red);
-    color: white;
-    font-size: 0.6rem;
-    font-weight: 800;
-    letter-spacing: 2px;
-    z-index: 3;
+    position: absolute; left: 0; top: 0; bottom: 0; width: 110px;
+    display: flex; align-items: center; padding-left: 10px;
+    background: var(--red); color: white;
+    font-size: 0.6rem; font-weight: 800; letter-spacing: 2px; z-index: 3;
   }
   #ticker-track {
-    display: flex;
-    align-items: center;
-    height: 100%;
-    padding-left: 120px;
-    white-space: nowrap;
+    display: flex; align-items: center; height: 100%;
+    padding-left: 120px; white-space: nowrap;
     animation: scroll 70s linear infinite;
   }
   @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-  .ti {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-right: 40px;
-    font-size: 0.68rem;
-  }
+  .ti { display: inline-flex; align-items: center; gap: 6px; margin-right: 40px; font-size: 0.68rem; }
   .ti-cat  { color: var(--red); font-weight: 700; font-size: 0.58rem; letter-spacing: 1.5px; }
   .ti-sep  { color: #444; }
   .ti-name { color: #ccc; }
@@ -86,78 +59,65 @@
 
   /* ── Header ── */
   header {
-    height: 46px;
-    min-height: 46px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    background: #111;
-    border-bottom: 2px solid var(--red);
-    flex-shrink: 0;
+    height: 46px; min-height: 46px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; background: #111;
+    border-bottom: 2px solid var(--red); flex-shrink: 0;
   }
   .logo { display: flex; align-items: center; gap: 10px; }
   .logo-amd  { background: var(--red); color: #fff; font-weight: 900; font-size: 1.1rem; padding: 2px 8px; letter-spacing: 2px; }
   .logo-text { font-size: 0.95rem; font-weight: 300; letter-spacing: 4px; color: #bbb; }
   #ai-badge  { font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; background: #1a1a1a; border: 1px solid #444; color: #555; transition: all 0.3s; }
-  #ai-badge.online { border-color: #22dd44; color: #22dd44; }
+  #ai-badge.online { border-color: var(--green); color: var(--green); }
 
   /* ── Body ── */
-  #body {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
+  #body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
   /* ── Camera panel ── */
   #cam-panel {
-    flex: 1;
-    position: relative;
-    background: #000;
-    overflow: hidden;
-    cursor: crosshair;
-    min-width: 0;
+    flex: 1; position: relative; background: #000;
+    overflow: hidden; cursor: crosshair; min-width: 0;
   }
   #feed {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; display: block;
   }
 
   /* overlays */
   .abs-overlay {
-    position: absolute;
-    inset: 0;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    z-index: 10;
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; z-index: 10;
   }
   .abs-overlay.on { display: flex; }
-  #gen-overlay  { background: rgba(0,0,0,0.78); }
+  #gen-overlay    { background: rgba(0,0,0,0.78); }
   #result-overlay { background: rgba(0,0,0,0.92); }
 
   .spinner {
     width: 50px; height: 50px;
-    border: 4px solid #333;
-    border-top-color: var(--cyan);
-    border-radius: 50%;
-    animation: spin 0.85s linear infinite;
+    border: 4px solid #333; border-top-color: var(--cyan);
+    border-radius: 50%; animation: spin 0.85s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   #gen-msg { color: var(--cyan); font-size: 0.95rem; letter-spacing: 1px; }
-  #result-img { max-height: 80vh; max-width: 92%; border-radius: 8px; }
+
+  /* Result overlay */
+  #result-overlay { gap: 12px; }
+  #result-img { max-height: 76vh; max-width: 92%; border-radius: 8px; }
+  .result-actions { display: flex; gap: 10px; align-items: center; }
   #result-close {
     background: var(--red); color: #fff; border: none;
-    padding: 11px 32px; border-radius: 6px; font-size: 0.95rem;
+    padding: 11px 28px; border-radius: 6px; font-size: 0.9rem;
     cursor: pointer; font-weight: 700; letter-spacing: 1px;
   }
+  #save-btn {
+    background: var(--green); color: #000; border: none;
+    padding: 11px 28px; border-radius: 6px; font-size: 0.9rem;
+    cursor: pointer; font-weight: 700; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  #save-btn:hover   { opacity: 0.88; }
+  #save-btn.saving  { opacity: 0.5; cursor: not-allowed; }
 
   /* selection badges */
   #sel-badge {
@@ -176,38 +136,35 @@
     cursor: pointer; display: none; z-index: 5;
   }
   #clear-btn.on { display: block; }
+
+  /* Known-face tags on camera */
   #known-panel {
     position: absolute; bottom: 12px; left: 12px;
     display: flex; flex-wrap: wrap; gap: 5px;
     max-width: 55%; z-index: 5;
   }
   .known-tag {
-    background: rgba(0,0,0,0.75);
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    border-radius: 20px; font-size: 0.68rem;
-    padding: 3px 9px; cursor: default;
-    display: flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,0.75); border: 1px solid var(--gold);
+    color: var(--gold); border-radius: 20px; font-size: 0.68rem;
+    padding: 3px 9px; display: flex; align-items: center; gap: 4px;
   }
   .ktx { color: #886600; font-size: 0.6rem; cursor: pointer; margin-left: 2px; }
   .ktx:hover { color: var(--red); }
 
   /* name modal */
   #name-modal-bg {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.65);
-    display: none; align-items: center; justify-content: center;
-    z-index: 50;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: none; align-items: center; justify-content: center; z-index: 50;
   }
   #name-modal-bg.on { display: flex; }
   #name-dialog {
-    background: #141414;
-    border: 1px solid var(--cyan);
-    border-radius: 12px; padding: 22px 24px;
-    width: 300px; display: flex; flex-direction: column; gap: 14px;
+    background: #141414; border: 1px solid var(--cyan);
+    border-radius: 12px; padding: 22px 24px; width: 300px;
+    display: flex; flex-direction: column; gap: 14px;
     box-shadow: 0 8px 40px rgba(0,212,255,0.25);
   }
   #name-dialog h4 { font-size: 0.82rem; color: var(--cyan); letter-spacing: 1px; }
+  #name-dialog p  { font-size: 0.72rem; color: #888; line-height: 1.5; }
   #name-input {
     background: #1a1a1a; border: 1px solid #444; border-radius: 6px;
     color: #fff; padding: 9px 12px; font-size: 0.95rem; outline: none; width: 100%;
@@ -220,26 +177,66 @@
 
   /* ── Sidebar ── */
   #sidebar {
-    width: 260px;
-    min-width: 260px;
-    background: var(--gray);
-    border-left: 1px solid #2a2a2a;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    width: 272px; min-width: 272px;
+    background: var(--gray); border-left: 1px solid #2a2a2a;
+    display: flex; flex-direction: column; overflow: hidden;
   }
   .sec-title {
     font-size: 0.58rem; letter-spacing: 3px; color: var(--dim);
     text-transform: uppercase; padding: 12px 16px 8px;
     border-bottom: 1px solid #222; flex-shrink: 0;
   }
+
+  /* ── Known Hosts panel ── */
+  #hosts-section {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #222;
+    flex-shrink: 0;
+  }
+  #hosts-section .sec-title {
+    padding: 0 0 8px; border-bottom: none; font-size: 0.55rem;
+  }
+  #hosts-list {
+    display: flex; flex-direction: column; gap: 5px;
+    max-height: 130px; overflow-y: auto;
+  }
+  .host-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #222; border-radius: 6px; padding: 7px 10px;
+    border: 1px solid #2e2e2e;
+  }
+  .host-info { display: flex; align-items: center; gap: 8px; }
+  .host-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan), #0066aa);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: #000; flex-shrink: 0;
+  }
+  .host-name  { font-size: 0.8rem; font-weight: 600; }
+  .host-sub   { font-size: 0.62rem; color: #666; }
+  .host-seen  { font-size: 0.58rem; color: var(--green); }
+  .host-del {
+    background: transparent; border: none; color: #555;
+    font-size: 0.7rem; cursor: pointer; padding: 3px 5px; border-radius: 4px;
+  }
+  .host-del:hover { color: var(--red); background: rgba(237,28,36,0.1); }
+  #add-host-btn {
+    width: 100%; margin-top: 7px; padding: 7px;
+    background: transparent; border: 1px dashed #333;
+    color: #555; border-radius: 6px; font-size: 0.72rem;
+    cursor: pointer; letter-spacing: 1px; transition: all 0.15s;
+  }
+  #add-host-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .host-row.recognized {
+    border-color: var(--gold);
+    background: rgba(255,204,0,0.05);
+  }
+  .host-row.recognized .host-name { color: var(--gold); }
+
+  /* ── Character grid ── */
   #char-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 7px;
-    padding: 10px;
-    overflow-y: auto;
-    flex: 1;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 7px; padding: 10px; overflow-y: auto; flex: 1;
   }
   .cc {
     background: var(--mid); border: 2px solid #333; border-radius: 8px;
@@ -253,6 +250,7 @@
   .cc-sub   { font-size: 0.57rem; color: var(--dim); margin-top: 2px; }
   .cc.ready .cc-name::after { content: " ✦"; color: var(--cyan); font-size: 0.58rem; }
 
+  /* ── Transform section ── */
   #xform-section {
     padding: 12px; border-top: 1px solid #222; flex-shrink: 0;
   }
@@ -261,6 +259,16 @@
     text-align: center; padding: 6px 0 4px; min-height: 20px;
   }
   #sel-status.has { color: var(--cyan); }
+  .action-btns { display: flex; flex-direction: column; gap: 7px; }
+  #name-btn {
+    width: 100%; padding: 9px;
+    background: transparent; color: var(--cyan);
+    border: 1px solid var(--cyan); border-radius: 8px;
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; display: none; text-transform: uppercase;
+    transition: background 0.15s;
+  }
+  #name-btn:hover { background: rgba(0,212,255,0.08); }
   #xform-btn {
     width: 100%; padding: 14px;
     background: var(--red); color: #fff; border: none;
@@ -276,8 +284,14 @@
     position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
     color: #fff; padding: 9px 22px; border-radius: 8px;
     font-size: 0.82rem; display: none; z-index: 99; white-space: nowrap;
+    pointer-events: none;
   }
   #toast.on { display: block; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -317,36 +331,47 @@
     <!-- Result -->
     <div id="result-overlay" class="abs-overlay">
       <img id="result-img" src="" alt="Result">
-      <button id="result-close" onclick="closeResult()">← Back to Camera</button>
+      <div class="result-actions">
+        <button id="save-btn" onclick="savePhoto()">💾 Save Photo</button>
+        <button id="result-close" onclick="closeResult()">← Back to Camera</button>
+      </div>
     </div>
   </div>
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <div class="sec-title">Choose Character</div>
-    <div id="char-grid">
-      <!-- Hardcoded fallback cards — JS will enhance with ai-ready state -->
+
+    <!-- Known Hosts -->
+    <div id="hosts-section">
+      <div class="sec-title">👥 Known Hosts</div>
+      <div id="hosts-list">
+        <div style="font-size:0.68rem;color:#444;padding:6px 2px;">
+          No hosts saved yet — select your face and tap "Name Selected Person" below.
+        </div>
+      </div>
+      <button id="add-host-btn" onclick="nameSelected()">+ Register Your Face</button>
     </div>
+
+    <div class="sec-title">Choose Character</div>
+    <div id="char-grid"></div>
+
     <div id="xform-section">
       <div id="sel-status">Select a person to transform</div>
-      <button id="name-btn" onclick="nameSelected()" style="
-        width:100%; padding:9px; margin-bottom:8px;
-        background:transparent; color:var(--cyan);
-        border:1px solid var(--cyan); border-radius:8px;
-        font-size:0.8rem; font-weight:700; letter-spacing:1px;
-        cursor:pointer; display:none; text-transform:uppercase;
-      ">👤 NAME SELECTED PERSON</button>
-      <button id="xform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
+      <div class="action-btns">
+        <button id="name-btn" onclick="nameSelected()">👤 Name Selected Person</button>
+        <button id="xform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
+      </div>
     </div>
   </div>
 
 </div>
 
-<!-- Name modal -->
+<!-- Name dialog -->
 <div id="name-modal-bg">
   <div id="name-dialog">
-    <h4>👤 NAME THIS PERSON</h4>
-    <input id="name-input" type="text" placeholder="Enter their name..." maxlength="30"
+    <h4>👤 REGISTER YOUR FACE</h4>
+    <p>Enter your name and the kiosk will recognize you automatically every time you step in front of the camera.</p>
+    <input id="name-input" type="text" placeholder="Enter your name..." maxlength="30"
            onkeydown="if(event.key==='Enter') saveName()">
     <div class="nd-btns">
       <button id="nd-save"   onclick="saveName()">✓ Save</button>
@@ -380,25 +405,28 @@ const STACK = [
   document.getElementById("ticker-track").innerHTML = t;
 })();
 
-// ── Characters (hardcoded so UI works even if API is slow) ────────────────────
+// ── Characters ────────────────────────────────────────────────────────────────
 const CHARS = [
-  { key:"navi",       emoji:"🔵", name:"Na'vi",      sub:"Avatar · Pandora" },
-  { key:"hulk",       emoji:"💚", name:"Hulk",        sub:"Gamma · Avengers" },
-  { key:"thanos",     emoji:"💜", name:"Thanos",      sub:"Infinity · Titan" },
-  { key:"predator",   emoji:"👁️", name:"Predator",    sub:"Thermal · Cloaked" },
-  { key:"ghost",      emoji:"👻", name:"Ghost",       sub:"Spectral · Ethereal" },
-  { key:"groot",      emoji:"🌿", name:"Groot",       sub:"Guardians · Flora" },
-  { key:"cyberpunk",  emoji:"🤖", name:"Cyberpunk",   sub:"Neon · Chrome" },
-  { key:"claymation", emoji:"🪆", name:"Claymation",  sub:"Clay · Stop Motion" },
-  { key:"anime",      emoji:"✨", name:"Anime",        sub:"Ghibli · Cel Shaded" },
+  { key:"navi",       emoji:"🔵", name:"Na'vi",     sub:"Avatar · Pandora" },
+  { key:"hulk",       emoji:"💚", name:"Hulk",       sub:"Gamma · Avengers" },
+  { key:"thanos",     emoji:"💜", name:"Thanos",     sub:"Infinity · Titan" },
+  { key:"predator",   emoji:"👁️", name:"Predator",   sub:"Thermal · Cloaked" },
+  { key:"ghost",      emoji:"👻", name:"Ghost",      sub:"Spectral · Ethereal" },
+  { key:"groot",      emoji:"🌿", name:"Groot",      sub:"Guardians · Flora" },
+  { key:"cyberpunk",  emoji:"🤖", name:"Cyberpunk",  sub:"Neon · Chrome" },
+  { key:"claymation", emoji:"🪆", name:"Claymation", sub:"Clay · Stop Motion" },
+  { key:"anime",      emoji:"✨", name:"Anime",       sub:"Ghibli · Cel Shaded" },
 ];
 
-let selectedChar  = "navi";
-let selCount      = 0;
-let faceCount     = 0;
+let selectedChar   = "navi";
+let selCount       = 0;
+let faceCount      = 0;
 let pendingNameIdx = null;
-let pollTimer     = null;
+let pollTimer      = null;
+let lastFaces      = [];
+let currentResultDataUrl = null;  // holds the latest AI result for saving
 
+// ── Character grid ────────────────────────────────────────────────────────────
 function buildCharGrid(aiReady) {
   const grid = document.getElementById("char-grid");
   grid.innerHTML = CHARS.map(c => `
@@ -416,6 +444,7 @@ function selectChar(key, el) {
   el.classList.add("active");
 }
 
+// ── AI status ─────────────────────────────────────────────────────────────────
 async function checkComfy() {
   try {
     const r = await fetch("/comfy_status");
@@ -433,17 +462,15 @@ function getImageCoords(e) {
   const rect = feed.getBoundingClientRect();
   const natW = feed.naturalWidth  || 1280;
   const natH = feed.naturalHeight || 720;
-  const renW = rect.width;
-  const renH = rect.height;
   const imgAR = natW / natH;
-  const boxAR = renW / renH;
+  const boxAR = rect.width / rect.height;
   let imgW, imgH, offX, offY;
   if (imgAR > boxAR) {
-    imgW = renW; imgH = renW / imgAR;
-    offX = 0;    offY = (renH - imgH) / 2;
+    imgW = rect.width;  imgH = rect.width / imgAR;
+    offX = 0;           offY = (rect.height - imgH) / 2;
   } else {
-    imgH = renH; imgW = renH * imgAR;
-    offX = (renW - imgW) / 2; offY = 0;
+    imgH = rect.height; imgW = rect.height * imgAR;
+    offX = (rect.width - imgW) / 2; offY = 0;
   }
   const cx = e.clientX - rect.left - offX;
   const cy = e.clientY - rect.top  - offY;
@@ -452,7 +479,8 @@ function getImageCoords(e) {
 }
 
 document.getElementById("cam-panel").addEventListener("click", async function(e) {
-  if (e.target.closest("button") || e.target.id === "result-img") return;
+  if (e.target.closest("button")) return;
+  if (e.target.id === "result-img") return;
   if (document.getElementById("result-overlay").classList.contains("on")) return;
   if (document.getElementById("gen-overlay").classList.contains("on")) return;
   if (document.getElementById("name-modal-bg").classList.contains("on")) { closeName(); return; }
@@ -470,21 +498,23 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
     const r    = await fetch("/select_person", { method:"POST", body:fd });
     const data = await r.json();
     updateSelUI(data.faces);
+    // Auto-open name dialog only if this is a brand-new selection without a name
     const newSel = data.faces.find(f => f.selected && !f.name);
     if (newSel) openNameDialog(newSel);
   } catch(err) {}
 });
 
-let lastFaces = [];
-
+// ── Selection UI ──────────────────────────────────────────────────────────────
 function updateSelUI(faces) {
   lastFaces = faces || [];
   faceCount = lastFaces.length;
   selCount  = lastFaces.filter(f => f.selected).length;
+
   const badge   = document.getElementById("sel-badge");
   const clrBtn  = document.getElementById("clear-btn");
   const status  = document.getElementById("sel-status");
   const nameBtn = document.getElementById("name-btn");
+
   if (selCount > 0) {
     badge.textContent = `${selCount} selected`;
     badge.classList.add("on");
@@ -501,21 +531,21 @@ function updateSelUI(faces) {
   }
 }
 
-function nameSelected() {
-  const face = lastFaces.find(f => f.selected);
-  if (face) {
-    openNameDialog(face);
-  } else {
-    toast("Tap your face on the camera first to select yourself");
-  }
-}
-
 async function clearSel() {
   await fetch("/clear_selection", { method:"POST" });
   updateSelUI([]);
 }
 
 // ── Name dialog ───────────────────────────────────────────────────────────────
+function nameSelected() {
+  const face = lastFaces.find(f => f.selected);
+  if (face) {
+    openNameDialog(face);
+  } else {
+    toast("Tap your face on the camera first, then use this button");
+  }
+}
+
 function openNameDialog(face) {
   pendingNameIdx = face.index;
   document.getElementById("name-input").value = face.name || "";
@@ -532,47 +562,127 @@ async function saveName() {
   const name = document.getElementById("name-input").value.trim();
   if (!name) { toast("Please enter a name"); return; }
   if (pendingNameIdx === null) { toast("No person selected"); closeName(); return; }
+
   const fd = new FormData();
   fd.append("index", pendingNameIdx);
   fd.append("name",  name);
+
   try {
     const r    = await fetch("/name_face", { method:"POST", body:fd });
     const data = await r.json();
     if (data.status === "ok") {
       toast(`✓ ${name} saved — will be recognized automatically`, "ok");
-      refreshKnownNames();
+      refreshKnownHosts();
       closeName();
     } else {
-      toast(`Could not save — try selecting the person again`);
+      toast("Could not save — tap your face on screen first, then try again");
     }
   } catch(e) {
     toast("Connection error: " + e.message);
   }
 }
 
-async function refreshKnownNames() {
-  try {
-    const r    = await fetch("/known_names");
-    const data = await r.json();
-    const panel = document.getElementById("known-panel");
-    panel.innerHTML = Object.values(data.names).map(n =>
-      `<div class="known-tag">👤 ${n}<span class="ktx" onclick="forgetFace('${n}',event)">✕</span></div>`
-    ).join("");
-  } catch(e) {}
-}
-
-async function forgetFace(name, e) {
-  e.stopPropagation();
-  const fd = new FormData();
-  fd.append("name", name);
-  await fetch("/forget_face", { method:"POST", body:fd });
-  toast(`Removed ${name}`);
-  refreshKnownNames();
-}
-
 document.getElementById("name-modal-bg").addEventListener("click", function(e) {
   if (e.target === this) closeName();
 });
+
+// ── Known Hosts panel ─────────────────────────────────────────────────────────
+// Tracks which names were recently spotted by the recognition engine
+let recognizedNow = new Set();
+
+async function refreshKnownHosts() {
+  try {
+    const r    = await fetch("/known_names");
+    const data = await r.json();
+    const names = Object.values(data.names);
+    const list  = document.getElementById("hosts-list");
+    const camPanel = document.getElementById("known-panel");
+
+    if (names.length === 0) {
+      list.innerHTML = `<div style="font-size:0.68rem;color:#444;padding:6px 2px;">
+        No hosts saved yet — select your face and tap "Name Selected Person" below.
+      </div>`;
+      camPanel.innerHTML = "";
+      return;
+    }
+
+    // Sidebar host rows
+    list.innerHTML = names.map(n => {
+      const initials = n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+      const isHere   = recognizedNow.has(n);
+      return `
+        <div class="host-row${isHere ? " recognized" : ""}">
+          <div class="host-info">
+            <div class="host-avatar">${initials}</div>
+            <div>
+              <div class="host-name">${n}</div>
+              <div class="${isHere ? "host-seen" : "host-sub"}">${isHere ? "● In frame now" : "Not detected"}</div>
+            </div>
+          </div>
+          <button class="host-del" onclick="forgetHost('${n}', event)" title="Remove ${n}">✕</button>
+        </div>`;
+    }).join("");
+
+    // Camera overlay tags (gold badges)
+    camPanel.innerHTML = names.filter(n => recognizedNow.has(n)).map(n =>
+      `<div class="known-tag">👤 ${n}<span class="ktx" onclick="forgetHost('${n}',event)">✕</span></div>`
+    ).join("");
+
+  } catch(e) {}
+}
+
+async function forgetHost(name, e) {
+  e.stopPropagation();
+  if (!confirm(`Remove ${name} from the kiosk? They will need to register again.`)) return;
+  const fd = new FormData();
+  fd.append("name", name);
+  await fetch("/forget_face", { method:"POST", body:fd });
+  recognizedNow.delete(name);
+  toast(`Removed ${name}`);
+  refreshKnownHosts();
+}
+
+// Poll the /faces endpoint to track who's currently recognized in frame
+async function pollRecognized() {
+  try {
+    const r    = await fetch("/faces");
+    const data = await r.json();
+    const prev = new Set(recognizedNow);
+    recognizedNow.clear();
+    (data.faces || []).forEach(f => { if (f.name) recognizedNow.add(f.name); });
+
+    // Re-render hosts panel if recognized set changed
+    let changed = recognizedNow.size !== prev.size;
+    if (!changed) { for (const n of recognizedNow) { if (!prev.has(n)) { changed = true; break; } } }
+    if (changed) refreshKnownHosts();
+  } catch(e) {}
+}
+
+// ── Save photo ────────────────────────────────────────────────────────────────
+function savePhoto() {
+  if (!currentResultDataUrl) return;
+  const btn = document.getElementById("save-btn");
+  btn.classList.add("saving");
+  btn.textContent = "Saving...";
+
+  // Build filename: character + timestamp
+  const ts   = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const name = `kiosk_${selectedChar}_${ts}.jpg`;
+
+  // Trigger browser download
+  const a = document.createElement("a");
+  a.href     = currentResultDataUrl;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  setTimeout(() => {
+    btn.classList.remove("saving");
+    btn.innerHTML = "💾 Save Photo";
+    toast("✓ Photo saved!", "ok");
+  }, 600);
+}
 
 // ── Transform ─────────────────────────────────────────────────────────────────
 async function doTransform() {
@@ -616,10 +726,14 @@ async function pollStatus() {
     const r    = await fetch("/generate_status");
     const data = await r.json();
     if (data.status === "done" && data.image) {
-      clearInterval(pollTimer); hideSpinner(); showResult(data.image);
+      clearInterval(pollTimer);
+      hideSpinner();
+      currentResultDataUrl = data.image;
+      showResult(data.image);
       document.getElementById("xform-btn").disabled = false;
     } else if (data.status === "error") {
-      clearInterval(pollTimer); hideSpinner();
+      clearInterval(pollTimer);
+      hideSpinner();
       toast("Error: " + (data.message || "unknown"));
       document.getElementById("xform-btn").disabled = false;
     } else if (data.message) {
@@ -629,15 +743,23 @@ async function pollStatus() {
 }
 
 function hideSpinner() { document.getElementById("gen-overlay").classList.remove("on"); }
+
 function showResult(src) {
+  // Reset save button state each time a new result comes in
+  const btn = document.getElementById("save-btn");
+  btn.classList.remove("saving");
+  btn.innerHTML = "💾 Save Photo";
   document.getElementById("result-img").src = src;
   document.getElementById("result-overlay").classList.add("on");
 }
+
 function closeResult() {
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
+  currentResultDataUrl = null;
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -648,15 +770,13 @@ function toast(msg, type) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  // Build character grid immediately from hardcoded data — no API dependency
   buildCharGrid(false);
-
-  // Then check if ComfyUI is up and mark cards as AI-ready
   const online = await checkComfy();
   buildCharGrid(online);
 
-  setInterval(checkComfy, 10000);
-  refreshKnownNames();
+  setInterval(checkComfy,      10000);
+  setInterval(pollRecognized,   2000);  // check who's in frame every 2s
+  refreshKnownHosts();
 }
 
 init();
