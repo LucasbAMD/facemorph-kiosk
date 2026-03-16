@@ -16,12 +16,15 @@ python3 -c "import torchvision" 2>/dev/null || {
     pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2 -q
 }
 pip install torchsde kornia spandrel requests -q 2>/dev/null || true
+pip install comfy-aimdo -q 2>/dev/null || true
 # AMD W7900 ROCm env vars
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
+export PYTORCH_TUNABLEOP_ENABLED=1
+export DISABLE_ADDMM_CUDA_LT=1
+export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
 export AMD_LOG_LEVEL=0
 export HIP_VISIBLE_DEVICES=0
 export ROCR_VISIBLE_DEVICES=0
-export PYTORCH_HIP_ALLOC_CONF=expandable_segments:True
 echo ""
 echo "======================================================"
 echo "  ComfyUI — AMD Adapt Kiosk AI Engine"
@@ -38,7 +41,5 @@ python3 main.py \
     --port 8188 \
     --listen 127.0.0.1 \
     --disable-auto-launch \
-    --use-split-cross-attention \
-    --disable-smart-memory \
-    --lowvram \
+    --force-fp16 \
     --output-directory "$HOME/ComfyUI/output"
