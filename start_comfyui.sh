@@ -16,7 +16,6 @@ python3 -c "import torchvision" 2>/dev/null || {
     pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2 -q
 }
 pip install torchsde kornia spandrel requests -q 2>/dev/null || true
-pip install comfy-aimdo -q 2>/dev/null || true
 # AMD W7900 ROCm env vars
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
 export PYTORCH_TUNABLEOP_ENABLED=1
