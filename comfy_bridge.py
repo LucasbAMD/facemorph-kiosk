@@ -640,21 +640,25 @@ def _build_instantid_workflow(char_key, image_name, face_name, canny_name, gende
 
 def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
     """
-    Single-pass img2img + ControlNet at 1024px.
-    The two-pass upscale was causing silent VAE decode hangs on ROCm —
-    the 1024px base is already a solid upgrade from the original 896px
-    and is stable on the W7900.
+    Single-pass img2img + ControlNet at 1024px using SDXL base 1.0.
+    SDXL-Turbo fp16 is incompatible with current ComfyUI (get_model_object error).
+    SDXL base 1.0 is stable, higher quality, and works correctly.
+    Uses DPM++ 2M Karras sampler — best quality/speed balance for SDXL base.
     """
     positive, negative = get_prompts(char_key, gender)
     cfg       = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
     seed      = int(time.time()) % 2**32
-    steps     = cfg.get("steps", 8)
-    sampler   = cfg.get("sampler",    "euler_ancestral")
-    scheduler = cfg.get("scheduler",  "sgm_uniform")
+
+    # SDXL base uses different sampler settings than Turbo
+    # DPM++ 2M Karras at 20 steps gives excellent quality in ~15-20s on W7900
+    steps     = 20
+    sampler   = "dpmpp_2m"
+    scheduler = "karras"
+    cfg_scale = 7.0
 
     return {
         "1": {"class_type": "CheckpointLoaderSimple",
-              "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
+              "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
         "2": {"class_type": "ControlNetLoader",
               "inputs": {"control_net_name": "control-lora-canny-rank128.safetensors"}},
         "3": {"class_type": "LoadImage", "inputs": {"image": image_name}},
@@ -676,7 +680,7 @@ def _build_workflow(char_key, image_name, canny_name, gender="unknown"):
                   "latent_image": ["5", 0],
                   "seed":         seed,
                   "steps":        steps,
-                  "cfg":          1.0,
+                  "cfg":          cfg_scale,
                   "sampler_name": sampler,
                   "scheduler":    scheduler,
                   "denoise":      cfg["denoise"],
