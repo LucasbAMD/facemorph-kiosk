@@ -167,6 +167,7 @@ def start_comfyui():
         "--listen",           "127.0.0.1",
         "--disable-auto-launch",
         "--use-split-cross-attention",
+        "--disable-smart-memory",
         "--lowvram",
         "--output-directory", str(output_dir),
     ]
