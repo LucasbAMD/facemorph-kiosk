@@ -154,14 +154,11 @@ def start_comfyui():
 
     env = os.environ.copy()
     env.update({
-        "HSA_OVERRIDE_GFX_VERSION":                "11.0.0",
-        "PYTORCH_TUNABLEOP_ENABLED":               "1",
-        "DISABLE_ADDMM_CUDA_LT":                   "1",
-        "TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL": "1",
-        "AMD_LOG_LEVEL":                           "0",
-        "HIP_VISIBLE_DEVICES":                     "0",
-        "ROCR_VISIBLE_DEVICES":                    "0",
-        "PYTORCH_HIP_ALLOC_CONF":                  "expandable_segments:True",
+        "HSA_OVERRIDE_GFX_VERSION":  "11.0.0",
+        "AMD_LOG_LEVEL":             "0",
+        "HIP_VISIBLE_DEVICES":       "0",
+        "ROCR_VISIBLE_DEVICES":      "0",
+        "PYTORCH_HIP_ALLOC_CONF":    "expandable_segments:True",
     })
 
     cmd = [
@@ -169,8 +166,7 @@ def start_comfyui():
         "--port",             "8188",
         "--listen",           "127.0.0.1",
         "--disable-auto-launch",
-        "--force-fp16",
-        "--bf16-vae",
+        "--use-split-cross-attention",
         "--lowvram",
         "--output-directory", str(output_dir),
     ]
