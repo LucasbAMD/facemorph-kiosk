@@ -19,15 +19,9 @@ pip install torchsde kornia spandrel requests -q 2>/dev/null || true
 pip uninstall -y comfy-aimdo 2>/dev/null || true
 # AMD W7900 ROCm env vars
 export HSA_OVERRIDE_GFX_VERSION=11.0.0
-export PYTORCH_TUNABLEOP_ENABLED=1
-export DISABLE_ADDMM_CUDA_LT=1
-export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
 export AMD_LOG_LEVEL=0
 export HIP_VISIBLE_DEVICES=0
 export ROCR_VISIBLE_DEVICES=0
-# Expandable memory segments — prevents GPU page fault during VAE decode on ROCm.
-# Without this, the fixed-block allocator can fault when the upscale pass
-# requests a large contiguous allocation that isn't available.
 export PYTORCH_HIP_ALLOC_CONF=expandable_segments:True
 echo ""
 echo "======================================================"
@@ -45,7 +39,7 @@ python3 main.py \
     --port 8188 \
     --listen 127.0.0.1 \
     --disable-auto-launch \
-    --force-fp16 \
-    --bf16-vae \
+    --use-split-cross-attention \
+    --disable-smart-memory \
     --lowvram \
     --output-directory "$HOME/ComfyUI/output"
