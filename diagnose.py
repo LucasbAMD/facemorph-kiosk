@@ -162,7 +162,7 @@ else:
     import time, uuid
     workflow = {
         "1": {"class_type": "CheckpointLoaderSimple",
-              "inputs": {"ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"}},
+              "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
         "2": {"class_type": "CLIPTextEncode",
               "inputs": {"text": "a red apple", "clip": ["1", 1]}},
         "3": {"class_type": "CLIPTextEncode",
@@ -172,9 +172,9 @@ else:
         "5": {"class_type": "KSampler",
               "inputs": {"model": ["1", 0], "positive": ["2", 0],
                          "negative": ["3", 0], "latent_image": ["4", 0],
-                         "seed": 42, "steps": 4, "cfg": 1.0,
-                         "sampler_name": "euler_ancestral",
-                         "scheduler": "sgm_uniform", "denoise": 1.0}},
+                         "seed": 42, "steps": 20, "cfg": 7.0,
+                         "sampler_name": "dpmpp_2m",
+                         "scheduler": "karras", "denoise": 1.0}},
         "6": {"class_type": "VAEDecode",
               "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
         "7": {"class_type": "SaveImage",
