@@ -43,6 +43,33 @@ def fix_gpu_permissions():
         except Exception:
             pass
 
+def disable_broken_custom_nodes():
+    """
+    Disable custom nodes that are known to break ComfyUI node validation
+    when their dependencies aren't installed. ComfyUI ignores folders
+    ending in _disabled so this is safe and reversible.
+
+    ComfyUI_InstantID requires insightface which is hard to install on ROCm.
+    When it fails to import, it poisons the entire node registry and causes
+    ALL workflows to fail instantly with empty outputs — even ones that
+    don't use InstantID at all.
+    """
+    custom_nodes = COMFY_DIR / "custom_nodes"
+    to_disable = ["ComfyUI_InstantID"]
+    for node in to_disable:
+        src  = custom_nodes / node
+        dest = custom_nodes / f"{node}_disabled"
+        if src.exists() and not dest.exists():
+            try:
+                src.rename(dest)
+                print(f"[OK] Disabled broken custom node: {node}")
+                print(f"     (requires insightface which isn't installed on ROCm)")
+            except Exception as e:
+                print(f"[WARN] Could not disable {node}: {e}")
+        elif dest.exists():
+            print(f"[OK] {node} already disabled — skipping")
+
+
 def start_comfyui():
     """
     Launch ComfyUI as a background subprocess using the comfyui-venv Python.
@@ -139,6 +166,7 @@ def main():
     print("="*60 + "\n")
 
     fix_gpu_permissions()
+    disable_broken_custom_nodes()
 
     # If ComfyUI is already running (e.g. from a previous session), skip launch
     if is_comfy_online():
