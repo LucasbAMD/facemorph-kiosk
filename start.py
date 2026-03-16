@@ -7,20 +7,21 @@ Single command to launch everything:
   3. Starts the FastAPI kiosk server
 
 Usage:
-    source ~/comfyui-venv/bin/activate   # only needed once per shell session
-    python start.py
+    python start.py              # normal start
+    python start.py --reinstall  # reinstall ComfyUI keeping your models
 """
 
 import os
 import sys
 import time
 import signal
+import shutil
 import subprocess
 import urllib.request
 from pathlib import Path
 
-ROOT      = Path(__file__).resolve().parent
-COMFY_DIR = Path(os.environ.get("COMFYUI_PATH", Path.home() / "ComfyUI"))
+ROOT       = Path(__file__).resolve().parent
+COMFY_DIR  = Path(os.environ.get("COMFYUI_PATH", Path.home() / "ComfyUI"))
 COMFY_VENV = Path.home() / "comfyui-venv"
 COMFY_URL  = "http://127.0.0.1:8188"
 
@@ -35,7 +36,6 @@ def is_comfy_online():
         return False
 
 def fix_gpu_permissions():
-    """Same permission fix as start_comfyui.sh — needed every launch on Ubuntu."""
     for dev in ["/dev/kfd", "/dev/dri/renderD128"]:
         try:
             subprocess.run(["sudo", "chmod", "666", dev],
@@ -45,59 +45,123 @@ def fix_gpu_permissions():
 
 def disable_broken_custom_nodes():
     """
-    Disable custom nodes that are known to break ComfyUI node validation
-    when their dependencies aren't installed. ComfyUI ignores folders
-    ending in _disabled so this is safe and reversible.
-
-    ComfyUI_InstantID requires insightface which is hard to install on ROCm.
-    When it fails to import, it poisons the entire node registry and causes
-    ALL workflows to fail instantly with empty outputs — even ones that
-    don't use InstantID at all.
+    Disable custom nodes that crash on import and poison the node registry.
+    ComfyUI_InstantID requires insightface which is not available on ROCm.
+    When it fails to import it causes ALL workflows to fail instantly.
     """
     custom_nodes = COMFY_DIR / "custom_nodes"
-    to_disable = ["ComfyUI_InstantID"]
-    for node in to_disable:
+    if not custom_nodes.exists():
+        return
+    for node in ["ComfyUI_InstantID"]:
         src  = custom_nodes / node
         dest = custom_nodes / f"{node}_disabled"
         if src.exists() and not dest.exists():
             try:
                 src.rename(dest)
                 print(f"[OK] Disabled broken custom node: {node}")
-                print(f"     (requires insightface which isn't installed on ROCm)")
             except Exception as e:
                 print(f"[WARN] Could not disable {node}: {e}")
         elif dest.exists():
-            print(f"[OK] {node} already disabled — skipping")
+            print(f"[OK] {node} already disabled")
+
+def run(cmd, cwd=None):
+    print(f"[..] {cmd}")
+    result = subprocess.run(cmd, shell=True, cwd=cwd)
+    if result.returncode != 0:
+        print(f"[ERR] Command failed (code {result.returncode}): {cmd}")
+        sys.exit(1)
+
+def reinstall_comfyui():
+    """
+    Reinstall ComfyUI cleanly while preserving all model files.
+      1. Back up models folder (~20GB, kept on same disk so it's instant)
+      2. Remove broken ComfyUI directory
+      3. Clone fresh ComfyUI from GitHub
+      4. Reinstall Python dependencies in existing comfyui-venv
+      5. Restore models
+    """
+    print("\n" + "="*60)
+    print("  ComfyUI Reinstall — preserving your models")
+    print("="*60 + "\n")
+
+    models_dir    = COMFY_DIR / "models"
+    models_backup = Path.home() / "comfyui_models_backup"
+
+    # Step 1 — back up models (same filesystem = fast rename, not copy)
+    if models_dir.exists():
+        if models_backup.exists():
+            print(f"[..] Removing old backup...")
+            shutil.rmtree(models_backup)
+        print(f"[..] Moving models to backup (fast — same disk)...")
+        shutil.move(str(models_dir), str(models_backup))
+        print(f"[OK] Models safely backed up to {models_backup}")
+    else:
+        print("[WARN] No models directory found")
+        models_backup = None
+
+    # Step 2 — remove broken install
+    if COMFY_DIR.exists():
+        print(f"[..] Removing broken ComfyUI...")
+        shutil.rmtree(COMFY_DIR)
+        print(f"[OK] Removed {COMFY_DIR}")
+
+    # Step 3 — fresh clone
+    print("[..] Cloning fresh ComfyUI from GitHub...")
+    run(f"git clone https://github.com/comfyanonymous/ComfyUI.git {COMFY_DIR}",
+        cwd=Path.home())
+    print("[OK] ComfyUI cloned")
+
+    # Step 4 — reinstall deps in existing venv
+    if not COMFY_VENV.exists():
+        print("[..] Creating comfyui-venv...")
+        run(f"python3 -m venv {COMFY_VENV}")
+
+    pip = COMFY_VENV / "bin" / "pip"
+    print("[..] Installing PyTorch for ROCm 6.2 (this takes a few minutes)...")
+    run(f"{pip} install torch torchvision torchaudio "
+        f"--index-url https://download.pytorch.org/whl/rocm6.2 -q")
+    print("[..] Installing ComfyUI requirements...")
+    run(f"{pip} install -r {COMFY_DIR}/requirements.txt -q")
+    print("[..] Installing extra packages...")
+    run(f"{pip} install torchsde kornia spandrel requests -q")
+
+    # Step 5 — restore models
+    if models_backup and models_backup.exists():
+        print(f"[..] Restoring models...")
+        restore_dir = COMFY_DIR / "models"
+        if restore_dir.exists():
+            shutil.rmtree(restore_dir)
+        shutil.move(str(models_backup), str(restore_dir))
+        print(f"[OK] Models restored")
+
+    # Output dir
+    (COMFY_DIR / "output").mkdir(exist_ok=True)
+
+    print("\n[OK] ComfyUI reinstalled successfully — starting kiosk...\n")
 
 
 def start_comfyui():
-    """
-    Launch ComfyUI as a background subprocess using the comfyui-venv Python.
-    Mirrors all flags and env vars from start_comfyui.sh.
-    Returns the Popen object so we can terminate it on exit.
-    """
     if not COMFY_DIR.exists():
-        print("[ERR] ComfyUI not found. Run: bash setup_ubuntu.sh")
+        print("[ERR] ComfyUI not found. Run: python start.py --reinstall")
         sys.exit(1)
     if not COMFY_VENV.exists():
-        print("[ERR] ComfyUI venv not found. Run: bash setup_ubuntu.sh")
+        print("[ERR] ComfyUI venv not found. Run: python start.py --reinstall")
         sys.exit(1)
 
     python_bin = COMFY_VENV / "bin" / "python3"
-    output_dir = Path.home() / "ComfyUI" / "output"
+    output_dir = COMFY_DIR / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
     env.update({
-        "HSA_OVERRIDE_GFX_VERSION":               "11.0.0",
-        "PYTORCH_TUNABLEOP_ENABLED":              "1",
-        "DISABLE_ADDMM_CUDA_LT":                  "1",
+        "HSA_OVERRIDE_GFX_VERSION":                "11.0.0",
+        "PYTORCH_TUNABLEOP_ENABLED":               "1",
+        "DISABLE_ADDMM_CUDA_LT":                   "1",
         "TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL": "1",
-        "AMD_LOG_LEVEL":                          "0",
-        "HIP_VISIBLE_DEVICES":                    "0",
-        "ROCR_VISIBLE_DEVICES":                   "0",
-        # Expandable segments — prevents GPU page fault during VAE decode on ROCm
-        "PYTORCH_HIP_ALLOC_CONF":                 "expandable_segments:True",
+        "AMD_LOG_LEVEL":                           "0",
+        "HIP_VISIBLE_DEVICES":                     "0",
+        "ROCR_VISIBLE_DEVICES":                    "0",
+        "PYTORCH_HIP_ALLOC_CONF":                  "expandable_segments:True",
     })
 
     cmd = [
@@ -112,63 +176,53 @@ def start_comfyui():
     ]
 
     print("[..] Starting ComfyUI in background...")
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(COMFY_DIR),
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+    return subprocess.Popen(
+        cmd, cwd=str(COMFY_DIR), env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
     )
-    return proc
 
 def stream_comfy_logs(proc):
-    """Forward ComfyUI stdout to our console with a prefix, in a daemon thread."""
     import threading
     def _read():
         for line in proc.stdout:
             line = line.rstrip()
             if line:
                 print(f"  [ComfyUI] {line}")
-    t = threading.Thread(target=_read, daemon=True)
-    t.start()
+    threading.Thread(target=_read, daemon=True).start()
 
-def wait_for_comfy(proc, timeout=120):
-    """
-    Poll until ComfyUI responds or times out.
-    Exits early if the subprocess dies unexpectedly.
-    """
-    print(f"[..] Waiting for ComfyUI to come online (up to {timeout}s)...")
+def wait_for_comfy(proc, timeout=180):
+    print(f"[..] Waiting for ComfyUI (up to {timeout}s)...")
     start = time.time()
     dots  = 0
     while time.time() - start < timeout:
         if proc.poll() is not None:
             print(f"\n[ERR] ComfyUI exited unexpectedly (code {proc.returncode})")
-            print("      Check the output above for errors.")
             sys.exit(1)
         if is_comfy_online():
-            elapsed = int(time.time() - start)
-            print(f"\n[OK] ComfyUI online ({elapsed}s)")
+            print(f"\n[OK] ComfyUI online ({int(time.time()-start)}s)")
             return
         time.sleep(1)
         dots += 1
-        print("." * dots + "\r", end="", flush=True)
-    print(f"\n[WARN] ComfyUI did not respond in {timeout}s — kiosk will start anyway.")
-    print("       AI generation may fail until ComfyUI finishes loading.")
+        print("." * (dots % 40) + "\r", end="", flush=True)
+    print(f"\n[WARN] ComfyUI did not respond in {timeout}s — starting kiosk anyway.")
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
+    reinstall = "--reinstall" in sys.argv
+
     print("\n" + "="*60)
     print("  AMD ADAPT KIOSK")
     print("  Kiosk  → http://localhost:8000")
     print("  AI     → http://127.0.0.1:8188")
     print("="*60 + "\n")
 
+    if reinstall:
+        reinstall_comfyui()
+
     fix_gpu_permissions()
     disable_broken_custom_nodes()
 
-    # If ComfyUI is already running (e.g. from a previous session), skip launch
     if is_comfy_online():
         print("[OK] ComfyUI already running — skipping launch")
         comfy_proc = None
@@ -177,7 +231,6 @@ def main():
         stream_comfy_logs(comfy_proc)
         wait_for_comfy(comfy_proc)
 
-    # Graceful shutdown: kill ComfyUI when the kiosk exits
     def _shutdown(sig, frame):
         print("\n[..] Shutting down...")
         if comfy_proc and comfy_proc.poll() is None:
@@ -194,8 +247,6 @@ def main():
 
     print("\n[OK] Starting kiosk at http://localhost:8000\n")
 
-    # Check kiosk dependencies before starting — gives a clear error instead
-    # of a confusing traceback if the wrong venv is active
     missing = []
     for pkg in ("uvicorn", "fastapi", "cv2"):
         try:
@@ -203,13 +254,10 @@ def main():
         except ImportError:
             missing.append(pkg)
     if missing:
-        print(f"[ERR] Missing packages in current venv: {', '.join(missing)}")
+        print(f"[ERR] Missing packages: {', '.join(missing)}")
         print("      Activate the kiosk venv first:")
         print("        source ~/facemorph-kiosk/venv/bin/activate")
-        print("      Then install missing packages:")
-        print(f"        pip install {' '.join(pkg for pkg in missing if pkg != 'cv2')}")
-        if "cv2" in missing:
-            print("        pip install opencv-python")
+        print("        pip install uvicorn fastapi opencv-python")
         sys.exit(1)
 
     import uvicorn
