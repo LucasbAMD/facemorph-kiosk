@@ -471,7 +471,7 @@ def _api(endpoint, data=None, method="GET"):
     headers = {"Content-Type": "application/json"}
     body    = json.dumps(data).encode() if data else None
     req     = urllib.request.Request(url, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=30) as r:
+    with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read())
 
 
@@ -791,12 +791,14 @@ def generate_character(frame, char_key, selection_mask=None,
         print(f"[Comfy] prompt_id={prompt_id}")
 
         start = time.time()
+        poll_errors = 0
         while time.time() - start < timeout:
-            time.sleep(1.0)
+            time.sleep(1.5)
             elapsed = int(time.time() - start)
             try:
                 history = _api(f"history/{prompt_id}")
                 entry   = history.get(prompt_id)
+                poll_errors = 0  # reset on success
 
                 if entry is None:
                     all_history = _api("history")
@@ -813,7 +815,7 @@ def generate_character(frame, char_key, selection_mask=None,
                                        f"filename={urllib.parse.quote(info['filename'])}"
                                        f"&subfolder={urllib.parse.quote(info.get('subfolder',''))}"
                                        f"&type={info.get('type','output')}")
-                            with urllib.request.urlopen(img_url, timeout=15) as r:
+                            with urllib.request.urlopen(img_url, timeout=30) as r:
                                 img_bytes = r.read()
                             arr = np.frombuffer(img_bytes, dtype=np.uint8)
                             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -826,7 +828,11 @@ def generate_character(frame, char_key, selection_mask=None,
                     if elapsed % 10 == 0:
                         print(f"[Comfy] {elapsed}s -- waiting for prompt_id in history...")
             except Exception as e:
-                print(f"[Comfy] Poll error at {elapsed}s: {e}")
+                poll_errors += 1
+                print(f"[Comfy] Poll error at {elapsed}s (#{poll_errors}): {e}")
+                if poll_errors >= 10:
+                    return None, f"Too many poll errors: {e}"
+                time.sleep(2)  # back off before retrying
 
         return None, "Timeout waiting for result"
     except Exception as e:
