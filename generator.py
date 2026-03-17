@@ -24,7 +24,7 @@ from PIL import Image
 
 # ── Model paths ───────────────────────────────────────────────────────────────
 SDXL_PATH      = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
-                   "sd_xl_base_1.0.safetensors")
+                   "sd_xl_turbo_1.0_fp16.safetensors")
 IP_ADAPTER_DIR = Path.home() / "kiosk_models" / "ip_adapter"
 
 # ── Character prompts — male + female variants ────────────────────────────────
@@ -457,8 +457,8 @@ def generate_character(frame, char_key, selection_mask=None,
                     image=source_pil,
                     ip_adapter_image=face_pil,
                     strength=denoise,
-                    num_inference_steps=30,
-                    guidance_scale=6.0,
+                    num_inference_steps=4,
+                    guidance_scale=0.0,
                     generator=generator,
                 ).images[0]
             else:
@@ -467,8 +467,8 @@ def generate_character(frame, char_key, selection_mask=None,
                     negative_prompt=negative,
                     image=source_pil,
                     strength=denoise,
-                    num_inference_steps=30,
-                    guidance_scale=6.0,
+                    num_inference_steps=4,
+                    guidance_scale=0.0,
                     generator=generator,
                 ).images[0]
 
