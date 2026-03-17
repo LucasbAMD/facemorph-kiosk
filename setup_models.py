@@ -55,7 +55,7 @@ print("  AMD Adapt Kiosk — Model Setup")
 print("="*55 + "\n")
 
 # Check SDXL base model exists
-sdxl_path = Path.home() / "ComfyUI" / "models" / "checkpoints" / "sd_xl_base_1.0.safetensors"
+sdxl_path = Path.home() / "ComfyUI" / "models" / "checkpoints" / "sd_xl_turbo_1.0_fp16.safetensors"
 if sdxl_path.exists():
     print(f"[OK] SDXL base 1.0 found at {sdxl_path}")
 else:
