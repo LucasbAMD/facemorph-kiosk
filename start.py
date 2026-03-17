@@ -53,7 +53,7 @@ def main():
         sys.exit(1)
 
     # Check model exists
-    sdxl = Path.home() / "ComfyUI" / "models" / "checkpoints" / "sd_xl_base_1.0.safetensors"
+    sdxl = Path.home() / "ComfyUI" / "models" / "checkpoints" / "sd_xl_turbo_1.0_fp16.safetensors"
     if not sdxl.exists():
         print(f"[ERR] SDXL model not found at {sdxl}")
         sys.exit(1)
