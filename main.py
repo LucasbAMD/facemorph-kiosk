@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from face_processor import FaceProcessor
-from comfy_bridge import ComfyBridge
+from generator import ComfyBridge
 
 app = FastAPI(title="AMD Adapt Kiosk")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
