@@ -215,7 +215,6 @@ def _load_pipeline():
     global _pipe, _pipe_ready
     try:
         import torch
-        from diffusers import StableDiffusionXLImg2ImgPipeline
 
         print("[Generator] Loading SDXL base 1.0...")
         print(f"[Generator] From: {SDXL_PATH}")
@@ -224,12 +223,22 @@ def _load_pipeline():
             print(f"[Generator] ERR: Model not found at {SDXL_PATH}")
             return
 
-        pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
-            str(SDXL_PATH),
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",
-        )
+        # Try from_single_file first, fall back to from_pretrained
+        try:
+            from diffusers import StableDiffusionXLImg2ImgPipeline
+            pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
+                str(SDXL_PATH),
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+            )
+        except Exception as e1:
+            print(f"[Generator] from_single_file failed ({e1}), trying alternate loader...")
+            from diffusers import StableDiffusionXLImg2ImgPipeline
+            from diffusers.loaders import FromSingleFileMixin
+            pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
+                str(SDXL_PATH),
+                torch_dtype=torch.float16,
+            )
 
         # Move to GPU
         pipe = pipe.to("cuda")
