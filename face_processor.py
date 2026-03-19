@@ -578,7 +578,7 @@ class FaceProcessor:
     def process_frame(self, frame):
         if frame is None:
             return frame
-        self.poser.update(frame)
+        # Pose tracking disabled — not needed for full-scene transform mode
 
         with self._det_lock:
             self._det_frame = frame

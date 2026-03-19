@@ -54,9 +54,9 @@ def start_capture(camera_index: int = 0):
                     print(f"[OK] Camera opened at index {alt}")
                     break
         if cap.isOpened():
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-            cap.set(cv2.CAP_PROP_FPS, 60)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            cap.set(cv2.CAP_PROP_FPS, 30)
 
     def loop():
         global latest_frame
@@ -94,10 +94,16 @@ def generate_frames():
             processed = _placeholder()
         else:
             processed = processor.process_frame(frame)
-        _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 82])
+        # Downscale for streaming to reduce JPEG encoding cost
+        h, w = processed.shape[:2]
+        if w > 1280:
+            scale = 1280 / w
+            processed = cv2.resize(processed, (1280, int(h * scale)),
+                                   interpolation=cv2.INTER_AREA)
+        _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 70])
         yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
                + buf.tobytes() + b"\r\n")
-        time.sleep(1/60)
+        time.sleep(1/30)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
