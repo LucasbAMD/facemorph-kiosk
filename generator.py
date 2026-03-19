@@ -529,8 +529,9 @@ def _try_load_ip_adapter(pipe):
         print("[Generator]   Loading IP-Adapter FaceID for SDXL...")
         pipe.load_ip_adapter(
             IP_ADAPTER_FACEID_REPO,
-            subfolder="",
+            subfolder=None,
             weight_name=IP_ADAPTER_FACEID_WEIGHT,
+            image_encoder_folder=None,
         )
         # Default scale to 0 so non-IP-Adapter styles are unaffected
         pipe.set_ip_adapter_scale(0.0)
