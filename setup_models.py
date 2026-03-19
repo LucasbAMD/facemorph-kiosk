@@ -90,16 +90,16 @@ def main():
         print(f"  [WARN] Could not download ControlNet: {e}")
         print("         Will fall back to Turbo-only mode.")
 
-    # ── Download DPT depth estimator ──────────────────────────────────────
-    print("\n[4/4] Downloading depth estimator (DPT)...")
-    print("       Model: Intel/dpt-hybrid-midas")
+    # ── Download Depth-Anything-V2 depth estimator ─────────────────────────
+    print("\n[4/4] Downloading depth estimator (Depth-Anything-V2)...")
+    print("       Model: depth-anything/Depth-Anything-V2-Small-hf")
     try:
-        from transformers import DPTForDepthEstimation, DPTImageProcessor
-        depth_id = "Intel/dpt-hybrid-midas"
+        from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+        depth_id = "depth-anything/Depth-Anything-V2-Small-hf"
         print(f"  [..] Downloading {depth_id}...")
-        DPTImageProcessor.from_pretrained(depth_id)
-        DPTForDepthEstimation.from_pretrained(depth_id)
-        print(f"  [OK] DPT depth estimator cached")
+        AutoImageProcessor.from_pretrained(depth_id)
+        AutoModelForDepthEstimation.from_pretrained(depth_id)
+        print(f"  [OK] Depth-Anything-V2 cached")
     except Exception as e:
         print(f"  [WARN] Could not download depth estimator: {e}")
         print("         Will fall back to Turbo-only mode.")

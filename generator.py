@@ -29,7 +29,7 @@ SDXL_TURBO_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
 # HuggingFace model IDs (downloaded to cache by setup_models.py)
 SDXL_BASE_ID = "stabilityai/stable-diffusion-xl-base-1.0"
 CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
-DEPTH_ESTIMATOR_ID = "Intel/dpt-hybrid-midas"
+DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
 # ── Style definitions ─────────────────────────────────────────────────────────
 # Each style has prompts and params for both ControlNet and Turbo modes.
@@ -210,13 +210,13 @@ def _load_pipeline():
                 StableDiffusionXLControlNetImg2ImgPipeline,
                 ControlNetModel,
             )
-            from transformers import DPTForDepthEstimation, DPTImageProcessor
+            from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
             print("[Generator] Loading ControlNet Depth + SDXL Base...")
-            print("[Generator]   Loading depth estimator...")
-            depth_proc = DPTImageProcessor.from_pretrained(DEPTH_ESTIMATOR_ID)
-            depth_model = DPTForDepthEstimation.from_pretrained(
-                DEPTH_ESTIMATOR_ID, torch_dtype=torch.float16)
+            print("[Generator]   Loading depth estimator (Depth-Anything-V2)...")
+            depth_proc = AutoImageProcessor.from_pretrained(DEPTH_ESTIMATOR_ID)
+            depth_model = AutoModelForDepthEstimation.from_pretrained(
+                DEPTH_ESTIMATOR_ID)
             depth_model = depth_model.to("cuda")
             depth_model.eval()
 
@@ -297,7 +297,7 @@ def get_mode():
 
 # ── Depth estimation ──────────────────────────────────────────────────────────
 def _estimate_depth(pil_image):
-    """Extract depth map from image using DPT."""
+    """Extract depth map from image using Depth-Anything-V2."""
     import torch
 
     with _pipe_lock:
@@ -305,13 +305,13 @@ def _estimate_depth(pil_image):
         model = _depth_estimator
 
     inputs = proc(images=pil_image, return_tensors="pt")
-    inputs = {k: v.to("cuda", dtype=torch.float16) for k, v in inputs.items()}
+    inputs = {k: v.to("cuda") for k, v in inputs.items()}
 
     with torch.inference_mode():
         outputs = model(**inputs)
         depth = outputs.predicted_depth
 
-    # Normalize and resize to match input
+    # Normalize to 0-255
     depth = depth.squeeze().float()
     depth = (depth - depth.min()) / (depth.max() - depth.min() + 1e-8)
     depth_np = depth.cpu().numpy()
