@@ -339,6 +339,8 @@ def generate_avatar(frame, style_key):
     Generate a stylized avatar from a webcam frame.
     Uses IP-Adapter with a face crop for identity, falls back to plain img2img.
     """
+    global _has_ip_adapter
+
     if not is_ready():
         return None, "AI pipeline loading — please wait a moment"
 
@@ -412,7 +414,6 @@ def generate_avatar(frame, style_key):
                 except Exception:
                     pass
 
-            global _has_ip_adapter
             _has_ip_adapter = False
 
             params = style["turbo"] if _is_turbo else style["base"]
