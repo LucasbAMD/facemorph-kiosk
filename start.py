@@ -15,7 +15,7 @@ os.chdir(ROOT)
 
 def main():
     print("\n" + "="*55)
-    print("  AI AVATAR KIOSK")
+    print("  AMD-ADAPT")
     print("  http://localhost:8000")
     print("="*55 + "\n")
 
