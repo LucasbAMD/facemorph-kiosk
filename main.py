@@ -155,36 +155,22 @@ async def generate(character: str = Form(...), gender: str = Form("unknown")):
     if not comfy.check_available():
         raise HTTPException(503, "AI engine not ready - loading model...")
 
-    detected = processor.get_detected_faces()
-    sel_faces = [f for f in detected if f["selected"]]
-    if len(detected) > 0 and len(sel_faces) == 0:
-        raise HTTPException(400, "Please select at least one person")
-
     # Use UI gender selection; fallback to stored gender from face recognition
     gender = gender.strip().lower()
     if gender not in ("male", "female"):
         gender = "unknown"
-        for f in sel_faces:
+        detected = processor.get_detected_faces()
+        for f in detected:
             if f.get("name"):
                 stored = processor.get_gender_for_name(f["name"])
                 if stored in ("male", "female"):
                     gender = stored
                     break
 
-    # Extract face bounding boxes for each selected person
-    face_boxes = []
-    for f in sel_faces:
-        face_boxes.append({
-            "x": f["x"], "y": f["y"], "w": f["w"], "h": f["h"],
-            "name": f.get("name"),
-        })
-
-    selected_mask = processor.get_selected_mask(frame)
-    started = comfy.generate(frame, character, selected_mask,
-                             face_boxes=face_boxes, gender=gender)
+    started = comfy.generate(frame, character, gender=gender)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
-    return JSONResponse({"status": "generating", "message": "Creating your avatar..."})
+    return JSONResponse({"status": "generating", "message": "Transforming scene..."})
 
 
 @app.get("/generate_status")

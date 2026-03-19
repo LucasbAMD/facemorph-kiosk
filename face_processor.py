@@ -35,12 +35,16 @@ except ImportError:
 
 # ── Style config (display info only — generation params in generator.py) ──────
 STYLE_CONFIG = {
-    "avatar":     {"label": "Avatar",     "subtitle": "Blue Alien · Pandora",    "emoji": "🔵", "color": "#00d4ff"},
-    "claymation": {"label": "Claymation", "subtitle": "Clay · Stop Motion",      "emoji": "🎨", "color": "#e67e22"},
-    "anime":      {"label": "Anime",      "subtitle": "Ghibli · Cel Shaded",     "emoji": "✨", "color": "#ff69b4"},
-    "ghost":      {"label": "Cyberpunk",   "subtitle": "Neon · Chrome · Future",  "emoji": "🤖", "color": "#ff00ff"},
+    "avatar":      {"label": "Avatar",      "subtitle": "Blue Alien · Pandora",       "emoji": "🔵", "color": "#00d4ff"},
+    "anime":       {"label": "Anime",       "subtitle": "Cel Shaded · Manga",         "emoji": "✨", "color": "#ff69b4"},
+    "cyberpunk":   {"label": "Cyberpunk",   "subtitle": "Neon · Chrome · Future",      "emoji": "🤖", "color": "#ff00ff"},
+    "claymation":  {"label": "Claymation",  "subtitle": "Clay · Stop Motion",          "emoji": "🎨", "color": "#e67e22"},
+    "oilpainting": {"label": "Oil Painting","subtitle": "Renaissance · Brushstrokes",  "emoji": "🖼️", "color": "#c8a24e"},
+    "comicbook":   {"label": "Comic Book",  "subtitle": "Bold Ink · Halftone",         "emoji": "💥", "color": "#e74c3c"},
+    "pixelart":    {"label": "Pixel Art",   "subtitle": "Retro · 16-Bit",              "emoji": "👾", "color": "#27ae60"},
+    "steampunk":   {"label": "Steampunk",   "subtitle": "Brass · Gears · Victorian",   "emoji": "⚙️", "color": "#d4a574"},
 }
-STYLE_ORDER = ["avatar", "claymation", "anime", "ghost"]
+STYLE_ORDER = ["avatar", "anime", "cyberpunk", "claymation", "oilpainting", "comicbook", "pixelart", "steampunk"]
 
 KNOWN_FACES_DIR = Path("known_faces")
 KNOWN_FACES_DB  = Path("known_faces/faces.json")

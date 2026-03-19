@@ -1,14 +1,7 @@
 """
-generator.py — AMD-Adapt AI Avatar Style Generator
-Uses SDXL + IP-Adapter on ROCm for identity-preserving stylized avatars.
-
-Supports both SDXL Turbo (fast, 4 steps) and SDXL Base (quality, 20 steps).
-Detects which model is loaded and adjusts parameters automatically.
-
-Identity preservation:
-  Uses IP-Adapter SDXL with a face crop — the CLIP image encoder captures
-  the person's appearance (face shape, skin tone, hair) and conditions
-  the generation so the output resembles them.
+generator.py — AMD-Adapt AI Scene Style Transfer
+Uses SDXL Turbo img2img on ROCm to transform the entire camera scene
+(person + background) into different artistic styles.
 """
 
 import cv2
@@ -20,133 +13,172 @@ from pathlib import Path
 from PIL import Image
 
 warnings.filterwarnings("ignore", message=".*upcast_vae.*")
+warnings.filterwarnings("ignore", message=".*enable_vae_slicing.*")
 
 # ── Model paths ───────────────────────────────────────────────────────────────
 SDXL_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
              "sd_xl_turbo_1.0_fp16.safetensors")
 
-IP_ADAPTER_DIR = Path.home() / "kiosk_models" / "ip_adapter"
-IP_ADAPTER_BIN = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter_sdxl.bin"
-IMAGE_ENCODER = IP_ADAPTER_DIR / "models" / "image_encoder"
-
 # ── Detect model type from filename ───────────────────────────────────────────
 _is_turbo = "turbo" in SDXL_PATH.name.lower()
 
 # ── Style definitions ─────────────────────────────────────────────────────────
+# Full-scene prompts: describe how the PERSON and ENVIRONMENT should look.
+# Strength ~0.80 preserves layout, ~0.90+ for dramatic transformation.
+
 STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
-            "blue skin alien warrior standing in bioluminescent jungle, "
-            "deep vivid blue skin covering entire face neck and body, "
-            "glowing cyan freckle dots across cheeks and forehead, "
-            "golden cat-slit eyes, long pointed ears, wide flat nose, "
-            "dark braided hair with luminous beads, tribal bone necklace, "
-            "towering alien trees with hanging vines behind, "
-            "floating glowing seeds and fireflies in misty air, "
+            "scene from alien planet Pandora, "
+            "person with deep vivid blue skin and glowing cyan bioluminescent dots, "
+            "golden cat-slit eyes, pointed elf ears, tribal bone jewelry, "
+            "lush bioluminescent jungle background with towering alien trees, "
+            "hanging vines, floating glowing seeds, fireflies in misty air, "
             "cinematic film still, masterpiece"
         ),
         "negative": (
-            "human skin, white skin, pink skin, pale skin, normal skin, "
-            "brown skin, realistic skin tone, normal ears, "
-            "cartoon, anime, blurry, deformed, text, watermark"
+            "human skin, white skin, pink skin, normal skin, office, "
+            "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.97, "guidance": 0.0, "steps": 8},
-        "base":   {"strength": 0.85, "guidance": 7.5, "steps": 20},
-        "ip_scale": 0.6,
+        "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.82, "guidance": 7.5, "steps": 20},
     },
     "claymation": {
         "label": "Claymation",
         "positive": (
-            "adorable claymation figure in miniature clay world, "
-            "smooth matte plasticine texture, round chunky proportions, "
-            "visible thumbprint marks on clay surface, "
-            "tiny handmade clay furniture and props on tabletop set, "
-            "miniature painted backdrop with rolling hills, "
-            "warm soft studio spotlight from above, "
-            "stop-motion animation frame, masterpiece"
+            "entire scene made of plasticine clay and stop-motion miniatures, "
+            "clay person with round chunky proportions and thumbprint texture, "
+            "miniature clay furniture and props on a tabletop set, "
+            "painted cardboard backdrop, warm studio spotlight, "
+            "Wallace and Gromit style stop-motion frame, masterpiece"
         ),
         "negative": (
-            "photorealistic, real human, CGI, 3D render, smooth plastic, "
-            "blurry, low quality, deformed, text, watermark"
+            "photorealistic, real human, CGI, 3D render, "
+            "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 6},
-        "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
-        "ip_scale": 0.6,
+        "turbo":  {"strength": 0.85, "guidance": 0.0, "steps": 6},
+        "base":   {"strength": 0.80, "guidance": 8.0, "steps": 20},
     },
     "anime": {
         "label": "Anime",
         "positive": (
-            "2D anime character in dramatic scene, "
-            "thick black ink outlines, flat cel-shaded coloring, "
-            "huge sparkling anime eyes with bright reflections, "
-            "colorful wild stylized hair blowing in wind, "
-            "cherry blossom petals floating through the air, "
-            "rooftop overlooking glowing anime city at sunset, "
-            "manga illustration style, masterpiece, vibrant colors"
+            "2D anime illustration of entire scene, "
+            "person drawn with thick black ink outlines and flat cel-shaded colors, "
+            "huge sparkling anime eyes, colorful stylized hair, "
+            "background transformed into anime cityscape at golden hour, "
+            "cherry blossom petals drifting through air, "
+            "manga style, vibrant saturated colors, masterpiece"
         ),
         "negative": (
             "photorealistic, real person, photograph, 3d render, "
-            "realistic face, realistic skin, natural lighting, "
-            "blurry, deformed, text, watermark"
+            "realistic skin, blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.93, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.85, "guidance": 8.0, "steps": 20},
-        "ip_scale": 0.55,
+        "turbo":  {"strength": 0.87, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
     },
-    "ghost": {
+    "cyberpunk": {
         "label": "Cyberpunk",
         "positive": (
-            "cyberpunk street warrior in neon-lit alley, "
-            "face lit by pink and cyan neon signs, "
-            "chrome cybernetic implants on temple and jaw, "
-            "glowing circuit-pattern tattoos on skin, "
-            "holographic advertisements and kanji signs behind, "
-            "rain falling through colored laser beams, "
-            "wet reflective street with puddles, steam rising, "
+            "cyberpunk scene, person with chrome cybernetic implants and "
+            "glowing circuit-pattern tattoos, neon pink and cyan lighting, "
+            "environment transformed into rain-soaked neon alley, "
+            "holographic advertisements, kanji signs, laser beams, "
+            "wet reflective surfaces with puddles, steam rising, "
             "cinematic neon noir, masterpiece"
         ),
         "negative": (
             "natural lighting, daytime, sunny, medieval, fantasy, "
-            "cartoon, anime, blurry, deformed, text, watermark"
+            "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "turbo":  {"strength": 0.85, "guidance": 0.0, "steps": 7},
         "base":   {"strength": 0.80, "guidance": 7.5, "steps": 20},
-        "ip_scale": 0.6,
+    },
+    "oilpainting": {
+        "label": "Oil Painting",
+        "positive": (
+            "classical oil painting of entire scene, "
+            "person painted with rich visible brushstrokes and impasto technique, "
+            "warm golden Rembrandt lighting with dramatic chiaroscuro shadows, "
+            "background as ornate Renaissance interior with velvet drapes, "
+            "gilded picture frames on dark walls, candelabra, "
+            "museum masterpiece on canvas, baroque style"
+        ),
+        "negative": (
+            "photograph, digital art, modern, cartoon, anime, "
+            "blurry, deformed, text, watermark"
+        ),
+        "turbo":  {"strength": 0.82, "guidance": 0.0, "steps": 6},
+        "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
+    },
+    "pixelart": {
+        "label": "Pixel Art",
+        "positive": (
+            "retro 16-bit pixel art scene, "
+            "person as pixel art character with blocky square pixels, "
+            "limited color palette, dithering shading, "
+            "background as retro video game level with pixel clouds and tiles, "
+            "8-bit aesthetic, classic SNES RPG style, "
+            "crisp pixel edges, nostalgic retro gaming art"
+        ),
+        "negative": (
+            "photorealistic, smooth, high resolution, 3d render, "
+            "blurry, deformed, text, watermark"
+        ),
+        "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
+    },
+    "comicbook": {
+        "label": "Comic Book",
+        "positive": (
+            "bold comic book illustration of entire scene, "
+            "person drawn with heavy black ink outlines and halftone dot shading, "
+            "bright primary colors, dramatic action pose, "
+            "background with comic panel speed lines and pop art bursts, "
+            "Ben-Day dots pattern, speech bubble space, "
+            "Marvel comic style, dynamic composition, masterpiece"
+        ),
+        "negative": (
+            "photorealistic, photograph, 3d render, anime, "
+            "blurry, deformed, text, watermark"
+        ),
+        "turbo":  {"strength": 0.86, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.80, "guidance": 8.0, "steps": 20},
+    },
+    "steampunk": {
+        "label": "Steampunk",
+        "positive": (
+            "steampunk scene, person wearing brass goggles and Victorian gear, "
+            "copper mechanical parts and clockwork accessories, "
+            "environment as Victorian workshop with spinning brass gears, "
+            "steam pipes, pressure gauges, leather-bound books, "
+            "warm amber gaslight illumination, copper and bronze tones, "
+            "industrial revolution aesthetic, masterpiece"
+        ),
+        "negative": (
+            "modern, futuristic, neon, digital, cartoon, anime, "
+            "blurry, deformed, text, watermark"
+        ),
+        "turbo":  {"strength": 0.84, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
     },
 }
+
+STYLE_ORDER = [
+    "avatar", "anime", "cyberpunk", "claymation",
+    "oilpainting", "comicbook", "pixelart", "steampunk",
+]
 
 
 # ── Pipeline state ────────────────────────────────────────────────────────────
 _pipe = None
 _pipe_lock = threading.Lock()
 _pipe_ready = False
-_face_app = None
-_face_app_lock = threading.Lock()
-_has_ip_adapter = False
-
-
-def _init_insightface():
-    """Initialize insightface for better face detection (optional)."""
-    global _face_app
-    try:
-        from insightface.app import FaceAnalysis
-        app = FaceAnalysis(
-            name="antelopev2",
-            providers=["CPUExecutionProvider"],
-        )
-        app.prepare(ctx_id=0, det_size=(640, 640))
-        _face_app = app
-        print("[Generator] insightface ready — better face detection")
-        return True
-    except Exception as e:
-        print(f"[Generator] insightface not available, using OpenCV: {e}")
-        return False
 
 
 def _load_pipeline():
-    """Load SDXL + IP-Adapter. Runs in background thread."""
-    global _pipe, _pipe_ready, _has_ip_adapter
+    """Load SDXL pipeline. Runs in background thread."""
+    global _pipe, _pipe_ready
 
     try:
         import torch
@@ -170,63 +202,10 @@ def _load_pipeline():
         except Exception:
             pass
 
-        # ── Load IP-Adapter for identity preservation ─────────────────────
-        # Check compatibility BEFORE loading to avoid first-generation crash.
-        # The ip-adapter_sdxl.bin requires a ViT-bigG encoder (projection_dim
-        # 1280), but the available image encoder outputs 1024 (ViT-H).
-        # This causes RuntimeError: mat1(1x1024) * mat2(1280x8192) on every
-        # first inference, then falls back. Skip loading entirely if wrong.
-        _ip_compatible = False
-        if IP_ADAPTER_BIN.exists() and IMAGE_ENCODER.exists():
-            try:
-                from transformers import CLIPVisionModelWithProjection
-                _test_enc = CLIPVisionModelWithProjection.from_pretrained(
-                    str(IMAGE_ENCODER))
-                proj_dim = getattr(_test_enc.config, "projection_dim", None)
-                hidden_dim = getattr(_test_enc.config, "hidden_size", None)
-                out_dim = proj_dim or hidden_dim or 0
-                del _test_enc
-                print(f"[Generator] IP-Adapter image encoder: "
-                      f"projection_dim={proj_dim} hidden_size={hidden_dim}")
-                if out_dim >= 1280:
-                    _ip_compatible = True
-                else:
-                    print(f"[Generator] IP-Adapter SKIPPED — encoder outputs "
-                          f"{out_dim}-dim but SDXL needs 1280. "
-                          f"Need ip-adapter-plus_sdxl_vit-h.bin for ViT-H.")
-            except Exception as e:
-                print(f"[Generator] Could not check IP-Adapter compatibility: {e}")
-
-        if _ip_compatible:
-            try:
-                print("[Generator] Loading IP-Adapter SDXL...")
-                pipe.load_ip_adapter(
-                    str(IP_ADAPTER_DIR),
-                    subfolder="sdxl_models",
-                    weight_name="ip-adapter_sdxl.bin",
-                    image_encoder_folder=str(IMAGE_ENCODER),
-                )
-                _has_ip_adapter = True
-                print("[Generator] IP-Adapter loaded — identity preservation ON")
-            except Exception as e:
-                print(f"[Generator] IP-Adapter load failed: {e}")
-                try:
-                    pipe.unload_ip_adapter()
-                except Exception:
-                    pass
-                _has_ip_adapter = False
-        else:
-            _has_ip_adapter = False
-            if not IP_ADAPTER_BIN.exists() or not IMAGE_ENCODER.exists():
-                print("[Generator] IP-Adapter not found — run: python setup_models.py")
-
-        # Initialize insightface for better face detection (optional)
-        _init_insightface()
-
         with _pipe_lock:
             _pipe = pipe
         _pipe_ready = True
-        print(f"[Generator] Ready! model={model_type} ip_adapter={_has_ip_adapter}")
+        print(f"[Generator] Ready! model={model_type}")
 
     except Exception as e:
         print(f"[Generator] ERROR loading pipeline: {e}")
@@ -238,256 +217,25 @@ def is_ready():
     return _pipe_ready and _pipe is not None
 
 
-# ── Face extraction ───────────────────────────────────────────────────────────
-_face_cascade = None
-
-
-def _get_face_cascade():
-    global _face_cascade
-    if _face_cascade is None:
-        _face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    return _face_cascade
-
-
-def extract_face_crop(frame, padding_ratio=0.65):
-    """
-    Extract the largest face from frame with generous padding.
-    Returns a square-ish PIL Image centered on the face.
-    """
-    # Try insightface first (more reliable)
-    if _face_app is not None:
-        try:
-            with _face_app_lock:
-                faces = _face_app.get(frame)
-            if faces:
-                face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]))
-                x1, y1, x2, y2 = [int(v) for v in face.bbox]
-                w, h = x2 - x1, y2 - y1
-                pad_x = int(w * padding_ratio)
-                pad_y = int(h * padding_ratio)
-                fh, fw = frame.shape[:2]
-                x1 = max(0, x1 - pad_x)
-                y1 = max(0, y1 - pad_y)
-                x2 = min(fw, x2 + pad_x)
-                y2 = min(fh, y2 + pad_y)
-                # Make roughly square
-                crop_w, crop_h = x2 - x1, y2 - y1
-                if crop_w > crop_h:
-                    diff = crop_w - crop_h
-                    y1 = max(0, y1 - diff // 2)
-                    y2 = min(fh, y2 + diff // 2)
-                elif crop_h > crop_w:
-                    diff = crop_h - crop_w
-                    x1 = max(0, x1 - diff // 2)
-                    x2 = min(fw, x2 + diff // 2)
-                crop = frame[y1:y2, x1:x2]
-                if crop.size > 0:
-                    return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-        except Exception:
-            pass
-
-    # Fallback to Haar cascade
-    detector = _get_face_cascade()
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
-    if len(faces) > 0:
-        x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-        pad_x = int(w * padding_ratio)
-        pad_y = int(h * padding_ratio)
-        fh, fw = frame.shape[:2]
-        x1, y1 = max(0, x - pad_x), max(0, y - pad_y)
-        x2, y2 = min(fw, x + w + pad_x), min(fh, y + h + pad_y)
-        crop_w, crop_h = x2 - x1, y2 - y1
-        if crop_w > crop_h:
-            diff = crop_w - crop_h
-            y1 = max(0, y1 - diff // 2)
-            y2 = min(fh, y2 + diff // 2)
-        elif crop_h > crop_w:
-            diff = crop_h - crop_w
-            x1 = max(0, x1 - diff // 2)
-            x2 = min(fw, x2 + diff // 2)
-        crop = frame[y1:y2, x1:x2]
-        if crop.size > 0:
-            return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-
-    # Last resort: center crop
-    h, w = frame.shape[:2]
-    size = min(h, w)
-    y1, x1 = (h - size) // 2, (w - size) // 2
-    return Image.fromarray(cv2.cvtColor(frame[y1:y1+size, x1:x1+size], cv2.COLOR_BGR2RGB))
-
-
-def _detect_gender(frame):
-    """Detect gender from the largest face using insightface. Returns 'male', 'female', or 'unknown'."""
-    if _face_app is not None:
-        try:
-            with _face_app_lock:
-                faces = _face_app.get(frame)
-            if faces:
-                face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]))
-                # insightface gender: 0=female, 1=male
-                if hasattr(face, 'gender'):
-                    return "male" if face.gender == 1 else "female"
-                # some versions use 'sex' attribute
-                if hasattr(face, 'sex'):
-                    return "male" if face.sex == "M" else "female"
-        except Exception:
-            pass
-    return "unknown"
-
-
-def _get_face_image(frame):
-    """Extract a face crop resized to 512x512 for IP-Adapter conditioning."""
-    # Try insightface
-    if _face_app is not None:
-        try:
-            with _face_app_lock:
-                faces = _face_app.get(frame)
-            if faces:
-                face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]))
-                x1, y1, x2, y2 = [int(v) for v in face.bbox]
-                pad = int(max(x2-x1, y2-y1) * 0.3)
-                fh, fw = frame.shape[:2]
-                x1, y1 = max(0, x1-pad), max(0, y1-pad)
-                x2, y2 = min(fw, x2+pad), min(fh, y2+pad)
-                crop = frame[y1:y2, x1:x2]
-                if crop.size > 0:
-                    return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)).resize(
-                        (512, 512), Image.LANCZOS)
-        except Exception:
-            pass
-
-    # Fallback to Haar
-    detector = _get_face_cascade()
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
-    if len(faces) > 0:
-        x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-        pad = int(max(w, h) * 0.3)
-        fh, fw = frame.shape[:2]
-        x1, y1 = max(0, x-pad), max(0, y-pad)
-        x2, y2 = min(fw, x+w+pad), min(fh, y+h+pad)
-        crop = frame[y1:y2, x1:x2]
-        if crop.size > 0:
-            return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)).resize(
-                (512, 512), Image.LANCZOS)
-
-    return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).resize(
-        (512, 512), Image.LANCZOS)
-
-
-def _extract_person_crop(frame, box, padding_ratio=0.65):
-    """Extract a face/body crop from frame using a bounding box dict."""
-    x, y, w, h = box["x"], box["y"], box["w"], box["h"]
-    fh, fw = frame.shape[:2]
-
-    # The box is a body box — find the face within it
-    bx1, by1 = max(0, x), max(0, y)
-    bx2, by2 = min(fw, x + w), min(fh, y + h)
-    body_roi = frame[by1:by2, bx1:bx2]
-
-    # Try to detect face within body box
-    if body_roi.size > 0:
-        detector = _get_face_cascade()
-        gray = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
-        faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
-        if len(faces) > 0:
-            fx, fy, fw2, fh2 = max(faces, key=lambda r: r[2] * r[3])
-            # Map back to full frame coordinates
-            abs_fx = bx1 + fx
-            abs_fy = by1 + fy
-            pad_x = int(fw2 * padding_ratio)
-            pad_y = int(fh2 * padding_ratio)
-            cx1 = max(0, abs_fx - pad_x)
-            cy1 = max(0, abs_fy - pad_y)
-            cx2 = min(fw, abs_fx + fw2 + pad_x)
-            cy2 = min(fh, abs_fy + fh2 + pad_y)
-            # Make roughly square
-            crop_w, crop_h = cx2 - cx1, cy2 - cy1
-            if crop_w > crop_h:
-                diff = crop_w - crop_h
-                cy1 = max(0, cy1 - diff // 2)
-                cy2 = min(fh, cy2 + diff // 2)
-            elif crop_h > crop_w:
-                diff = crop_h - crop_w
-                cx1 = max(0, cx1 - diff // 2)
-                cx2 = min(fw, cx2 + diff // 2)
-            crop = frame[cy1:cy2, cx1:cx2]
-            if crop.size > 0:
-                return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-
-    # Fallback: use top portion of body box as face area
-    face_h = min(by1 + int(h * 0.5), fh)
-    crop = frame[by1:face_h, bx1:bx2]
-    if crop.size > 0:
-        return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-
-    return extract_face_crop(frame, padding_ratio)
-
-
 # ── Generation ────────────────────────────────────────────────────────────────
 def _build_prompts(style, gender):
     """Build gender-aware positive and negative prompts."""
     prompt = style["positive"]
     neg = style["negative"]
     if gender == "male":
-        prompt = f"male, man, masculine features, {prompt}"
-        neg = f"female, woman, feminine, breasts, {neg}"
+        prompt = f"male man, {prompt}"
+        neg = f"female, woman, {neg}"
     elif gender == "female":
-        prompt = f"female, woman, feminine features, {prompt}"
-        neg = f"male, man, masculine, beard, {neg}"
+        prompt = f"female woman, {prompt}"
+        neg = f"male, man, beard, {neg}"
     return prompt, neg
 
 
-def _generate_single(pipe, source_pil, style, style_key, gender="unknown"):
-    """Generate one avatar from a single face crop PIL image."""
-    global _has_ip_adapter
-    import torch
-
-    params = style["turbo"] if _is_turbo else style["base"]
-    prompt, neg_prompt = _build_prompts(style, gender)
-
-    model_type = "Turbo" if _is_turbo else "Base"
-    print(f"[Generator] Style={style_key} Model={model_type} "
-          f"Steps={params['steps']} Strength={params['strength']} "
-          f"Gender={gender}")
-
-    generator = torch.Generator(device="cuda").manual_seed(
-        int(time.time()) % 2**32)
-
-    gen_kwargs = {
-        "prompt": prompt,
-        "negative_prompt": neg_prompt,
-        "image": source_pil,
-        "strength": params["strength"],
-        "num_inference_steps": params["steps"],
-        "guidance_scale": params["guidance"],
-        "generator": generator,
-    }
-
-    if _has_ip_adapter:
-        try:
-            pipe.set_ip_adapter_scale(style["ip_scale"])
-            gen_kwargs["ip_adapter_image"] = source_pil.resize(
-                (512, 512), Image.LANCZOS)
-        except Exception as e:
-            print(f"[Generator] IP-Adapter conditioning failed: {e}")
-
-    with torch.inference_mode():
-        result = pipe(**gen_kwargs).images[0]
-
-    return result
-
-
-def generate_avatar(frame, style_key, gender="unknown", face_boxes=None):
+def generate_scene(frame, style_key, gender="unknown"):
     """
-    Generate stylized avatar(s) from a webcam frame.
-    If face_boxes is provided, generates one avatar per person and combines.
-    gender: 'male', 'female', or 'unknown' — used to guide prompt.
+    Transform entire camera frame into the given style.
+    Returns (cv2_image, error_string).
     """
-    global _has_ip_adapter
-
     if not is_ready():
         return None, "AI pipeline loading — please wait a moment"
 
@@ -498,141 +246,49 @@ def generate_avatar(frame, style_key, gender="unknown", face_boxes=None):
     try:
         import torch
 
+        params = style["turbo"] if _is_turbo else style["base"]
+        prompt, neg_prompt = _build_prompts(style, gender)
+
+        # Use full frame, resize to 1024x1024 for SDXL
+        h, w = frame.shape[:2]
+        source_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
+
         with _pipe_lock:
             pipe = _pipe
 
-        # Auto-detect gender from insightface if not provided
-        if gender == "unknown":
-            gender = _detect_gender(frame)
-
-        # Determine face crops to generate
-        if face_boxes and len(face_boxes) > 1:
-            # Multi-person: extract each person's face
-            crops = []
-            for box in face_boxes:
-                crop = _extract_person_crop(frame, box)
-                crops.append(crop.resize((1024, 1024), Image.LANCZOS))
-            print(f"[Generator] Multi-person: {len(crops)} faces")
-        else:
-            # Single person (or no boxes): use largest face
-            if face_boxes and len(face_boxes) == 1:
-                crop = _extract_person_crop(frame, face_boxes[0])
-            else:
-                crop = extract_face_crop(frame)
-            crops = [crop.resize((1024, 1024), Image.LANCZOS)]
+        model_type = "Turbo" if _is_turbo else "Base"
+        print(f"[Generator] Style={style_key} Model={model_type} "
+              f"Steps={params['steps']} Strength={params['strength']} "
+              f"Gender={gender} Frame={w}x{h}")
 
         start = time.time()
-        results = []
-        for i, source_pil in enumerate(crops):
-            if len(crops) > 1:
-                print(f"[Generator] Generating person {i+1}/{len(crops)}...")
-            result = _generate_single(pipe, source_pil, style, style_key, gender)
-            results.append(cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR))
+        generator = torch.Generator(device="cuda").manual_seed(
+            int(time.time()) % 2**32)
+
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=neg_prompt,
+                image=source_pil,
+                strength=params["strength"],
+                num_inference_steps=params["steps"],
+                guidance_scale=params["guidance"],
+                generator=generator,
+            ).images[0]
 
         elapsed = time.time() - start
-        print(f"[Generator] Done in {elapsed:.1f}s ({len(results)} avatar(s))")
+        print(f"[Generator] Done in {elapsed:.1f}s")
 
-        if len(results) == 1:
-            return results[0], None
-
-        # Combine multiple results into a side-by-side grid
-        return _combine_grid(results), None
+        # Resize back to original aspect ratio
+        result_cv = cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR)
+        result_cv = cv2.resize(result_cv, (w, h), interpolation=cv2.INTER_LANCZOS4)
+        return result_cv, None
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-
-        # ── Fallback: unload IP-Adapter and retry plain img2img ───────────
-        try:
-            print("[Generator] Retrying without IP-Adapter...")
-            import torch
-
-            with _pipe_lock:
-                pipe = _pipe
-                try:
-                    pipe.unload_ip_adapter()
-                except Exception:
-                    pass
-
-            _has_ip_adapter = False
-
-            source_pil = extract_face_crop(frame).resize((1024, 1024), Image.LANCZOS)
-            prompt, neg_prompt = _build_prompts(style, gender)
-            params = style["turbo"] if _is_turbo else style["base"]
-            generator = torch.Generator(device="cuda").manual_seed(42)
-
-            with torch.inference_mode():
-                result = pipe(
-                    prompt=prompt,
-                    negative_prompt=neg_prompt,
-                    image=source_pil,
-                    strength=params["strength"],
-                    num_inference_steps=params["steps"],
-                    guidance_scale=params["guidance"],
-                    generator=generator,
-                ).images[0]
-
-            print("[Generator] Fallback succeeded (IP-Adapter disabled for future runs)")
-            return cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR), None
-
-        except Exception as e2:
-            import traceback
-            traceback.print_exc()
-            return None, f"Generation failed: {e2}"
-
-
-def _combine_grid(images):
-    """Combine multiple avatar images into a side-by-side grid."""
-    n = len(images)
-    if n == 0:
-        return None
-    if n == 1:
-        return images[0]
-
-    # Resize all to same height
-    target_h = min(img.shape[0] for img in images)
-    resized = []
-    for img in images:
-        if img.shape[0] != target_h:
-            scale = target_h / img.shape[0]
-            new_w = int(img.shape[1] * scale)
-            img = cv2.resize(img, (new_w, target_h))
-        resized.append(img)
-
-    # For 2-3 people: horizontal row
-    if n <= 3:
-        gap = 4
-        total_w = sum(img.shape[1] for img in resized) + gap * (n - 1)
-        canvas = np.zeros((target_h, total_w, 3), dtype=np.uint8)
-        x = 0
-        for img in resized:
-            canvas[:, x:x+img.shape[1]] = img
-            x += img.shape[1] + gap
-        return canvas
-
-    # 4+ people: 2-column grid
-    cols = 2
-    rows = (n + 1) // 2
-    target_w = min(img.shape[1] for img in resized)
-    cell_resized = []
-    for img in resized:
-        if img.shape[1] != target_w:
-            scale = target_w / img.shape[1]
-            new_h = int(img.shape[0] * scale)
-            img = cv2.resize(img, (target_w, new_h))
-        cell_resized.append(img)
-
-    cell_h = min(img.shape[0] for img in cell_resized)
-    gap = 4
-    canvas = np.zeros((cell_h * rows + gap * (rows - 1),
-                        target_w * cols + gap, 3), dtype=np.uint8)
-    for i, img in enumerate(cell_resized):
-        r, c = i // cols, i % cols
-        y = r * (cell_h + gap)
-        x = c * (target_w + gap)
-        canvas[y:y+cell_h, x:x+target_w] = img[:cell_h, :target_w]
-
-    return canvas
+        return None, f"Generation failed: {e}"
 
 
 # ── ComfyBridge-compatible wrapper ────────────────────────────────────────────
@@ -651,7 +307,7 @@ class ComfyBridge:
         _load_pipeline()
         self.available = is_ready()
         if self.available:
-            print(f"[Generator] AI engine ready (ip_adapter={_has_ip_adapter})")
+            print("[Generator] AI engine ready")
         else:
             print("[Generator] AI engine failed to load")
 
@@ -659,24 +315,22 @@ class ComfyBridge:
         self.available = is_ready()
         return self.available
 
-    def generate(self, frame, style_key, selection_mask=None, face_boxes=None,
-                 gender="unknown"):
+    def generate(self, frame, style_key, gender="unknown"):
         if self._status == "generating":
             return False
         self._status = "generating"
         self._result = None
-        self._message = "Generating avatar..."
+        self._message = "Transforming scene..."
         self._thread = threading.Thread(
             target=self._run,
-            args=(frame.copy(), style_key, gender, face_boxes),
+            args=(frame.copy(), style_key, gender),
             daemon=True,
         )
         self._thread.start()
         return True
 
-    def _run(self, frame, style_key, gender="unknown", face_boxes=None):
-        img, err = generate_avatar(frame, style_key, gender=gender,
-                                   face_boxes=face_boxes)
+    def _run(self, frame, style_key, gender="unknown"):
+        img, err = generate_scene(frame, style_key, gender=gender)
         if img is not None:
             self._result = img
             self._status = "done"
