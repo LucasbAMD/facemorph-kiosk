@@ -164,10 +164,19 @@ async def generate_status():
     if status["status"] == "done":
         result = comfy.get_result()
         if result is not None:
-            _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 97])
-            b64 = base64.b64encode(buf.tobytes()).decode()
-            return JSONResponse({"status": "done",
-                                 "image": f"data:image/jpeg;base64,{b64}"})
+            try:
+                _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                b64 = base64.b64encode(buf.tobytes()).decode()
+                print(f"[Status] Result ready: {result.shape}, JPEG size: {len(buf)}bytes")
+                return JSONResponse({"status": "done",
+                                     "image": f"data:image/jpeg;base64,{b64}"})
+            except Exception as e:
+                print(f"[Status] Error encoding result: {e}")
+                return JSONResponse({"status": "error", "message": f"Encoding failed: {e}"})
+        else:
+            # Result was already consumed or missing
+            print("[Status] Done but result is None (already consumed?)")
+            return JSONResponse({"status": "idle", "message": ""})
     return JSONResponse(status)
 
 

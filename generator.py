@@ -72,7 +72,7 @@ STYLES = {
             "office, indoor room, plain wall, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 40,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
@@ -96,7 +96,7 @@ STYLES = {
             "photorealistic, real human, real skin, photograph, "
             "office, plain wall, blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 40,
+        "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.52},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
@@ -120,7 +120,7 @@ STYLES = {
             "3d render, realistic lighting, office, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 40,
+        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
@@ -144,7 +144,7 @@ STYLES = {
             "natural lighting, daytime, sunny, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 40,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.53},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
@@ -168,7 +168,7 @@ STYLES = {
             "photograph, digital art, modern, plain background, office, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 40,
+        "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 35,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
@@ -190,7 +190,7 @@ STYLES = {
             "photorealistic, smooth, high resolution, photograph, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 40,
+        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
@@ -215,7 +215,7 @@ STYLES = {
             "photorealistic, photograph, real skin, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 40,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
@@ -241,7 +241,7 @@ STYLES = {
             "modern, futuristic, neon, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 40,
+        "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 35,
                         "controlnet_scale": 0.58},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
@@ -415,21 +415,10 @@ def generate_scene(frame, style_key):
         prompt_2 = style.get("prompt_2", prompt)
         neg_prompt = style["negative"]
 
-        # Prepare source image — use SDXL-native resolution preserving aspect ratio
-        # SDXL works best at resolutions where total pixels ~ 1024x1024
-        # For 16:9 input: 1280x720 is close to 1024^2 total pixels
+        # Prepare source image at 1024x1024 for SDXL
         h, w = frame.shape[:2]
-        aspect = w / h
-        if aspect >= 1.5:      # wide (16:9) → 1280x720
-            gen_w, gen_h = 1280, 720
-        elif aspect >= 1.2:    # 4:3 → 1152x896
-            gen_w, gen_h = 1152, 896
-        elif aspect <= 0.75:   # tall portrait → 720x1280
-            gen_w, gen_h = 720, 1280
-        else:                  # ~square → 1024x1024
-            gen_w, gen_h = 1024, 1024
         source_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        source_pil = source_pil.resize((gen_w, gen_h), Image.LANCZOS)
+        source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
 
         with _pipe_lock:
             pipe = _pipe
