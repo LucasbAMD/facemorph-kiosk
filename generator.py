@@ -353,11 +353,11 @@ STYLES = {
     "fantasy": {
         "label": "Fantasy Elf",
         "prompt": (
-            "person as a high fantasy elf warrior, "
+            "same person as a high fantasy elf warrior, "
             "elegant long pointed elf ears, ethereal pale luminous skin, "
             "ornate silver mithril circlet on forehead with blue gem, "
             "flowing elven robes with leaf filigree embroidery, "
-            "same facial features and expression preserved"
+            "same face same identity same gender, same expression preserved"
         ),
         "prompt_2": (
             "epic Lord of the Rings fantasy scene, "
@@ -369,9 +369,9 @@ STYLES = {
         "negative": _NEG_IDENTITY + ", modern clothing, technology, urban, contemporary",
         "negative_2": _NEG_QUALITY + ", office, plain background, white wall, indoor room",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── POP ART ───────────────────────────────────────────────────────
