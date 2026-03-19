@@ -72,23 +72,29 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "prompt": (
-            "Na'vi alien warrior portrait, vivid deep blue skin covering entire face "
-            "and body, glowing cyan bioluminescent freckles and dots on cheeks and "
-            "forehead, golden cat-slit eyes, tall pointed ears, "
-            "leather warrior chest plate and shoulder armor"
+            "Na'vi from James Cameron Avatar movie, "
+            "blue skin with darker blue tiger stripe markings on face and body, "
+            "wide flat nose, large luminous yellow-green eyes with cat-slit pupils, "
+            "small glowing bioluminescent freckles, long braided hair, "
+            "tall pointed elf-like ears, tribal bone and leather necklace"
         ),
         "prompt_2": (
-            "cinematic still from Avatar movie on planet Pandora, "
-            "lush bioluminescent jungle, massive glowing trees, floating seeds, "
-            "blue misty atmosphere, James Cameron cinematography, "
+            "cinematic still from Avatar 2009 movie, planet Pandora, "
+            "lush bioluminescent rainforest, giant glowing willow trees, "
+            "floating mountains in background, blue-green misty atmosphere, "
+            "Weta Digital CGI quality, James Cameron cinematography, "
             "ultra detailed, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin, pale skin",
+        "negative": (
+            _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin, "
+            "pale skin, grey alien, green alien, generic alien, "
+            "smooth skin without stripes, plain blue skin"
+        ),
         "negative_2": _NEG_QUALITY + ", realistic photo, office, indoor room, plain wall",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.6,
-        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 40,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.88, "guidance": 14.0, "steps": 40,
+                        "controlnet_scale": 0.42},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
