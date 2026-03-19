@@ -1,13 +1,8 @@
 """
-face_processor.py — AMD Adapt Kiosk
-Full-body pose tracking via MediaPipe + face recognition via LBPH.
+face_processor.py — AI Avatar Kiosk
+Face detection, recognition, person selection, and live preview overlay.
 
-Fixes vs previous version:
-  - get_detected_faces() now casts all box coords to plain int() so FastAPI
-    can JSON-serialize them (numpy.int32 was causing the iterencode TypeError)
-  - _crop_for_naming is now also saved when a person is ALREADY selected and
-    re-clicked, so the Name button always works after a single click-to-select
-  - name_face() fallback message updated: "tap" → "click"
+Simplified for 4 avatar styles: Avatar, Claymation, Anime, Ghost.
 """
 
 import cv2
@@ -26,13 +21,6 @@ try:
 except Exception:
     pass
 
-# ── rembg ─────────────────────────────────────────────────────────────────────
-try:
-    from rembg import remove, new_session
-    REMBG_AVAILABLE = True
-except ImportError:
-    REMBG_AVAILABLE = False
-
 # ── MediaPipe ─────────────────────────────────────────────────────────────────
 MP_AVAILABLE = False
 mp_pose = None
@@ -45,20 +33,19 @@ try:
 except ImportError:
     print("[WARN] MediaPipe not available")
 
-CHAR_CONFIG = {
-    "navi":     {"label":"Na'vi",    "subtitle":"Avatar · Pandora",     "emoji":"🔵","color":"#00d4ff"},
-    "hulk":     {"label":"Hulk",     "subtitle":"Gamma · Avengers",     "emoji":"💚","color":"#22dd44"},
-    "thanos":   {"label":"Thanos",   "subtitle":"Infinity · Mad Titan", "emoji":"💜","color":"#9b30ff"},
-    "predator": {"label":"Predator", "subtitle":"Thermal · Cloaked",    "emoji":"👁️","color":"#ff6600"},
-    "ghost":    {"label":"Ghost",    "subtitle":"Spectral · Ethereal",  "emoji":"👻","color":"#aaddff"},
-    "groot":    {"label":"Groot",    "subtitle":"Guardians · Flora",    "emoji":"🌿","color":"#8B5E3C"},
+# ── Style config (display info only — generation params in generator.py) ──────
+STYLE_CONFIG = {
+    "avatar":     {"label": "Avatar",     "subtitle": "Blue Alien · Pandora",    "emoji": "🔵", "color": "#00d4ff"},
+    "claymation": {"label": "Claymation", "subtitle": "Clay · Stop Motion",      "emoji": "🎨", "color": "#e67e22"},
+    "anime":      {"label": "Anime",      "subtitle": "Ghibli · Cel Shaded",     "emoji": "✨", "color": "#ff69b4"},
+    "ghost":      {"label": "Ghost",      "subtitle": "Spectral · Ethereal",     "emoji": "👻", "color": "#aaddff"},
 }
-CHARACTER_ORDER = ["navi","hulk","thanos","predator","ghost","groot"]
+STYLE_ORDER = ["avatar", "claymation", "anime", "ghost"]
 
-KNOWN_FACES_DIR  = Path("known_faces")
-KNOWN_FACES_DB   = Path("known_faces/faces.json")
-RECOGNIZER_FILE  = Path("known_faces/recognizer.pkl")
-KNOWN_GENDER_DB  = Path("known_faces/genders.json")   # name → gender mapping
+KNOWN_FACES_DIR = Path("known_faces")
+KNOWN_FACES_DB  = Path("known_faces/faces.json")
+RECOGNIZER_FILE = Path("known_faces/recognizer.pkl")
+KNOWN_GENDER_DB = Path("known_faces/genders.json")
 
 
 # ── PoseTracker ───────────────────────────────────────────────────────────────
@@ -74,40 +61,37 @@ class PoseTracker:
 
     def __init__(self):
         self._landmarks = None
-        self._skeleton  = None
-        self._frame     = None
-        self._lock      = threading.Lock()
+        self._skeleton = None
+        self._frame = None
+        self._lock = threading.Lock()
         if MP_AVAILABLE:
             threading.Thread(target=self._run, daemon=True).start()
-            print("[OK] Pose tracker started")
 
     def _run(self):
         pose = mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
+            static_image_mode=False, model_complexity=1,
             smooth_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_detection_confidence=0.5, min_tracking_confidence=0.5,
         )
         while True:
             with self._lock:
                 frame = self._frame
             if frame is not None:
                 try:
-                    rgb     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     results = pose.process(rgb)
                     if results.pose_landmarks:
                         h, w = frame.shape[:2]
-                        lms  = results.pose_landmarks.landmark
-                        pts  = [(int(lm.x * w), int(lm.y * h)) for lm in lms]
+                        lms = results.pose_landmarks.landmark
+                        pts = [(int(lm.x * w), int(lm.y * h)) for lm in lms]
                         skel = self._draw_skeleton(pts, h, w)
                         with self._lock:
                             self._landmarks = pts
-                            self._skeleton  = skel
+                            self._skeleton = skel
                     else:
                         with self._lock:
                             self._landmarks = None
-                            self._skeleton  = None
+                            self._skeleton = None
                 except Exception:
                     pass
             time.sleep(1/15)
@@ -126,27 +110,17 @@ class PoseTracker:
             cv2.circle(img, p, 5, (200, 200, 200), -1, cv2.LINE_AA)
         return img
 
-    def get_skeleton(self, h, w):
-        with self._lock:
-            skel = self._skeleton
-        if skel is None:
-            return None
-        return cv2.resize(skel, (w, h))
-
-    def get_landmarks(self):
-        with self._lock:
-            return list(self._landmarks) if self._landmarks else None
-
     def get_body_mask(self, h, w):
-        lms = self.get_landmarks()
+        with self._lock:
+            lms = list(self._landmarks) if self._landmarks else None
         if not lms:
             return None
         pts = np.array([[x, y] for x, y in lms], dtype=np.int32)
         pts[:, 0] = (pts[:, 0] * w / 640).astype(int)
         pts[:, 1] = (pts[:, 1] * h / 480).astype(int)
         pts = np.clip(pts, 0, [w-1, h-1])
-        mask   = np.zeros((h, w), dtype=np.float32)
-        hull   = cv2.convexHull(pts)
+        mask = np.zeros((h, w), dtype=np.float32)
+        hull = cv2.convexHull(pts)
         center = hull.mean(axis=0)
         expanded = ((hull - center) * 1.4 + center).astype(np.int32)
         cv2.fillConvexPoly(mask, expanded, 1.0)
@@ -154,79 +128,25 @@ class PoseTracker:
         return mask
 
 
-# ── Segmenter ─────────────────────────────────────────────────────────────────
-class Segmenter:
-    def __init__(self):
-        self._mask  = None
-        self._frame = None
-        self._lock  = threading.Lock()
-        self._ready = False
-        if REMBG_AVAILABLE:
-            threading.Thread(target=self._init_model, daemon=True).start()
-
-    def _init_model(self):
-        try:
-            self._session = new_session("u2net_human_seg")
-            self._ready   = True
-            print("[OK] Body segmentation ready!")
-            threading.Thread(target=self._run, daemon=True).start()
-        except Exception as e:
-            print(f"[WARN] Segmentation init: {e}")
-
-    def _run(self):
-        while True:
-            with self._lock:
-                frame = self._frame
-            if frame is not None:
-                try:
-                    from PIL import Image
-                    pil  = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    out  = remove(pil, session=self._session)
-                    arr  = np.array(out)
-                    mask = (arr[:,:,3] / 255.0).astype(np.float32)
-                    with self._lock:
-                        self._mask = cv2.resize(mask, (frame.shape[1], frame.shape[0]))
-                except Exception:
-                    pass
-            time.sleep(0.1)
-
-    def update(self, frame):
-        if self._ready:
-            with self._lock:
-                self._frame = cv2.resize(frame, (320, 240))
-
-    def get(self, h, w):
-        with self._lock:
-            m = self._mask
-        if m is None: return None
-        return cv2.resize(m, (w, h))
-
-
-# ── Face recognizer backend — works with OR without opencv-contrib ────────────
-# opencv-contrib-python provides cv2.face.LBPHFaceRecognizer_create().
-# If only base opencv-python is installed, cv2.face doesn't exist.
-# We detect which is available at import time and use the best option.
-
+# ── Face recognizer backends ──────────────────────────────────────────────────
 _CONTRIB_AVAILABLE = hasattr(cv2, "face") and hasattr(cv2.face, "LBPHFaceRecognizer_create")
 
 if not _CONTRIB_AVAILABLE:
-    # Fallback: use scikit-learn KNN — works with base opencv-python
     try:
         from sklearn.neighbors import KNeighborsClassifier
         _SKLEARN_AVAILABLE = True
-        print("[OK] Face recognition: using sklearn KNN (opencv-contrib not installed)")
+        print("[OK] Face recognition: sklearn KNN")
     except ImportError:
         _SKLEARN_AVAILABLE = False
-        print("[WARN] Face recognition disabled — install opencv-contrib-python OR scikit-learn")
+        print("[WARN] Face recognition disabled")
 else:
     _SKLEARN_AVAILABLE = False
-    print("[OK] Face recognition: using opencv LBPH")
+    print("[OK] Face recognition: opencv LBPH")
 
 
 class _LBPHRecognizer:
-    """Thin wrapper around cv2.face.LBPHFaceRecognizer (requires opencv-contrib)."""
     def __init__(self):
-        self._rec     = cv2.face.LBPHFaceRecognizer_create()
+        self._rec = cv2.face.LBPHFaceRecognizer_create()
         self._trained = False
 
     def train(self, imgs, labels):
@@ -245,19 +165,11 @@ class _LBPHRecognizer:
 
 
 class _KNNRecognizer:
-    """
-    Pure scikit-learn KNN recognizer.
-    Uses LBP-like histogram features extracted with OpenCV so it is
-    compatible with the same 100×100 grayscale crops as LBPH.
-    """
     def __init__(self):
-        self._knn     = KNeighborsClassifier(n_neighbors=3, metric="euclidean")
+        self._knn = KNeighborsClassifier(n_neighbors=3, metric="euclidean")
         self._trained = False
 
     def _features(self, img):
-        # Simple but effective: flatten the equalised grayscale crop into a
-        # 1-D feature vector.  At 100×100 this is 10 000 dimensions — fast
-        # for KNN at the small sample counts we have (< 200 samples total).
         return img.flatten().astype(np.float32) / 255.0
 
     def train(self, imgs, labels):
@@ -269,12 +181,10 @@ class _KNNRecognizer:
     def predict(self, img):
         if not self._trained:
             return -1, 9999.0
-        x   = self._features(img).reshape(1, -1)
+        x = self._features(img).reshape(1, -1)
         lbl = int(self._knn.predict(x)[0])
-        # KNN distance as a proxy for confidence (lower = more confident,
-        # matching the LBPH convention so the threshold logic stays the same)
         dist, _ = self._knn.kneighbors(x, n_neighbors=1)
-        conf    = float(dist[0][0]) * 1000   # scale to ~0-200 range
+        conf = float(dist[0][0]) * 1000
         return lbl, conf
 
     @property
@@ -283,7 +193,6 @@ class _KNNRecognizer:
 
 
 class _NoopRecognizer:
-    """Used when neither contrib nor sklearn is available — recognition is disabled."""
     def train(self, imgs, labels): pass
     def predict(self, img): return -1, 9999.0
     @property
@@ -304,10 +213,10 @@ class FaceRecognizer:
 
     def __init__(self):
         KNOWN_FACES_DIR.mkdir(exist_ok=True)
-        self._lock       = threading.Lock()
-        self._names      = {}   # label_int → name str
-        self._genders    = {}   # name str  → 'male'|'female'|'unknown'
-        self._samples    = {}
+        self._lock = threading.Lock()
+        self._names = {}
+        self._genders = {}
+        self._samples = {}
         self._recognizer = _make_recognizer()
         self._load()
 
@@ -329,11 +238,9 @@ class FaceRecognizer:
                     loaded = pickle.load(f)
                 if hasattr(loaded, "predict") and hasattr(loaded, "trained"):
                     self._recognizer = loaded
-                    print(f"[OK] Face recognizer loaded — {len(self._names)} known face(s)")
-                else:
-                    print("[WARN] Saved recognizer format mismatch — starting fresh")
+                    print(f"[OK] Recognizer loaded — {len(self._names)} face(s)")
             except Exception as e:
-                print(f"[WARN] Could not load saved recognizer: {e}")
+                print(f"[WARN] Could not load recognizer: {e}")
 
     def _save(self):
         KNOWN_FACES_DIR.mkdir(exist_ok=True)
@@ -349,11 +256,6 @@ class FaceRecognizer:
         return max(self._names.keys(), default=-1) + 1
 
     def learn(self, face_img, name, gender="unknown"):
-        """
-        Learn a face and store the person's gender.
-        gender should be 'male', 'female', or 'unknown'.
-        Generates 8 augmented samples from the single crop for reliable recognition.
-        """
         with self._lock:
             label = next((k for k, v in self._names.items() if v == name), None)
             if label is None:
@@ -361,8 +263,6 @@ class FaceRecognizer:
                 self._names[label] = name
                 self._samples[label] = []
 
-            # Store gender against name — used at generation time so we never
-            # have to guess gender for registered hosts
             if gender != "unknown":
                 self._genders[name] = gender
             elif name not in self._genders:
@@ -372,8 +272,7 @@ class FaceRecognizer:
             gray = cv2.resize(gray, (100, 100))
             gray = cv2.equalizeHist(gray)
 
-            augmented = [gray]
-            augmented.append(cv2.flip(gray, 1))
+            augmented = [gray, cv2.flip(gray, 1)]
             for delta in (-25, -12, 12, 25):
                 shifted = np.clip(gray.astype(np.int16) + delta, 0, 255).astype(np.uint8)
                 augmented.append(shifted)
@@ -388,9 +287,6 @@ class FaceRecognizer:
 
             self._retrain()
             self._save()
-            print(f"[Recognizer] Saved {len(augmented)} samples for '{name}' "
-                  f"gender={self._genders.get(name)} "
-                  f"(total={len(self._samples[label])})")
             return label
 
     def _retrain(self):
@@ -418,7 +314,6 @@ class FaceRecognizer:
         return None, None
 
     def get_gender_for_name(self, name):
-        """Return stored gender for a registered person, or 'unknown'."""
         with self._lock:
             return self._genders.get(name, "unknown")
 
@@ -441,32 +336,30 @@ class FaceRecognizer:
 class FaceProcessor:
     def __init__(self, faces_dir="faces"):
         self.faces_dir = Path(faces_dir)
-        self.mode      = "passthrough"
-        self.character = "navi"
-        self.face_key  = None
-        self._lock     = threading.Lock()
-        self.catalog   = {}
-        self._load_catalog()
+        self.mode = "passthrough"
+        self.character = "avatar"
+        self.face_key = None
+        self._lock = threading.Lock()
+        self.catalog = {}
 
-        self.seg        = Segmenter()
-        self.poser      = PoseTracker()
+        self.poser = PoseTracker()
         self.recognizer = FaceRecognizer()
 
         self.face_det = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-        self._detected_faces   = []
+        self._detected_faces = []
         self._recognized_names = {}
-        self._selected_people  = set()
-        self._frame_size       = (0, 0)
-        self._crop_for_naming  = None
+        self._selected_people = set()
+        self._frame_size = (0, 0)
+        self._crop_for_naming = None
 
-        self._det_frame   = None
-        self._det_lock    = threading.Lock()
+        self._det_frame = None
+        self._det_lock = threading.Lock()
         self._recog_frame = None
-        self._recog_lock  = threading.Lock()
+        self._recog_lock = threading.Lock()
         threading.Thread(target=self._detect_loop, daemon=True).start()
-        threading.Thread(target=self._recog_loop,  daemon=True).start()
+        threading.Thread(target=self._recog_loop, daemon=True).start()
 
     def _detect_loop(self):
         while True:
@@ -474,8 +367,8 @@ class FaceProcessor:
                 frame = self._det_frame
             if frame is not None:
                 try:
-                    h, w  = frame.shape[:2]
-                    gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    h, w = frame.shape[:2]
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                     faces = self.face_det.detectMultiScale(
                         gray, scaleFactor=1.1, minNeighbors=6, minSize=(50, 50))
                     body_boxes = []
@@ -486,7 +379,7 @@ class FaceProcessor:
                         bh = min(h - by, int(fh * 5.5))
                         body_boxes.append((bx, by, bw, bh))
                     with self._lock:
-                        self._detected_faces  = body_boxes
+                        self._detected_faces = body_boxes
                         self._selected_people = {
                             i for i in self._selected_people
                             if i < len(body_boxes)}
@@ -495,122 +388,88 @@ class FaceProcessor:
                     pass
             time.sleep(0.10)
 
-    def _load_catalog(self):
-        if not self.faces_dir.exists():
-            self.faces_dir.mkdir(parents=True)
-            return
-        ext = {".jpg",".jpeg",".png",".webp"}
-        for cat in self.faces_dir.iterdir():
-            if not cat.is_dir(): continue
-            for p in cat.iterdir():
-                if p.suffix.lower() not in ext: continue
-                img = cv2.imread(str(p))
-                if img is None: continue
-                key = f"{cat.name}/{p.stem}"
-                self.catalog[key] = {"label":p.stem.replace("_"," ").title(),
-                                     "category":cat.name.title(),"img":img,"path":str(p)}
-        print(f"[OK] {len(self.catalog)} catalog face(s)")
-
-    def reload_catalog(self):
-        with self._lock:
-            self.catalog.clear(); self._load_catalog()
-
-    def get_catalog(self):
-        return [{"key":k,"label":v["label"],"category":v["category"]}
-                for k,v in self.catalog.items()]
-
     def get_characters(self):
-        return [{"key":k,"label":CHAR_CONFIG[k]["label"],
-                 "subtitle":CHAR_CONFIG[k]["subtitle"],
-                 "emoji":CHAR_CONFIG[k]["emoji"],
-                 "color":CHAR_CONFIG[k]["color"],
-                 "swap_ready":True,"ref_photo":""}
-                for k in CHARACTER_ORDER]
+        return [
+            {
+                "key": k,
+                "label": STYLE_CONFIG[k]["label"],
+                "subtitle": STYLE_CONFIG[k]["subtitle"],
+                "emoji": STYLE_CONFIG[k]["emoji"],
+                "color": STYLE_CONFIG[k]["color"],
+            }
+            for k in STYLE_ORDER
+        ]
 
     def set_mode(self, mode, face_key=None, character=None):
         with self._lock:
             self.mode = mode
-            if face_key:  self.face_key = face_key
-            if character and character in CHAR_CONFIG:
+            if face_key:
+                self.face_key = face_key
+            if character and character in STYLE_CONFIG:
                 self.character = character
 
     # ── Person selection ──────────────────────────────────────────────────────
     def get_detected_faces(self):
-        """
-        Return face list with all coordinates cast to plain Python int.
-        numpy.int32 values are NOT JSON-serializable and caused the
-        'object of type int32 is not JSON serializable' TypeError.
-        """
         with self._lock:
             faces = list(self._detected_faces)
-            sel   = set(self._selected_people)
+            sel = set(self._selected_people)
             names = dict(self._recognized_names)
             fw, fh = self._frame_size
         return [
             {
-                "index":    i,
-                "x":        int(x),   # cast np.int32 → int
-                "y":        int(y),
-                "w":        int(w),
-                "h":        int(h),
+                "index": i,
+                "x": int(x),
+                "y": int(y),
+                "w": int(w),
+                "h": int(h),
                 "selected": i in sel,
-                "name":     names.get(i),
-                "frame_w":  int(fw),
-                "frame_h":  int(fh),
+                "name": names.get(i),
+                "frame_w": int(fw),
+                "frame_h": int(fh),
             }
             for i, (x, y, w, h) in enumerate(faces)
         ]
 
     def _extract_and_store_crop(self, frame, x, y, w, h):
-        """
-        Extract a face crop from the body box and store it for naming.
-        Called every time a person is selected (or re-selected) so the
-        Name button always has a fresh crop to work with.
-        """
-        bx1 = max(0, x); by1 = max(0, y)
+        bx1 = max(0, x)
+        by1 = max(0, y)
         bx2 = min(frame.shape[1], x + w)
         by2 = min(frame.shape[0], y + h)
-        body_roi  = frame[by1:by2, bx1:bx2]
+        body_roi = frame[by1:by2, bx1:bx2]
         face_crop = None
 
         if body_roi.size > 0:
-            gray_roi  = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
+            gray_roi = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
             sub_faces = self.face_det.detectMultiScale(
                 gray_roi, 1.1, 4, minSize=(30, 30))
             if len(sub_faces) > 0:
                 fx2, fy2, fw2, fh2 = sub_faces[0]
                 face_crop = body_roi[fy2:fy2+fh2, fx2:fx2+fw2]
 
-        # Fallback: top 30% of body box
         if face_crop is None or face_crop.size == 0:
-            face_top  = min(by1 + int(h * 0.30), frame.shape[0])
+            face_top = min(by1 + int(h * 0.30), frame.shape[0])
             face_crop = frame[by1:face_top, bx1:bx2]
 
         if face_crop is not None and face_crop.size > 0:
             with self._lock:
                 self._crop_for_naming = face_crop.copy()
-            print(f"[CROP] Saved face crop {face_crop.shape} for naming")
 
     def toggle_person(self, click_x, click_y, frame_w, frame_h, frame=None):
         with self._lock:
-            faces  = list(self._detected_faces)
+            faces = list(self._detected_faces)
             fw, fh = self._frame_size
-        if fw == 0 or fh == 0: return
+        if fw == 0 or fh == 0:
+            return
         sx = int(click_x * fw / frame_w)
         sy = int(click_y * fh / frame_h)
         pad = 35
         for i, (x, y, w, h) in enumerate(faces):
             if (x-pad) <= sx <= (x+w+pad) and (y-pad) <= sy <= (y+h+pad):
                 with self._lock:
-                    already_selected = i in self._selected_people
-                    if already_selected:
+                    if i in self._selected_people:
                         self._selected_people.discard(i)
                     else:
                         self._selected_people.add(i)
-
-                # Always save a fresh crop on any click (select OR re-select).
-                # This ensures the Name button always has a valid crop regardless
-                # of whether the person was previously selected.
                 if frame is not None:
                     self._extract_and_store_crop(frame, x, y, w, h)
                 return
@@ -623,68 +482,60 @@ class FaceProcessor:
     def get_selected_mask(self, frame):
         with self._lock:
             faces = list(self._detected_faces)
-            sel   = set(self._selected_people)
+            sel = set(self._selected_people)
         h, w = frame.shape[:2]
         if not sel:
             return np.ones((h, w), dtype=np.float32)
 
         pose_mask = self.poser.get_body_mask(h, w)
-        if pose_mask is not None and sel:
+        if pose_mask is not None:
             return pose_mask
 
         mask = np.zeros((h, w), dtype=np.float32)
         for i in sel:
             if i < len(faces):
                 x, y, fw, fh = faces[i]
-                y1 = max(0, y - fh//2);  y2 = min(h, y + fh * 4)
-                x1 = max(0, x - fw);     x2 = min(w, x + fw * 2)
+                y1 = max(0, y - fh//2)
+                y2 = min(h, y + fh * 4)
+                x1 = max(0, x - fw)
+                x2 = min(w, x + fw * 2)
                 mask[y1:y2, x1:x2] = 1.0
         return mask
 
-    def get_pose_skeleton(self, h, w):
-        return self.poser.get_skeleton(h, w)
-
     # ── Face naming ───────────────────────────────────────────────────────────
     def name_face(self, index, name, gender="unknown"):
-        """Name using the crop saved at last click-to-select."""
         with self._lock:
             crop = self._crop_for_naming
         if crop is None:
-            print("[NAME] No crop saved — user must click to select themselves first")
             return False
         self.recognizer.learn(crop, name, gender)
         with self._lock:
             self._crop_for_naming = None
-        print(f"[NAME] Learned: {name} gender={gender}")
         return True
 
     def name_selected_face(self, index, name, frame, gender="unknown"):
-        """Try stored crop first, fall back to live detection in current frame."""
         if self.name_face(index, name, gender):
             return True
-        print("[NAME] No stored crop — falling back to live frame detection")
         with self._lock:
             faces = list(self._detected_faces)
-            sel   = set(self._selected_people)
+            sel = set(self._selected_people)
         targets = [faces[i] for i in sel if i < len(faces)] or (faces[:1] if faces else [])
         for (x, y, w, h) in targets:
             pad = 10
-            x1 = max(0, x - pad); y1 = max(0, y - pad)
+            x1 = max(0, x - pad)
+            y1 = max(0, y - pad)
             x2 = min(frame.shape[1], x + w + pad)
             y2 = min(frame.shape[0], y + h + pad)
             crop = frame[y1:y2, x1:x2]
             if crop.size > 0:
                 self.recognizer.learn(crop, name, gender)
-                print(f"[NAME] Learned (fallback): {name} gender={gender}")
                 return True
-        print("[NAME] Failed — click your face on screen first, then use the Name button")
         return False
 
     def get_known_names(self):
         return self.recognizer.get_known_names()
 
     def get_gender_for_name(self, name):
-        """Return the registered gender for a known host, or 'unknown'."""
         return self.recognizer.get_gender_for_name(name)
 
     def forget_face(self, name):
@@ -701,22 +552,23 @@ class FaceProcessor:
                 new_names = {}
                 for i, (x, y, w, h) in enumerate(faces):
                     p = 10
-                    x1=max(0,x-p); y1=max(0,y-p)
-                    x2=min(frame.shape[1],x+w+p); y2=min(frame.shape[0],y+h+p)
+                    x1 = max(0, x-p)
+                    y1 = max(0, y-p)
+                    x2 = min(frame.shape[1], x+w+p)
+                    y2 = min(frame.shape[0], y+h+p)
                     crop = frame[y1:y2, x1:x2]
                     if crop.size > 0:
                         name, _ = self.recognizer.recognize(crop)
-                        if name: new_names[i] = name
+                        if name:
+                            new_names[i] = name
                 with self._lock:
                     self._recognized_names = new_names
             time.sleep(0.3)
 
     # ── process_frame ─────────────────────────────────────────────────────────
     def process_frame(self, frame):
-        if frame is None: return frame
-        h, w = frame.shape[:2]
-
-        self.seg.update(frame)
+        if frame is None:
+            return frame
         self.poser.update(frame)
 
         with self._det_lock:
@@ -725,8 +577,8 @@ class FaceProcessor:
             self._recog_frame = frame
 
         with self._lock:
-            sel        = set(self._selected_people)
-            names      = dict(self._recognized_names)
+            sel = set(self._selected_people)
+            names = dict(self._recognized_names)
             faces_snap = list(self._detected_faces)
 
         result = frame.copy()
@@ -736,35 +588,35 @@ class FaceProcessor:
     def _draw_overlay(self, frame, faces, selected, names):
         for i, (x, y, w, h) in enumerate(faces):
             is_sel = i in selected
-            name   = names.get(i)
-            pad    = 10
-            x1,y1  = max(0,x-pad), max(0,y-pad)
-            x2,y2  = min(frame.shape[1],x+w+pad), min(frame.shape[0],y+h+pad)
+            name = names.get(i)
+            pad = 10
+            x1, y1 = max(0, x-pad), max(0, y-pad)
+            x2, y2 = min(frame.shape[1], x+w+pad), min(frame.shape[0], y+h+pad)
 
             if is_sel:
-                color, thick = (0,220,255), 3
-                cv2.rectangle(frame,(x1-2,y1-2),(x2+2,y2+2),(0,100,120),6)
+                color, thick = (0, 220, 255), 3
+                cv2.rectangle(frame, (x1-2, y1-2), (x2+2, y2+2), (0, 100, 120), 6)
             else:
-                color, thick = (70,70,70), 1
+                color, thick = (70, 70, 70), 1
 
-            cv2.rectangle(frame,(x1,y1),(x2,y2),color,thick)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, thick)
 
             if name:
-                label, label_col, bg_col = name, (0,210,255), (0,80,100)
+                label, label_col, bg_col = name, (0, 210, 255), (0, 80, 100)
             elif is_sel:
-                label, label_col, bg_col = f"Person {i+1} ✓", (0,220,255), (0,60,80)
+                label, label_col, bg_col = f"Person {i+1}", (0, 220, 255), (0, 60, 80)
             else:
-                label, label_col, bg_col = f"Person {i+1}", (70,70,70), None
+                label, label_col, bg_col = f"Person {i+1}", (70, 70, 70), None
 
             (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.58, 2)
             lx = x1
             ly = max(th+6, y1-6)
             if bg_col:
-                cv2.rectangle(frame,(lx-2,ly-th-4),(lx+tw+6,ly+4),bg_col,-1)
+                cv2.rectangle(frame, (lx-2, ly-th-4), (lx+tw+6, ly+4), bg_col, -1)
             cv2.putText(frame, label, (lx+2, ly),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.58, label_col, 2, cv2.LINE_AA)
 
         if faces and not selected:
             cv2.putText(frame, "Click a person to select",
                         (10, frame.shape[0]-16),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,140,200), 2, cv2.LINE_AA)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 140, 200), 2, cv2.LINE_AA)

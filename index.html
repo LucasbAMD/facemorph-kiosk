@@ -3,75 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AMD ADAPT KIOSK</title>
+<title>AI Avatar Kiosk</title>
 <style>
   :root {
-    --red:  #ED1C24;
-    --dark: #0a0a0a;
-    --gray: #1a1a1a;
-    --mid:  #2a2a2a;
-    --text: #f0f0f0;
-    --cyan: #00d4ff;
-    --gold: #ffcc00;
-    --dim:  #555;
-    --green: #22dd44;
+    --bg:     #0a0a0a;
+    --card:   #141414;
+    --border: #222;
+    --text:   #f0f0f0;
+    --dim:    #666;
+    --accent: #00d4ff;
+    --red:    #ED1C24;
+    --green:  #22dd44;
+    --gold:   #ffcc00;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    height: 100%;
-    background: var(--dark);
-    color: var(--text);
-    font-family: 'Segoe UI', sans-serif;
-    overflow: hidden;
-    user-select: none;
+    height: 100%; background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden; user-select: none;
   }
   body { display: flex; flex-direction: column; }
 
-  /* ── Ticker ── */
-  #ticker-wrap {
-    height: 28px; min-height: 28px;
-    background: #000; border-bottom: 1px solid #222;
-    overflow: hidden; position: relative; flex-shrink: 0;
-  }
-  #ticker-wrap::before, #ticker-wrap::after {
-    content: ''; position: absolute; top: 0; bottom: 0;
-    width: 50px; z-index: 2; pointer-events: none;
-  }
-  #ticker-wrap::before { left: 0;  background: linear-gradient(to right, #000, transparent); }
-  #ticker-wrap::after  { right: 0; background: linear-gradient(to left,  #000, transparent); }
-  .ticker-label {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 110px;
-    display: flex; align-items: center; padding-left: 10px;
-    background: var(--red); color: white;
-    font-size: 0.6rem; font-weight: 800; letter-spacing: 2px; z-index: 3;
-  }
-  #ticker-track {
-    display: flex; align-items: center; height: 100%;
-    padding-left: 120px; white-space: nowrap;
-    animation: scroll 70s linear infinite;
-  }
-  @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-  .ti { display: inline-flex; align-items: center; gap: 6px; margin-right: 40px; font-size: 0.68rem; }
-  .ti-cat  { color: var(--red); font-weight: 700; font-size: 0.58rem; letter-spacing: 1.5px; }
-  .ti-sep  { color: #444; }
-  .ti-name { color: #ccc; }
-  .ti-dot  { color: #333; margin-right: 40px; font-size: 0.45rem; }
-
   /* ── Header ── */
   header {
-    height: 46px; min-height: 46px;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 20px; background: #111;
+    height: 52px; min-height: 52px; display: flex;
+    align-items: center; justify-content: space-between;
+    padding: 0 24px; background: #111;
     border-bottom: 2px solid var(--red); flex-shrink: 0;
   }
-  .logo { display: flex; align-items: center; gap: 10px; }
-  .logo-amd  { background: var(--red); color: #fff; font-weight: 900; font-size: 1.1rem; padding: 2px 8px; letter-spacing: 2px; }
-  .logo-text { font-size: 0.95rem; font-weight: 300; letter-spacing: 4px; color: #bbb; }
-  #ai-badge  { font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; background: #1a1a1a; border: 1px solid #444; color: #555; transition: all 0.3s; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-badge {
+    background: var(--red); color: #fff; font-weight: 900;
+    font-size: 1rem; padding: 3px 10px; letter-spacing: 2px;
+  }
+  .logo-text {
+    font-size: 1rem; font-weight: 300;
+    letter-spacing: 4px; color: #bbb;
+  }
+  #ai-badge {
+    font-size: 0.72rem; padding: 4px 12px; border-radius: 20px;
+    background: #1a1a1a; border: 1px solid #444; color: #555;
+    transition: all 0.3s;
+  }
   #ai-badge.online { border-color: var(--green); color: var(--green); }
 
-  /* ── Body ── */
-  #body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+  /* ── Layout ── */
+  #main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
   /* ── Camera panel ── */
   #cam-panel {
@@ -83,46 +60,50 @@
     object-fit: contain; display: block;
   }
 
-  /* overlays */
-  .abs-overlay {
+  /* Overlays */
+  .overlay {
     position: absolute; inset: 0; display: none;
-    flex-direction: column; align-items: center; justify-content: center;
-    gap: 16px; z-index: 10;
+    flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px; z-index: 10;
   }
-  .abs-overlay.on { display: flex; }
-  #gen-overlay    { background: rgba(0,0,0,0.78); }
-  #result-overlay { background: rgba(0,0,0,0.92); }
+  .overlay.on { display: flex; }
+  #gen-overlay { background: rgba(0,0,0,0.82); }
+  #result-overlay { background: rgba(0,0,0,0.94); }
 
   .spinner {
-    width: 50px; height: 50px;
-    border: 4px solid #333; border-top-color: var(--cyan);
-    border-radius: 50%; animation: spin 0.85s linear infinite;
+    width: 48px; height: 48px;
+    border: 4px solid #333; border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #gen-msg { color: var(--cyan); font-size: 0.95rem; letter-spacing: 1px; }
 
-  /* Result overlay */
-  #result-overlay { gap: 12px; }
+  #gen-msg { color: var(--accent); font-size: 0.95rem; letter-spacing: 1px; }
+  .progress-wrap {
+    width: 300px; max-width: 80%; background: #222;
+    border-radius: 8px; height: 6px; overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%; width: 0%; background: var(--accent);
+    border-radius: 8px; transition: width 0.4s ease;
+  }
+  #progress-label { font-size: 0.68rem; color: #555; letter-spacing: 1px; }
+  #elapsed { font-size: 0.6rem; color: #333; }
+
+  /* Result */
   #result-img { max-height: 76vh; max-width: 92%; border-radius: 8px; }
-  .result-actions { display: flex; gap: 10px; align-items: center; }
-  #result-close {
-    background: var(--red); color: #fff; border: none;
-    padding: 11px 28px; border-radius: 6px; font-size: 0.9rem;
-    cursor: pointer; font-weight: 700; letter-spacing: 1px;
+  .result-btns { display: flex; gap: 10px; }
+  .result-btns button {
+    padding: 12px 28px; border: none; border-radius: 6px;
+    font-size: 0.9rem; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer;
   }
-  #save-btn {
-    background: var(--green); color: #000; border: none;
-    padding: 11px 28px; border-radius: 6px; font-size: 0.9rem;
-    cursor: pointer; font-weight: 700; letter-spacing: 1px;
-    display: flex; align-items: center; gap: 7px;
-  }
-  #save-btn:hover   { opacity: 0.88; }
-  #save-btn.saving  { opacity: 0.5; cursor: not-allowed; }
+  #save-btn { background: var(--green); color: #000; }
+  #close-btn { background: var(--red); color: #fff; }
 
-  /* selection badges */
+  /* Selection badges */
   #sel-badge {
     position: absolute; top: 12px; left: 12px;
-    background: var(--cyan); color: #000;
+    background: var(--accent); color: #000;
     font-weight: 700; font-size: 0.8rem;
     padding: 5px 12px; border-radius: 20px;
     display: none; z-index: 5;
@@ -130,165 +111,169 @@
   #sel-badge.on { display: block; }
   #clear-btn {
     position: absolute; top: 12px; left: 12px;
-    background: transparent; color: var(--cyan);
-    border: 1px solid var(--cyan); font-size: 0.75rem;
+    background: transparent; color: var(--accent);
+    border: 1px solid var(--accent); font-size: 0.75rem;
     padding: 5px 12px; border-radius: 20px;
     cursor: pointer; display: none; z-index: 5;
   }
   #clear-btn.on { display: block; }
 
-  /* Known-face tags on camera */
-  #known-panel {
+  /* Known face tags */
+  #known-tags {
     position: absolute; bottom: 12px; left: 12px;
     display: flex; flex-wrap: wrap; gap: 5px;
     max-width: 55%; z-index: 5;
   }
   .known-tag {
     background: rgba(0,0,0,0.75); border: 1px solid var(--gold);
-    color: var(--gold); border-radius: 20px; font-size: 0.68rem;
-    padding: 3px 9px; display: flex; align-items: center; gap: 4px;
+    color: var(--gold); border-radius: 20px; font-size: 0.7rem;
+    padding: 3px 10px;
   }
-  .ktx { color: #886600; font-size: 0.6rem; cursor: pointer; margin-left: 2px; }
-  .ktx:hover { color: var(--red); }
-
-  /* name modal */
-  #name-modal-bg {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
-    display: none; align-items: center; justify-content: center; z-index: 50;
-  }
-  #name-modal-bg.on { display: flex; }
-  #name-dialog {
-    background: #141414; border: 1px solid var(--cyan);
-    border-radius: 12px; padding: 22px 24px; width: 300px;
-    display: flex; flex-direction: column; gap: 14px;
-    box-shadow: 0 8px 40px rgba(0,212,255,0.25);
-  }
-  #name-dialog h4 { font-size: 0.82rem; color: var(--cyan); letter-spacing: 1px; }
-  #name-dialog p  { font-size: 0.72rem; color: #888; line-height: 1.5; }
-  #name-input {
-    background: #1a1a1a; border: 1px solid #444; border-radius: 6px;
-    color: #fff; padding: 9px 12px; font-size: 0.95rem; outline: none; width: 100%;
-  }
-  #name-input:focus { border-color: var(--cyan); }
-  .nd-btns { display: flex; gap: 8px; }
-  .nd-btns button { flex: 1; padding: 9px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 700; }
-  #nd-save   { background: var(--cyan); color: #000; }
-  #nd-cancel { background: #2a2a2a; color: #ccc; }
 
   /* ── Sidebar ── */
   #sidebar {
-    width: 272px; min-width: 272px;
-    background: var(--gray); border-left: 1px solid #2a2a2a;
+    width: 280px; min-width: 280px; background: var(--card);
+    border-left: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden;
   }
   .sec-title {
-    font-size: 0.58rem; letter-spacing: 3px; color: var(--dim);
-    text-transform: uppercase; padding: 12px 16px 8px;
-    border-bottom: 1px solid #222; flex-shrink: 0;
+    font-size: 0.6rem; letter-spacing: 3px; color: var(--dim);
+    text-transform: uppercase; padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
 
-  /* ── Known Hosts panel ── */
+  /* Known hosts */
   #hosts-section {
-    padding: 10px 12px 8px;
-    border-bottom: 1px solid #222;
-    flex-shrink: 0;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
-  #hosts-section .sec-title {
-    padding: 0 0 8px; border-bottom: none; font-size: 0.55rem;
-  }
+  #hosts-section .sec-title { padding: 0 0 8px; border-bottom: none; }
   #hosts-list {
     display: flex; flex-direction: column; gap: 5px;
-    max-height: 130px; overflow-y: auto;
+    max-height: 120px; overflow-y: auto;
   }
   .host-row {
     display: flex; align-items: center; justify-content: space-between;
-    background: #222; border-radius: 6px; padding: 7px 10px;
-    border: 1px solid #2e2e2e;
+    background: #1a1a1a; border-radius: 6px; padding: 7px 10px;
+    border: 1px solid #252525;
   }
+  .host-row.here { border-color: var(--gold); background: rgba(255,204,0,0.04); }
   .host-info { display: flex; align-items: center; gap: 8px; }
   .host-avatar {
     width: 28px; height: 28px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--cyan), #0066aa);
+    background: linear-gradient(135deg, var(--accent), #0066aa);
     display: flex; align-items: center; justify-content: center;
     font-size: 0.75rem; font-weight: 700; color: #000; flex-shrink: 0;
   }
-  .host-name  { font-size: 0.8rem; font-weight: 600; }
-  .host-sub   { font-size: 0.62rem; color: #666; }
-  .host-seen  { font-size: 0.58rem; color: var(--green); }
+  .host-name { font-size: 0.8rem; font-weight: 600; }
+  .host-row.here .host-name { color: var(--gold); }
+  .host-status { font-size: 0.6rem; color: #555; }
+  .host-row.here .host-status { color: var(--green); }
   .host-del {
-    background: transparent; border: none; color: #555;
-    font-size: 0.7rem; cursor: pointer; padding: 3px 5px; border-radius: 4px;
+    background: transparent; border: none; color: #444;
+    font-size: 0.7rem; cursor: pointer; padding: 3px 5px;
   }
-  .host-del:hover { color: var(--red); background: rgba(237,28,36,0.1); }
+  .host-del:hover { color: var(--red); }
   #add-host-btn {
     width: 100%; margin-top: 7px; padding: 7px;
     background: transparent; border: 1px dashed #333;
     color: #555; border-radius: 6px; font-size: 0.72rem;
-    cursor: pointer; letter-spacing: 1px; transition: all 0.15s;
+    cursor: pointer; letter-spacing: 1px;
   }
-  #add-host-btn:hover { border-color: var(--cyan); color: var(--cyan); }
-  .host-row.recognized {
-    border-color: var(--gold);
-    background: rgba(255,204,0,0.05);
-  }
-  .host-row.recognized .host-name { color: var(--gold); }
+  #add-host-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ── Character grid ── */
-  #char-grid {
+  /* ── Style grid ── */
+  .sec-title.styles { border-bottom: none; padding-bottom: 6px; }
+  #style-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 7px; padding: 10px; overflow-y: auto; flex: 1;
+    gap: 8px; padding: 0 14px 14px; flex-shrink: 0;
   }
-  .cc {
-    background: var(--mid); border: 2px solid #333; border-radius: 8px;
-    padding: 10px 6px; text-align: center; cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+  .style-card {
+    background: #1a1a1a; border: 2px solid #2a2a2a; border-radius: 10px;
+    padding: 16px 8px; text-align: center; cursor: pointer;
+    transition: all 0.15s;
   }
-  .cc:hover  { border-color: #555; background: #333; }
-  .cc.active { border-color: var(--cyan); background: rgba(0,212,255,0.08); }
-  .cc-emoji { font-size: 1.5rem; margin-bottom: 4px; }
-  .cc-name  { font-size: 0.73rem; font-weight: 600; }
-  .cc-sub   { font-size: 0.57rem; color: var(--dim); margin-top: 2px; }
-  .cc.ready .cc-name::after { content: " ✦"; color: var(--cyan); font-size: 0.58rem; }
+  .style-card:hover { border-color: #444; background: #222; }
+  .style-card.active { border-color: var(--accent); background: rgba(0,212,255,0.06); }
+  .style-card.active .style-name { color: var(--accent); }
+  .style-emoji { font-size: 2rem; margin-bottom: 6px; }
+  .style-name { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.5px; }
+  .style-sub { font-size: 0.6rem; color: var(--dim); margin-top: 3px; }
+  .style-card.ready .style-name::after {
+    content: " \2726"; color: var(--accent); font-size: 0.6rem;
+  }
 
-  /* ── Transform section ── */
-  #xform-section {
-    padding: 12px; border-top: 1px solid #222; flex-shrink: 0;
+  /* ── Transform button area ── */
+  #action-section {
+    padding: 14px; border-top: 1px solid var(--border);
+    flex-shrink: 0; margin-top: auto;
   }
   #sel-status {
-    font-size: 0.68rem; color: var(--dim);
-    text-align: center; padding: 6px 0 4px; min-height: 20px;
+    font-size: 0.7rem; color: var(--dim);
+    text-align: center; padding: 0 0 10px; min-height: 18px;
   }
-  #sel-status.has { color: var(--cyan); }
-  .action-btns { display: flex; flex-direction: column; gap: 7px; }
+  #sel-status.has { color: var(--accent); }
   #name-btn {
-    width: 100%; padding: 9px;
-    background: transparent; color: var(--cyan);
-    border: 1px solid var(--cyan); border-radius: 8px;
-    font-size: 0.8rem; font-weight: 700; letter-spacing: 1px;
+    width: 100%; padding: 9px; margin-bottom: 8px;
+    background: transparent; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 8px;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 1px;
     cursor: pointer; display: none; text-transform: uppercase;
-    transition: background 0.15s;
   }
-  #name-btn:hover { background: rgba(0,212,255,0.08); }
-  #xform-btn {
-    width: 100%; padding: 14px;
-    background: var(--red); color: #fff; border: none;
-    border-radius: 8px; font-size: 0.92rem; font-weight: 700;
-    letter-spacing: 2px; cursor: pointer; text-transform: uppercase;
+  #name-btn:hover { background: rgba(0,212,255,0.06); }
+  #transform-btn {
+    width: 100%; padding: 16px;
+    background: linear-gradient(135deg, var(--red), #cc1520);
+    color: #fff; border: none; border-radius: 10px;
+    font-size: 1rem; font-weight: 800; letter-spacing: 2px;
+    cursor: pointer; text-transform: uppercase;
     transition: opacity 0.15s;
   }
-  #xform-btn:hover    { opacity: 0.88; }
-  #xform-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  #transform-btn:hover { opacity: 0.9; }
+  #transform-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  /* toast */
+  /* Name modal */
+  #name-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+  }
+  #name-modal.on { display: flex; }
+  #name-dialog {
+    background: var(--card); border: 1px solid var(--accent);
+    border-radius: 12px; padding: 22px 24px; width: 300px;
+    display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 8px 40px rgba(0,212,255,0.2);
+  }
+  #name-dialog h4 { font-size: 0.85rem; color: var(--accent); letter-spacing: 1px; }
+  #name-dialog p { font-size: 0.72rem; color: #888; line-height: 1.5; }
+  #name-input {
+    background: #1a1a1a; border: 1px solid #444; border-radius: 6px;
+    color: #fff; padding: 10px 12px; font-size: 0.95rem; outline: none; width: 100%;
+  }
+  #name-input:focus { border-color: var(--accent); }
+  .gender-row {
+    display: flex; gap: 10px; align-items: center;
+    font-size: 0.75rem; color: #888;
+  }
+  .gender-row label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .dialog-btns { display: flex; gap: 8px; }
+  .dialog-btns button {
+    flex: 1; padding: 10px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 0.82rem; font-weight: 700;
+  }
+  #nd-save { background: var(--accent); color: #000; }
+  #nd-cancel { background: #2a2a2a; color: #ccc; }
+
+  /* Toast */
   #toast {
-    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-    color: #fff; padding: 9px 22px; border-radius: 8px;
-    font-size: 0.82rem; display: none; z-index: 99; white-space: nowrap;
-    pointer-events: none;
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    color: #fff; padding: 10px 24px; border-radius: 8px;
+    font-size: 0.82rem; display: none; z-index: 99;
+    white-space: nowrap; pointer-events: none;
   }
   #toast.on { display: block; }
 
-  /* scrollbar */
+  /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
@@ -296,101 +281,84 @@
 </head>
 <body>
 
-<!-- Ticker -->
-<div id="ticker-wrap">
-  <div class="ticker-label">AMD STACK</div>
-  <div id="ticker-track"></div>
-</div>
-
 <!-- Header -->
 <header>
   <div class="logo">
-    <span class="logo-amd">AMD</span>
-    <span class="logo-text">ADAPT KIOSK</span>
+    <span class="logo-badge">AMD</span>
+    <span class="logo-text">AI AVATAR KIOSK</span>
   </div>
-  <div id="ai-badge">AI ENGINE ●</div>
+  <div id="ai-badge">AI ENGINE</div>
 </header>
 
-<!-- Main body -->
-<div id="body">
+<!-- Main -->
+<div id="main">
 
   <!-- Camera -->
   <div id="cam-panel">
     <img id="feed" src="/video_feed" alt="Live Feed">
-
     <div id="sel-badge"></div>
-    <button id="clear-btn" onclick="clearSel()">✕ Clear</button>
-    <div id="known-panel"></div>
+    <button id="clear-btn" onclick="clearSel()">Clear</button>
+    <div id="known-tags"></div>
 
-    <!-- Generating -->
-    <div id="gen-overlay" class="abs-overlay">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;max-width:90%;">
-        <div class="spinner"></div>
-        <div id="gen-msg" style="color:var(--cyan);font-size:0.95rem;letter-spacing:1px;">Transforming...</div>
-        <div style="width:100%;background:#222;border-radius:8px;height:8px;overflow:hidden;">
-          <div id="gen-progress-bar" style="height:100%;width:0%;background:var(--cyan);border-radius:8px;transition:width 0.4s ease;"></div>
-        </div>
-        <div id="gen-progress-label" style="font-size:0.68rem;color:#555;letter-spacing:1px;">Starting AI engine...</div>
-        <div id="gen-elapsed" style="font-size:0.62rem;color:#333;">0s</div>
-      </div>
+    <!-- Generating overlay -->
+    <div id="gen-overlay" class="overlay">
+      <div class="spinner"></div>
+      <div id="gen-msg">Creating your avatar...</div>
+      <div class="progress-wrap"><div id="progress-bar"></div></div>
+      <div id="progress-label">Starting AI engine...</div>
+      <div id="elapsed">0s</div>
     </div>
 
-    <!-- Result -->
-    <div id="result-overlay" class="abs-overlay">
+    <!-- Result overlay -->
+    <div id="result-overlay" class="overlay">
       <img id="result-img" src="" alt="Result">
-      <div class="result-actions">
-        <button id="save-btn" onclick="savePhoto()">💾 Save Photo</button>
-        <button id="result-close" onclick="closeResult()">← Back to Camera</button>
+      <div class="result-btns">
+        <button id="save-btn" onclick="savePhoto()">Save Photo</button>
+        <button id="close-btn" onclick="closeResult()">Back to Camera</button>
       </div>
     </div>
   </div>
 
   <!-- Sidebar -->
   <div id="sidebar">
-
     <!-- Known Hosts -->
     <div id="hosts-section">
-      <div class="sec-title">👥 Known Hosts</div>
+      <div class="sec-title">Known Hosts</div>
       <div id="hosts-list">
         <div style="font-size:0.68rem;color:#444;padding:6px 2px;">
-          No hosts saved yet — click your face on screen, then click "Name Selected Person".
+          No hosts yet. Click your face, then "Register Face".
         </div>
       </div>
       <button id="add-host-btn" onclick="nameSelected()">+ Register Your Face</button>
     </div>
 
-    <div class="sec-title">Choose Character</div>
-    <div id="char-grid"></div>
+    <!-- Style selector -->
+    <div class="sec-title styles">Choose Your Style</div>
+    <div id="style-grid"></div>
 
-    <div id="xform-section">
+    <!-- Actions -->
+    <div id="action-section">
       <div id="sel-status">Select a person to transform</div>
-      <div class="action-btns">
-        <button id="name-btn" onclick="nameSelected()">👤 Name Selected Person</button>
-        <button id="xform-btn" onclick="doTransform()">⚡ TRANSFORM ME</button>
-      </div>
+      <button id="name-btn" onclick="nameSelected()">Name Selected Person</button>
+      <button id="transform-btn" onclick="doTransform()">GENERATE AVATAR</button>
     </div>
   </div>
-
 </div>
 
 <!-- Name dialog -->
-<div id="name-modal-bg">
+<div id="name-modal">
   <div id="name-dialog">
-    <h4>👤 REGISTER YOUR FACE</h4>
-    <p>Enter your name and the kiosk will recognize you automatically every time you step in front of the camera.</p>
+    <h4>REGISTER YOUR FACE</h4>
+    <p>Enter your name and the kiosk will recognize you automatically.</p>
     <input id="name-input" type="text" placeholder="Enter your name..." maxlength="30"
            onkeydown="if(event.key==='Enter') saveName()">
-    <div style="display:flex;gap:8px;align-items:center;margin-top:2px;">
-      <span style="font-size:0.72rem;color:#888;">I am:</span>
-      <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;">
-        <input type="radio" name="nd-gender" value="male" id="nd-male"> Male
-      </label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;cursor:pointer;">
-        <input type="radio" name="nd-gender" value="female" id="nd-female"> Female
-      </label>
+    <div class="gender-row">
+      <span>I am:</span>
+      <label><input type="radio" name="nd-gender" value="male"> Male</label>
+      <label><input type="radio" name="nd-gender" value="female"> Female</label>
     </div>
-    <div class="nd-btns">
-      <button id="nd-save"   onclick="saveName()">✓ Save</button>
+    <div class="dialog-btns">
+      <button id="nd-save" onclick="saveName()">Save</button>
       <button id="nd-cancel" onclick="closeName()">Cancel</button>
     </div>
   </div>
@@ -399,97 +367,71 @@
 <div id="toast"></div>
 
 <script>
-// ── Ticker ────────────────────────────────────────────────────────────────────
-const STACK = [
-  ["CPU",      "AMD Threadripper PRO 9995X  ·  96 Cores / 192 Threads  ·  5.1 GHz Boost"],
-  ["GPU",      "AMD Radeon PRO W7900  ·  48 GB GDDR6  ·  RDNA3  ·  gfx1100"],
-  ["PLATFORM", "ROCm 6.2  ·  HIP Runtime  ·  HSA  ·  DirectML"],
-  ["AI MODEL", "SDXL-Turbo  ·  Stable Diffusion XL 1.0 FP16  ·  4-step inference"],
-  ["AI MODEL", "ControlNet LoRA Canny Rank-128  ·  Pose-guided generation"],
-  ["ENGINE",   "ComfyUI v0.3.10  ·  AMD-optimized pipeline  ·  REST API"],
-  ["VISION",   "OpenCV  ·  Haar Cascade Face Detection  ·  LBPH Face Recognition"],
-  ["VISION",   "rembg  ·  u2net-human-seg  ·  Real-time body segmentation"],
-  ["VISION",   "MediaPipe  ·  33-point pose skeleton tracking"],
-  ["BACKEND",  "FastAPI  ·  Uvicorn ASGI  ·  MJPEG stream  ·  60fps"],
-  ["OS",       "Ubuntu 24.04 LTS  ·  ROCm 6.2 kernel driver  ·  HSA Runtime"],
-  ["CAMERA",   "Logitech Brio 4K  ·  1080p @ 60fps  ·  USB 3.0"],
-];
-(function buildTicker() {
-  const t = [...STACK, ...STACK].map(([cat, name]) =>
-    `<span class="ti"><span class="ti-cat">${cat}</span><span class="ti-sep">▸</span><span class="ti-name">${name}</span></span><span class="ti-dot">◆</span>`
-  ).join("");
-  document.getElementById("ticker-track").innerHTML = t;
-})();
-
-// ── Characters ────────────────────────────────────────────────────────────────
-const CHARS = [
-  { key:"navi",       emoji:"🔵", name:"Na'vi",     sub:"Avatar · Pandora" },
-  { key:"hulk",       emoji:"💚", name:"Hulk",       sub:"Gamma · Avengers" },
-  { key:"thanos",     emoji:"💜", name:"Thanos",     sub:"Infinity · Titan" },
-  { key:"predator",   emoji:"👁️", name:"Predator",   sub:"Thermal · Cloaked" },
-  { key:"ghost",      emoji:"👻", name:"Ghost",      sub:"Spectral · Ethereal" },
-  { key:"groot",      emoji:"🌿", name:"Groot",      sub:"Guardians · Flora" },
-  { key:"cyberpunk",  emoji:"🤖", name:"Cyberpunk",  sub:"Neon · Chrome" },
-  { key:"claymation", emoji:"🪆", name:"Claymation", sub:"Clay · Stop Motion" },
-  { key:"anime",      emoji:"✨", name:"Anime",       sub:"Ghibli · Cel Shaded" },
+// ── Styles ───────────────────────────────────────────────────────────────────
+const STYLES = [
+  { key: "avatar",     emoji: "\uD83D\uDD35", name: "Avatar",     sub: "Blue Alien \u00B7 Pandora" },
+  { key: "claymation", emoji: "\uD83C\uDFA8", name: "Claymation", sub: "Clay \u00B7 Stop Motion" },
+  { key: "anime",      emoji: "\u2728",       name: "Anime",      sub: "Ghibli \u00B7 Cel Shaded" },
+  { key: "ghost",      emoji: "\uD83D\uDC7B", name: "Ghost",      sub: "Spectral \u00B7 Ethereal" },
 ];
 
-let selectedChar   = "navi";
-let selCount       = 0;
-let faceCount      = 0;
+let selectedStyle = "avatar";
+let selCount = 0;
+let faceCount = 0;
 let pendingNameIdx = null;
-let pollTimer      = null;
-let lastFaces      = [];
-let currentResultDataUrl = null;  // holds the latest AI result for saving
+let pollTimer = null;
+let lastFaces = [];
+let currentResultDataUrl = null;
+let recognizedNow = new Set();
 
-// ── Character grid ────────────────────────────────────────────────────────────
-function buildCharGrid(aiReady) {
-  const grid = document.getElementById("char-grid");
-  grid.innerHTML = CHARS.map(c => `
-    <div class="cc${c.key === selectedChar ? " active" : ""}${aiReady ? " ready" : ""}"
-         onclick="selectChar('${c.key}', this)" data-key="${c.key}">
-      <div class="cc-emoji">${c.emoji}</div>
-      <div class="cc-name">${c.name}</div>
-      <div class="cc-sub">${c.sub}</div>
+// ── Build style grid ─────────────────────────────────────────────────────────
+function buildStyleGrid(aiReady) {
+  const grid = document.getElementById("style-grid");
+  grid.innerHTML = STYLES.map(s => `
+    <div class="style-card${s.key === selectedStyle ? " active" : ""}${aiReady ? " ready" : ""}"
+         onclick="selectStyle('${s.key}', this)" data-key="${s.key}">
+      <div class="style-emoji">${s.emoji}</div>
+      <div class="style-name">${s.name}</div>
+      <div class="style-sub">${s.sub}</div>
     </div>`).join("");
 }
 
-function selectChar(key, el) {
-  selectedChar = key;
-  document.querySelectorAll(".cc").forEach(c => c.classList.remove("active"));
+function selectStyle(key, el) {
+  selectedStyle = key;
+  document.querySelectorAll(".style-card").forEach(c => c.classList.remove("active"));
   el.classList.add("active");
 }
 
-// ── AI status ─────────────────────────────────────────────────────────────────
-async function checkComfy() {
+// ── AI status ────────────────────────────────────────────────────────────────
+async function checkAI() {
   try {
     const r = await fetch("/comfy_status");
     const d = await r.json();
     const b = document.getElementById("ai-badge");
-    b.textContent = d.available ? "AI ENGINE ●" : "AI ENGINE ○";
+    b.textContent = d.available ? "AI ENGINE READY" : "AI ENGINE LOADING...";
     b.classList.toggle("online", !!d.available);
     return d.available;
-  } catch(e) { return false; }
+  } catch { return false; }
 }
 
-// ── Click to select person ────────────────────────────────────────────────────
+// ── Click to select person ───────────────────────────────────────────────────
 function getImageCoords(e) {
   const feed = document.getElementById("feed");
   const rect = feed.getBoundingClientRect();
-  const natW = feed.naturalWidth  || 1280;
+  const natW = feed.naturalWidth || 1280;
   const natH = feed.naturalHeight || 720;
   const imgAR = natW / natH;
   const boxAR = rect.width / rect.height;
   let imgW, imgH, offX, offY;
   if (imgAR > boxAR) {
-    imgW = rect.width;  imgH = rect.width / imgAR;
-    offX = 0;           offY = (rect.height - imgH) / 2;
+    imgW = rect.width; imgH = rect.width / imgAR;
+    offX = 0; offY = (rect.height - imgH) / 2;
   } else {
     imgH = rect.height; imgW = rect.height * imgAR;
     offX = (rect.width - imgW) / 2; offY = 0;
   }
   const cx = e.clientX - rect.left - offX;
-  const cy = e.clientY - rect.top  - offY;
+  const cy = e.clientY - rect.top - offY;
   if (cx < 0 || cy < 0 || cx > imgW || cy > imgH) return null;
   return { clickX: cx, clickY: cy, frameW: imgW, frameH: imgH };
 }
@@ -499,7 +441,7 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
   if (e.target.id === "result-img") return;
   if (document.getElementById("result-overlay").classList.contains("on")) return;
   if (document.getElementById("gen-overlay").classList.contains("on")) return;
-  if (document.getElementById("name-modal-bg").classList.contains("on")) { closeName(); return; }
+  if (document.getElementById("name-modal").classList.contains("on")) { closeName(); return; }
 
   const coords = getImageCoords(e);
   if (!coords) return;
@@ -511,294 +453,257 @@ document.getElementById("cam-panel").addEventListener("click", async function(e)
   fd.append("frame_h", coords.frameH);
 
   try {
-    const r    = await fetch("/select_person", { method:"POST", body:fd });
+    const r = await fetch("/select_person", { method: "POST", body: fd });
     const data = await r.json();
     updateSelUI(data.faces);
-    // Do NOT auto-open the name dialog here — the crop is saved server-side
-    // during toggle_person(), but the response hasn't fully round-tripped yet.
-    // The user should click "Name Selected Person" after selecting themselves.
-  } catch(err) {}
+  } catch {}
 });
 
-// ── Selection UI ──────────────────────────────────────────────────────────────
+// ── Selection UI ─────────────────────────────────────────────────────────────
 function updateSelUI(faces) {
   lastFaces = faces || [];
   faceCount = lastFaces.length;
-  selCount  = lastFaces.filter(f => f.selected).length;
+  selCount = lastFaces.filter(f => f.selected).length;
 
-  const badge   = document.getElementById("sel-badge");
-  const clrBtn  = document.getElementById("clear-btn");
-  const status  = document.getElementById("sel-status");
+  const badge = document.getElementById("sel-badge");
+  const clrBtn = document.getElementById("clear-btn");
+  const status = document.getElementById("sel-status");
   const nameBtn = document.getElementById("name-btn");
 
   if (selCount > 0) {
-    badge.textContent = `${selCount} selected`;
+    badge.textContent = selCount + " selected";
     badge.classList.add("on");
     clrBtn.classList.add("on");
-    status.textContent = `Transforming ${selCount} of ${faceCount} person${faceCount > 1 ? "s" : ""}`;
+    status.textContent = "Ready to generate avatar";
     status.className = "has";
     nameBtn.style.display = "block";
   } else {
     badge.classList.remove("on");
     clrBtn.classList.remove("on");
-    status.textContent = faceCount > 0 ? "Tap a person to select" : "Select a person to transform";
+    status.textContent = faceCount > 0 ? "Click a person to select" : "No faces detected";
     status.className = "";
     nameBtn.style.display = "none";
   }
 }
 
 async function clearSel() {
-  await fetch("/clear_selection", { method:"POST" });
+  await fetch("/clear_selection", { method: "POST" });
   updateSelUI([]);
 }
 
-// ── Name dialog ───────────────────────────────────────────────────────────────
+// ── Name dialog ──────────────────────────────────────────────────────────────
 function nameSelected() {
   const face = lastFaces.find(f => f.selected);
   if (face) {
-    openNameDialog(face);
+    pendingNameIdx = face.index;
+    document.getElementById("name-input").value = face.name || "";
+    document.getElementById("name-modal").classList.add("on");
+    setTimeout(() => document.getElementById("name-input").focus(), 80);
   } else {
-    toast("Click your face on the camera first, then use this button");
+    toast("Click your face on the camera first");
   }
 }
 
-function openNameDialog(face) {
-  pendingNameIdx = face.index;
-  document.getElementById("name-input").value = face.name || "";
-  document.getElementById("name-modal-bg").classList.add("on");
-  setTimeout(() => document.getElementById("name-input").focus(), 80);
-}
-
 function closeName() {
-  document.getElementById("name-modal-bg").classList.remove("on");
+  document.getElementById("name-modal").classList.remove("on");
   pendingNameIdx = null;
 }
 
 async function saveName() {
   const name = document.getElementById("name-input").value.trim();
   if (!name) { toast("Please enter a name"); return; }
-  if (pendingNameIdx === null) { toast("No person selected"); closeName(); return; }
+  if (pendingNameIdx === null) { closeName(); return; }
 
   const genderEl = document.querySelector('input[name="nd-gender"]:checked');
-  const gender   = genderEl ? genderEl.value : "unknown";
+  const gender = genderEl ? genderEl.value : "unknown";
 
   const fd = new FormData();
-  fd.append("index",  pendingNameIdx);
-  fd.append("name",   name);
+  fd.append("index", pendingNameIdx);
+  fd.append("name", name);
   fd.append("gender", gender);
 
   try {
-    const r    = await fetch("/name_face", { method:"POST", body:fd });
+    const r = await fetch("/name_face", { method: "POST", body: fd });
     const data = await r.json();
     if (data.status === "ok") {
-      const gLabel = gender !== "unknown" ? ` (${gender})` : "";
-      toast(`✓ ${name}${gLabel} saved — will be recognized automatically`, "ok");
-      refreshKnownHosts();
+      toast("Saved! " + name + " will be recognized automatically", "ok");
+      refreshHosts();
       closeName();
     } else {
-      toast("Could not save — click your face on screen first, then try again");
+      toast("Could not save - click your face first");
     }
-  } catch(e) {
-    toast("Connection error: " + e.message);
+  } catch (e) {
+    toast("Connection error");
   }
 }
 
-document.getElementById("name-modal-bg").addEventListener("click", function(e) {
+document.getElementById("name-modal").addEventListener("click", function(e) {
   if (e.target === this) closeName();
 });
 
-// ── Known Hosts panel ─────────────────────────────────────────────────────────
-// Tracks which names were recently spotted by the recognition engine
-let recognizedNow = new Set();
-
-async function refreshKnownHosts() {
+// ── Known Hosts ──────────────────────────────────────────────────────────────
+async function refreshHosts() {
   try {
-    const r    = await fetch("/known_names");
+    const r = await fetch("/known_names");
     const data = await r.json();
     const names = Object.values(data.names);
-    const list  = document.getElementById("hosts-list");
-    const camPanel = document.getElementById("known-panel");
+    const list = document.getElementById("hosts-list");
+    const tags = document.getElementById("known-tags");
 
     if (names.length === 0) {
-      list.innerHTML = `<div style="font-size:0.68rem;color:#444;padding:6px 2px;">
-        No hosts saved yet — click your face on screen, then click "Name Selected Person".
-      </div>`;
-      camPanel.innerHTML = "";
+      list.innerHTML = '<div style="font-size:0.68rem;color:#444;padding:6px 2px;">No hosts yet.</div>';
+      tags.innerHTML = "";
       return;
     }
 
-    // Sidebar host rows
     list.innerHTML = names.map(n => {
       const initials = n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-      const isHere   = recognizedNow.has(n);
+      const here = recognizedNow.has(n);
       return `
-        <div class="host-row${isHere ? " recognized" : ""}">
+        <div class="host-row${here ? " here" : ""}">
           <div class="host-info">
             <div class="host-avatar">${initials}</div>
             <div>
               <div class="host-name">${n}</div>
-              <div class="${isHere ? "host-seen" : "host-sub"}">${isHere ? "● In frame now" : "Not detected"}</div>
+              <div class="host-status">${here ? "In frame" : "Not detected"}</div>
             </div>
           </div>
-          <button class="host-del" onclick="forgetHost('${n}', event)" title="Remove ${n}">✕</button>
+          <button class="host-del" onclick="forgetHost('${n}',event)">x</button>
         </div>`;
     }).join("");
 
-    // Camera overlay tags (gold badges)
-    camPanel.innerHTML = names.filter(n => recognizedNow.has(n)).map(n =>
-      `<div class="known-tag">👤 ${n}<span class="ktx" onclick="forgetHost('${n}',event)">✕</span></div>`
+    tags.innerHTML = names.filter(n => recognizedNow.has(n)).map(n =>
+      `<div class="known-tag">${n}</div>`
     ).join("");
-
-  } catch(e) {}
+  } catch {}
 }
 
 async function forgetHost(name, e) {
   e.stopPropagation();
-  if (!confirm(`Remove ${name} from the kiosk? They will need to register again.`)) return;
+  if (!confirm("Remove " + name + "?")) return;
   const fd = new FormData();
   fd.append("name", name);
-  await fetch("/forget_face", { method:"POST", body:fd });
+  await fetch("/forget_face", { method: "POST", body: fd });
   recognizedNow.delete(name);
-  toast(`Removed ${name}`);
-  refreshKnownHosts();
+  toast("Removed " + name);
+  refreshHosts();
 }
 
-// Poll the /faces endpoint to track who's currently recognized in frame
 async function pollRecognized() {
   try {
-    const r    = await fetch("/faces");
+    const r = await fetch("/faces");
     const data = await r.json();
     const prev = new Set(recognizedNow);
     recognizedNow.clear();
     (data.faces || []).forEach(f => { if (f.name) recognizedNow.add(f.name); });
 
-    // Re-render hosts panel if recognized set changed
     let changed = recognizedNow.size !== prev.size;
-    if (!changed) { for (const n of recognizedNow) { if (!prev.has(n)) { changed = true; break; } } }
-    if (changed) refreshKnownHosts();
-  } catch(e) {}
+    if (!changed) for (const n of recognizedNow) if (!prev.has(n)) { changed = true; break; }
+    if (changed) refreshHosts();
+  } catch {}
 }
 
-// ── Save photo ────────────────────────────────────────────────────────────────
+// ── Save photo ───────────────────────────────────────────────────────────────
 function savePhoto() {
   if (!currentResultDataUrl) return;
-  const btn = document.getElementById("save-btn");
-  btn.classList.add("saving");
-  btn.textContent = "Saving...";
-
-  // Build filename: character + timestamp
-  const ts   = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const name = `kiosk_${selectedChar}_${ts}.jpg`;
-
-  // Trigger browser download
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const name = "avatar_" + selectedStyle + "_" + ts + ".jpg";
   const a = document.createElement("a");
-  a.href     = currentResultDataUrl;
+  a.href = currentResultDataUrl;
   a.download = name;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-
-  setTimeout(() => {
-    btn.classList.remove("saving");
-    btn.innerHTML = "💾 Save Photo";
-    toast("✓ Photo saved!", "ok");
-  }, 600);
+  toast("Photo saved!", "ok");
 }
 
-// ── Transform + progress ──────────────────────────────────────────────────────
-let genStartTime   = 0;
-let progressTimer  = null;
-let elapsedTimer   = null;
-
-// Fake-progress model: generation takes ~30-60s depending on character.
-// We advance a synthetic progress bar and update it with real queue state.
-// Stages: uploading (5%), generating pass1 (5→65%), upscaling (65→80%),
-//         refining pass2 (80→95%), decoding (95→99%), done (100%).
-const PROGRESS_STAGES = [
-  { pct: 5,   label: "Uploading frame..." },
-  { pct: 25,  label: "Generating character..." },
-  { pct: 50,  label: "Refining details..." },
-  { pct: 75,  label: "Almost there..." },
-  { pct: 90,  label: "Decoding image..." },
-  { pct: 97,  label: "Finishing up..." },
-];
+// ── Transform + progress ─────────────────────────────────────────────────────
+let genStart = 0;
+let progressTmr = null;
+let elapsedTmr = null;
 let stageIdx = 0;
 
+const STAGES = [
+  { pct: 5,  label: "Analyzing face..." },
+  { pct: 20, label: "Generating avatar..." },
+  { pct: 45, label: "Applying style..." },
+  { pct: 65, label: "Refining details..." },
+  { pct: 82, label: "Almost there..." },
+  { pct: 95, label: "Final touches..." },
+];
+const STAGE_TIMES = [1500, 3000, 4000, 4000, 3000, 3000];
+
 function setProgress(pct, label) {
-  document.getElementById("gen-progress-bar").style.width = pct + "%";
-  if (label) document.getElementById("gen-progress-label").textContent = label;
+  document.getElementById("progress-bar").style.width = pct + "%";
+  if (label) document.getElementById("progress-label").textContent = label;
 }
 
-function startProgressAnimation() {
-  stageIdx     = 0;
-  genStartTime = Date.now();
+function startProgress() {
+  stageIdx = 0;
+  genStart = Date.now();
   setProgress(0, "Starting AI engine...");
 
-  const stageDurations = [2000, 6000, 8000, 6000, 4000, 3000];
-  function advanceStage() {
-    if (stageIdx >= PROGRESS_STAGES.length) return;
-    const s = PROGRESS_STAGES[stageIdx];
+  function advance() {
+    if (stageIdx >= STAGES.length) return;
+    const s = STAGES[stageIdx];
     setProgress(s.pct, s.label);
     stageIdx++;
-    if (stageIdx < PROGRESS_STAGES.length) {
-      progressTimer = setTimeout(advanceStage, stageDurations[stageIdx - 1] || 4000);
-    }
+    if (stageIdx < STAGES.length)
+      progressTmr = setTimeout(advance, STAGE_TIMES[stageIdx - 1] || 3000);
   }
-  advanceStage();
+  advance();
 
-  // Elapsed timer
-  elapsedTimer = setInterval(() => {
-    const s = Math.floor((Date.now() - genStartTime) / 1000);
-    document.getElementById("gen-elapsed").textContent = s + "s";
+  elapsedTmr = setInterval(() => {
+    const s = Math.floor((Date.now() - genStart) / 1000);
+    document.getElementById("elapsed").textContent = s + "s";
   }, 1000);
 }
 
-function stopProgressAnimation() {
-  if (progressTimer)  { clearTimeout(progressTimer);   progressTimer = null; }
-  if (elapsedTimer)   { clearInterval(elapsedTimer);   elapsedTimer  = null; }
+function stopProgress() {
+  if (progressTmr) { clearTimeout(progressTmr); progressTmr = null; }
+  if (elapsedTmr) { clearInterval(elapsedTmr); elapsedTmr = null; }
 }
 
 async function doTransform() {
-  const btn = document.getElementById("xform-btn");
+  const btn = document.getElementById("transform-btn");
   btn.disabled = true;
 
-  const online = await checkComfy();
+  const online = await checkAI();
   if (!online) {
-    toast("AI Engine offline — start the kiosk with python start.py");
+    toast("AI Engine still loading - please wait");
     btn.disabled = false;
     return;
   }
 
   document.getElementById("gen-overlay").classList.add("on");
-  document.getElementById("gen-msg").textContent = selCount > 0
-    ? `Transforming ${selCount} person${selCount > 1 ? "s" : ""}...`
-    : "Transforming...";
-  startProgressAnimation();
+  document.getElementById("gen-msg").textContent =
+    "Creating your " + STYLES.find(s => s.key === selectedStyle).name + " avatar...";
+  startProgress();
 
   const fd = new FormData();
-  fd.append("character", selectedChar);
+  fd.append("character", selectedStyle);
   try {
-    const r = await fetch("/generate", { method:"POST", body:fd });
+    const r = await fetch("/generate", { method: "POST", body: fd });
     if (r.status === 400) {
       const d = await r.json();
-      stopProgressAnimation();
-      hideSpinner();
-      toast(d.detail || "Select at least one person first");
+      stopProgress();
+      document.getElementById("gen-overlay").classList.remove("on");
+      toast(d.detail || "Select a person first");
       btn.disabled = false;
       return;
     }
     const data = await r.json();
     if (data.status === "generating" || data.status === "busy") {
-      pollTimer = setInterval(pollStatus, 1500);
+      pollTimer = setInterval(pollStatus, 1200);
     } else {
-      stopProgressAnimation();
-      hideSpinner();
-      toast(data.message || "Error starting");
+      stopProgress();
+      document.getElementById("gen-overlay").classList.remove("on");
+      toast(data.message || "Error");
       btn.disabled = false;
     }
-  } catch(e) {
-    stopProgressAnimation();
-    hideSpinner();
+  } catch {
+    stopProgress();
+    document.getElementById("gen-overlay").classList.remove("on");
     toast("Connection error");
     btn.disabled = false;
   }
@@ -806,38 +711,27 @@ async function doTransform() {
 
 async function pollStatus() {
   try {
-    const r    = await fetch("/generate_status");
+    const r = await fetch("/generate_status");
     const data = await r.json();
     if (data.status === "done" && data.image) {
       clearInterval(pollTimer);
-      stopProgressAnimation();
+      stopProgress();
       setProgress(100, "Done!");
       setTimeout(() => {
-        hideSpinner();
+        document.getElementById("gen-overlay").classList.remove("on");
         currentResultDataUrl = data.image;
-        showResult(data.image);
-        document.getElementById("xform-btn").disabled = false;
-      }, 400);
+        document.getElementById("result-img").src = data.image;
+        document.getElementById("result-overlay").classList.add("on");
+        document.getElementById("transform-btn").disabled = false;
+      }, 300);
     } else if (data.status === "error") {
       clearInterval(pollTimer);
-      stopProgressAnimation();
-      hideSpinner();
-      toast("Error: " + (data.message || "unknown — check terminal for details"));
-      document.getElementById("xform-btn").disabled = false;
+      stopProgress();
+      document.getElementById("gen-overlay").classList.remove("on");
+      toast("Error: " + (data.message || "unknown"));
+      document.getElementById("transform-btn").disabled = false;
     }
-    // message updates are handled by the stage animation — no need to overwrite
-  } catch(e) {}
-}
-
-function hideSpinner() { document.getElementById("gen-overlay").classList.remove("on"); }
-
-function showResult(src) {
-  // Reset save button state each time a new result comes in
-  const btn = document.getElementById("save-btn");
-  btn.classList.remove("saving");
-  btn.innerHTML = "💾 Save Photo";
-  document.getElementById("result-img").src = src;
-  document.getElementById("result-overlay").classList.add("on");
+  } catch {}
 }
 
 function closeResult() {
@@ -846,26 +740,24 @@ function closeResult() {
   currentResultDataUrl = null;
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
   t.style.background = type === "ok" ? "#1a7a3a" : "#c0392b";
   t.classList.add("on");
-  setTimeout(() => t.classList.remove("on"), 4000);
+  setTimeout(() => t.classList.remove("on"), 3500);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
-  buildCharGrid(false);
-  const online = await checkComfy();
-  buildCharGrid(online);
-
-  setInterval(checkComfy,      10000);
-  setInterval(pollRecognized,   2000);  // check who's in frame every 2s
-  refreshKnownHosts();
+  buildStyleGrid(false);
+  const online = await checkAI();
+  buildStyleGrid(online);
+  setInterval(checkAI, 8000);
+  setInterval(pollRecognized, 2000);
+  refreshHosts();
 }
-
 init();
 </script>
 </body>

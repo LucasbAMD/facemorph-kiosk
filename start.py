@@ -1,35 +1,31 @@
 #!/usr/bin/env python3
 """
-start.py — AMD Adapt Kiosk
+start.py — AI Avatar Kiosk Launcher
 Run with: python start.py
-
-No ComfyUI needed — uses diffusers directly.
-First time setup: python setup_models.py
 """
 
 import os
 import sys
-import time
-import signal
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 os.chdir(ROOT)
 
+
 def main():
     print("\n" + "="*55)
-    print("  AMD ADAPT KIOSK")
+    print("  AI AVATAR KIOSK")
     print("  http://localhost:8000")
     print("="*55 + "\n")
 
-    # Set ROCm env vars
+    # ROCm environment
     os.environ.update({
-        "HSA_OVERRIDE_GFX_VERSION":  "11.0.0",
-        "AMD_LOG_LEVEL":             "0",
-        "HIP_VISIBLE_DEVICES":       "0",
-        "ROCR_VISIBLE_DEVICES":      "0",
-        "PYTORCH_HIP_ALLOC_CONF":    "expandable_segments:True",
+        "HSA_OVERRIDE_GFX_VERSION": "11.0.0",
+        "AMD_LOG_LEVEL": "0",
+        "HIP_VISIBLE_DEVICES": "0",
+        "ROCR_VISIBLE_DEVICES": "0",
+        "PYTORCH_HIP_ALLOC_CONF": "expandable_segments:True",
     })
 
     # GPU permissions
@@ -40,7 +36,7 @@ def main():
         except Exception:
             pass
 
-    # Check packages
+    # Check required packages
     missing = []
     for pkg in ("uvicorn", "fastapi", "cv2", "diffusers", "torch"):
         try:
@@ -49,27 +45,31 @@ def main():
             missing.append(pkg)
     if missing:
         print(f"[ERR] Missing packages: {', '.join(missing)}")
-        print("      Run: pip install uvicorn fastapi opencv-python diffusers transformers accelerate safetensors")
+        print("      Run: pip install -r requirements.txt")
         sys.exit(1)
 
-    # Check model exists
-    sdxl = Path.home() / "ComfyUI" / "models" / "checkpoints" / "sd_xl_turbo_1.0_fp16.safetensors"
+    # Check model
+    sdxl = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
+            "sd_xl_turbo_1.0_fp16.safetensors")
     if not sdxl.exists():
         print(f"[ERR] SDXL model not found at {sdxl}")
         sys.exit(1)
 
-    ip_adapter = Path.home() / "kiosk_models" / "ip_adapter" / "sdxl_models" / "ip-adapter_sdxl.bin"
-    if not ip_adapter.exists():
-        print("[WARN] IP-Adapter not found — face identity preservation disabled")
-        print("       Run: python setup_models.py")
+    # Check IP-Adapter
+    ip_bin = Path.home() / "kiosk_models" / "ip_adapter" / "sdxl_models" / "ip-adapter_sdxl.bin"
+    ip_enc = Path.home() / "kiosk_models" / "ip_adapter" / "models" / "image_encoder"
+    if ip_bin.exists() and ip_enc.exists():
+        print("[OK] IP-Adapter found - face identity preservation active")
     else:
-        print("[OK] IP-Adapter found — face identity preservation active")
+        print("[WARN] IP-Adapter not found - avatars will be style-only (no face matching)")
+        print("       Run: python setup_models.py")
 
     print("\n[OK] Starting kiosk at http://localhost:8000")
     print("     AI pipeline loading in background...\n")
 
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, workers=1)
+
 
 if __name__ == "__main__":
     main()
