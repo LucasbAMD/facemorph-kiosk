@@ -43,8 +43,20 @@ STYLE_CONFIG = {
     "comicbook":   {"label": "Comic Book",  "subtitle": "Bold Ink · Halftone",         "emoji": "💥", "color": "#e74c3c"},
     "pixelart":    {"label": "Pixel Art",   "subtitle": "Retro · 16-Bit",              "emoji": "👾", "color": "#27ae60"},
     "steampunk":   {"label": "Steampunk",   "subtitle": "Brass · Gears · Victorian",   "emoji": "⚙️", "color": "#d4a574"},
+    "watercolor":  {"label": "Watercolor", "subtitle": "Soft · Delicate",              "emoji": "🌺", "color": "#88c8e8"},
+    "zombie":      {"label": "Zombie",     "subtitle": "Horror · Undead",              "emoji": "🧟", "color": "#5a7247"},
+    "fantasy":     {"label": "Fantasy Elf","subtitle": "Magic · Enchanted",            "emoji": "🧙", "color": "#7b68ee"},
+    "popart":      {"label": "Pop Art",    "subtitle": "Bold · Graphic",               "emoji": "🎨", "color": "#ff4081"},
+    "ice":         {"label": "Ice & Frost","subtitle": "Frozen · Crystal",             "emoji": "❄️", "color": "#a0d8ef"},
+    "neon":        {"label": "Neon Glow",  "subtitle": "Electric · UV",                "emoji": "🔮", "color": "#b400ff"},
+    "labubu":      {"label": "Labubu",     "subtitle": "Vinyl Toy · Kawaii",           "emoji": "🧸", "color": "#ffb6c1"},
+    "wizard":      {"label": "Wizard",     "subtitle": "Magic · Hogwarts",             "emoji": "🪄", "color": "#7b3f00"},
 }
-STYLE_ORDER = ["avatar", "anime", "cyberpunk", "claymation", "oilpainting", "comicbook", "pixelart", "steampunk"]
+STYLE_ORDER = [
+    "avatar", "anime", "cyberpunk", "claymation", "oilpainting", "comicbook",
+    "pixelart", "steampunk", "watercolor", "zombie", "fantasy", "popart",
+    "ice", "neon", "labubu", "wizard",
+]
 
 KNOWN_FACES_DIR = Path("known_faces")
 KNOWN_FACES_DB  = Path("known_faces/faces.json")

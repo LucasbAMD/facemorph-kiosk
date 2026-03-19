@@ -456,9 +456,63 @@ STYLES = {
                         "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── LABUBU ───────────────────────────────────────────────────────
+    "labubu": {
+        "label": "Labubu",
+        "prompt": (
+            "same person transformed into an adorable Labubu vinyl art toy, "
+            "oversized round head with mischievous wide grin showing tiny pointy teeth, "
+            "large round glossy eyes, small pointy elf ears, "
+            "chubby stubby body with short arms and legs, "
+            "smooth shiny vinyl toy surface, same face same identity"
+        ),
+        "prompt_2": (
+            "cute designer vinyl art toy figure by Kasing Lung, "
+            "colorful candy-pastel toy shelf display background, "
+            "soft studio lighting with gentle shadows, "
+            "Pop Mart blind box collectible toy photography, "
+            "kawaii aesthetic, highly detailed figurine, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", realistic human, photorealistic skin, "
+            "scary, horror, dark, matte finish, rough texture"
+        ),
+        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, nature",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+    },
+    # ── WIZARD ───────────────────────────────────────────────────────
+    "wizard": {
+        "label": "Wizard",
+        "prompt": (
+            "same person as a powerful wizard from Harry Potter, "
+            "wearing dark flowing wizard robes with house crest embroidery, "
+            "pointed wizard hat slightly tilted, round spectacles, "
+            "holding a glowing magic wand casting bright sparkling spell, "
+            "same face same identity same gender, same expression"
+        ),
+        "prompt_2": (
+            "Hogwarts School of Witchcraft and Wizardry interior, "
+            "grand stone hall with floating candles overhead, "
+            "moving portraits on walls, enchanted starry ceiling, "
+            "magical spell light trails and sparkles in air, "
+            "Harry Potter movie cinematic quality, warm candlelight, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", modern clothing, casual wear, "
+            "evil, dark lord, skull, death eater mask"
+        ),
+        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, daylight, white wall",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.42},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
 }
-
-STYLE_ORDER = [
     "avatar", "anime", "cyberpunk", "claymation",
     "oilpainting", "comicbook", "pixelart", "steampunk",
     "watercolor", "zombie", "fantasy", "popart", "ice", "neon",
