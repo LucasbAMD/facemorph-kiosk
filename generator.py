@@ -510,9 +510,12 @@ STYLES = {
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
 }
+
+STYLE_ORDER = [
     "avatar", "anime", "cyberpunk", "claymation",
     "oilpainting", "comicbook", "pixelart", "steampunk",
     "watercolor", "zombie", "fantasy", "popart", "ice", "neon",
+    "labubu", "wizard",
 ]
 
 
