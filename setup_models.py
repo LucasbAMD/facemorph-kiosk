@@ -127,23 +127,62 @@ def main():
             print(f"  [WARN] Could not download Real-ESRGAN: {e}")
             print("         Output will not be upscaled (still works, just lower res).")
 
-    print("\n[6/8] Downloading IP-Adapter FaceID for SDXL...")
-    print("       (This preserves your face identity during avatar style)")
+    print("\n[6/10] Downloading IP-Adapter FaceID for SDXL...")
+    print("       (Preserves face identity + visual appearance during styles)")
     print("       Model: h94/IP-Adapter-FaceID")
     try:
         from huggingface_hub import hf_hub_download
-        print("  [..] Downloading ip-adapter-faceid_sdxl.bin...")
+        # Plus v2 (best quality — uses face + CLIP visual features)
+        print("  [..] Downloading ip-adapter-faceid-plusv2_sdxl.bin...")
+        hf_hub_download(
+            repo_id="h94/IP-Adapter-FaceID",
+            filename="ip-adapter-faceid-plusv2_sdxl.bin",
+        )
+        print("  [OK] IP-Adapter FaceID Plus v2 SDXL cached")
+        # Also download basic FaceID as fallback
+        print("  [..] Downloading ip-adapter-faceid_sdxl.bin (fallback)...")
         hf_hub_download(
             repo_id="h94/IP-Adapter-FaceID",
             filename="ip-adapter-faceid_sdxl.bin",
         )
-        print("  [OK] IP-Adapter FaceID SDXL cached")
+        print("  [OK] IP-Adapter FaceID basic SDXL cached (fallback)")
     except Exception as e:
         print(f"  [WARN] Could not download IP-Adapter FaceID: {e}")
         print("         Avatar style will work without face ID preservation.")
 
+    # ── Download CLIP Vision encoder for FaceID Plus v2 ────────────────
+    print("\n[7/10] Downloading CLIP Vision encoder for FaceID Plus v2...")
+    print("       (Provides visual appearance features for better identity)")
+    print("       Model: laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
+    try:
+        from transformers import CLIPVisionModelWithProjection, CLIPImageProcessor
+        clip_id = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+        print(f"  [..] Downloading {clip_id}...")
+        CLIPImageProcessor.from_pretrained(clip_id)
+        CLIPVisionModelWithProjection.from_pretrained(clip_id, torch_dtype=torch.float16)
+        print("  [OK] CLIP Vision encoder cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download CLIP Vision encoder: {e}")
+        print("         FaceID will fall back to basic mode.")
+
+    # ── Download SDXL VAE fp16 fix ─────────────────────────────────────
+    print("\n[8/10] Downloading SDXL VAE fp16 fix...")
+    print("       (More vivid colors, prevents fp16 NaN artifacts)")
+    print("       Model: madebyollin/sdxl-vae-fp16-fix")
+    try:
+        from diffusers import AutoencoderKL
+        print("  [..] Downloading madebyollin/sdxl-vae-fp16-fix...")
+        AutoencoderKL.from_pretrained(
+            "madebyollin/sdxl-vae-fp16-fix",
+            torch_dtype=torch.float16,
+        )
+        print("  [OK] SDXL VAE fp16 fix cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download VAE fp16 fix: {e}")
+        print("         Will use default VAE (still works fine).")
+
     # ── Download InsightFace buffalo_l model ───────────────────────────
-    print("\n[7/8] Checking InsightFace face analysis model...")
+    print("\n[9/10] Checking InsightFace face analysis model...")
     try:
         from insightface.app import FaceAnalysis
         print("  [..] Downloading buffalo_l model (if needed)...")
@@ -157,7 +196,7 @@ def main():
         print(f"  [WARN] Could not download InsightFace model: {e}")
 
     # ── Download Juggernaut XL v9 base model ─────────────────────────────
-    print("\n[Bonus] Pre-caching Juggernaut XL v9 pipeline components...")
+    print("\n[10/10] Pre-caching Juggernaut XL v9 pipeline components...")
     print("        (Much higher quality than vanilla SDXL Base)")
     print("        This may take a while on first run (~6.5 GB).")
     try:
