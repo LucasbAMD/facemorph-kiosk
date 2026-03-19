@@ -18,17 +18,17 @@ IP_ADAPTER_DIR = MODELS_DIR / "ip_adapter" / "sdxl_models"
 # IP-Adapter SDXL model — preserves facial identity in generated images
 # Source: https://huggingface.co/h94/IP-Adapter
 IP_ADAPTER_FILES = {
-    "ip-adapter_sdxl.bin": (
+    "ip-adapter_sdxl.safetensors": (
         "https://huggingface.co/h94/IP-Adapter/resolve/main/"
-        "sdxl_models/ip-adapter_sdxl.bin"
+        "sdxl_models/ip-adapter_sdxl.safetensors"
     ),
     "image_encoder/config.json": (
         "https://huggingface.co/h94/IP-Adapter/resolve/main/"
         "models/image_encoder/config.json"
     ),
-    "image_encoder/pytorch_model.bin": (
+    "image_encoder/model.safetensors": (
         "https://huggingface.co/h94/IP-Adapter/resolve/main/"
-        "models/image_encoder/pytorch_model.bin"
+        "models/image_encoder/model.safetensors"
     ),
 }
 
