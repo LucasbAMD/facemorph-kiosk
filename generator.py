@@ -247,14 +247,14 @@ def _load_pipeline():
         pipe.enable_attention_slicing()
 
         # Load IP-Adapter if available
-        ip_bin = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter_sdxl.bin"
+        ip_bin  = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter_sdxl.safetensors"
         img_enc = IP_ADAPTER_DIR / "sdxl_models" / "image_encoder"
         if ip_bin.exists() and img_enc.exists():
             print("[Generator] Loading IP-Adapter SDXL...")
             pipe.load_ip_adapter(
                 str(IP_ADAPTER_DIR),
                 subfolder="sdxl_models",
-                weight_name="ip-adapter_sdxl.bin",
+                weight_name="ip-adapter_sdxl.safetensors",
             )
             print("[Generator] IP-Adapter loaded — face identity preservation active")
         else:
