@@ -58,7 +58,7 @@ def main():
     print(f"  CUDA/ROCm available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
         print(f"  GPU: {torch.cuda.get_device_name(0)}")
-        vram = torch.cuda.get_device_properties(0).total_mem / 1024**3
+        vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
         print(f"  VRAM: {vram:.1f} GB")
 
     # ── Check/download SDXL Turbo (existing) ──────────────────────────────
