@@ -15,8 +15,11 @@ import cv2
 import numpy as np
 import threading
 import time
+import warnings
 from pathlib import Path
 from PIL import Image
+
+warnings.filterwarnings("ignore", message=".*upcast_vae.*")
 
 # ── Model paths ───────────────────────────────────────────────────────────────
 SDXL_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /

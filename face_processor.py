@@ -209,7 +209,7 @@ def _make_recognizer():
 
 # ── FaceRecognizer ────────────────────────────────────────────────────────────
 class FaceRecognizer:
-    CONFIDENCE_THRESHOLD = 75
+    CONFIDENCE_THRESHOLD = 110  # Higher = more forgiving (KNN dist*1000, LBPH raw)
 
     def __init__(self):
         KNOWN_FACES_DIR.mkdir(exist_ok=True)
@@ -287,6 +287,8 @@ class FaceRecognizer:
 
             self._retrain()
             self._save()
+            print(f"[FaceRecognizer] Learned '{name}' (label={label}, "
+                  f"samples={len(self._samples[label])}, gender={gender})")
             return label
 
     def _retrain(self):
@@ -431,25 +433,7 @@ class FaceProcessor:
         ]
 
     def _extract_and_store_crop(self, frame, x, y, w, h):
-        bx1 = max(0, x)
-        by1 = max(0, y)
-        bx2 = min(frame.shape[1], x + w)
-        by2 = min(frame.shape[0], y + h)
-        body_roi = frame[by1:by2, bx1:bx2]
-        face_crop = None
-
-        if body_roi.size > 0:
-            gray_roi = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
-            sub_faces = self.face_det.detectMultiScale(
-                gray_roi, 1.1, 4, minSize=(30, 30))
-            if len(sub_faces) > 0:
-                fx2, fy2, fw2, fh2 = sub_faces[0]
-                face_crop = body_roi[fy2:fy2+fh2, fx2:fx2+fw2]
-
-        if face_crop is None or face_crop.size == 0:
-            face_top = min(by1 + int(h * 0.30), frame.shape[0])
-            face_crop = frame[by1:face_top, bx1:bx2]
-
+        face_crop = self._extract_face_from_body(frame, x, y, w, h)
         if face_crop is not None and face_crop.size > 0:
             with self._lock:
                 self._crop_for_naming = face_crop.copy()
@@ -521,14 +505,10 @@ class FaceProcessor:
             sel = set(self._selected_people)
         targets = [faces[i] for i in sel if i < len(faces)] or (faces[:1] if faces else [])
         for (x, y, w, h) in targets:
-            pad = 10
-            x1 = max(0, x - pad)
-            y1 = max(0, y - pad)
-            x2 = min(frame.shape[1], x + w + pad)
-            y2 = min(frame.shape[0], y + h + pad)
-            crop = frame[y1:y2, x1:x2]
-            if crop.size > 0:
-                self.recognizer.learn(crop, name, gender)
+            # Extract just the face from the body box
+            face_crop = self._extract_face_from_body(frame, x, y, w, h)
+            if face_crop is not None and face_crop.size > 0:
+                self.recognizer.learn(face_crop, name, gender)
                 return True
         return False
 
@@ -541,6 +521,36 @@ class FaceProcessor:
     def forget_face(self, name):
         self.recognizer.forget(name)
 
+    def _extract_face_from_body(self, frame, bx, by, bw, bh):
+        """Extract just the face from a body bounding box."""
+        fh_frame, fw_frame = frame.shape[:2]
+        bx1 = max(0, bx)
+        by1 = max(0, by)
+        bx2 = min(fw_frame, bx + bw)
+        by2 = min(fh_frame, by + bh)
+        body_roi = frame[by1:by2, bx1:bx2]
+
+        if body_roi.size == 0:
+            return None
+
+        # Re-detect face within this body box
+        gray = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
+        sub_faces = self.face_det.detectMultiScale(
+            gray, 1.1, 4, minSize=(30, 30))
+        if len(sub_faces) > 0:
+            fx, fy, fw, fhh = max(sub_faces, key=lambda r: r[2] * r[3])
+            face_crop = body_roi[fy:fy+fhh, fx:fx+fw]
+            if face_crop.size > 0:
+                return face_crop
+
+        # Fallback: top third of body box (approximate head area)
+        head_h = max(1, (by2 - by1) // 3)
+        head_crop = frame[by1:by1+head_h, bx1:bx2]
+        if head_crop.size > 0:
+            return head_crop
+
+        return None
+
     # ── Background recognition ────────────────────────────────────────────────
     def _recog_loop(self):
         while True:
@@ -551,14 +561,9 @@ class FaceProcessor:
                     faces = list(self._detected_faces)
                 new_names = {}
                 for i, (x, y, w, h) in enumerate(faces):
-                    p = 10
-                    x1 = max(0, x-p)
-                    y1 = max(0, y-p)
-                    x2 = min(frame.shape[1], x+w+p)
-                    y2 = min(frame.shape[0], y+h+p)
-                    crop = frame[y1:y2, x1:x2]
-                    if crop.size > 0:
-                        name, _ = self.recognizer.recognize(crop)
+                    face_crop = self._extract_face_from_body(frame, x, y, w, h)
+                    if face_crop is not None:
+                        name, _ = self.recognizer.recognize(face_crop)
                         if name:
                             new_names[i] = name
                 with self._lock:
