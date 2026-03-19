@@ -174,14 +174,14 @@
   /* ── Style grid ── */
   #style-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8px; padding: 16px 16px; flex: 1; min-height: 0;
+    gap: 6px; padding: 12px 12px; flex: 1; min-height: 0;
     overflow-y: auto; align-content: start;
   }
   .style-card {
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 14px 8px 12px; text-align: center; cursor: pointer;
+    border-radius: 10px;
+    padding: 10px 6px 8px; text-align: center; cursor: pointer;
     transition: all 0.2s ease; position: relative; overflow: hidden;
   }
   .style-card::before {
@@ -203,15 +203,15 @@
   .style-card.active::before { opacity: 1; }
   .style-card.active .style-name { color: var(--accent); }
 
-  .style-emoji { font-size: 1.6rem; margin-bottom: 6px; position: relative; z-index: 1; }
+  .style-emoji { font-size: 1.3rem; margin-bottom: 4px; position: relative; z-index: 1; }
   .style-name {
-    font-size: 0.72rem; font-weight: 700;
+    font-size: 0.65rem; font-weight: 700;
     letter-spacing: 0.5px; position: relative; z-index: 1;
     transition: color 0.2s;
   }
   .style-sub {
-    font-size: 0.52rem; color: var(--dim);
-    margin-top: 3px; position: relative; z-index: 1;
+    font-size: 0.48rem; color: var(--dim);
+    margin-top: 2px; position: relative; z-index: 1;
     letter-spacing: 0.5px;
   }
   .style-card.ready .style-name::after {
@@ -406,6 +406,12 @@ const STYLES = [
   { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Ink \u00B7 Halftone" },
   { key: "pixelart",    emoji: "\uD83D\uDC7E", name: "Pixel Art",   sub: "Retro \u00B7 16-Bit" },
   { key: "steampunk",   emoji: "\u2699\uFE0F", name: "Steampunk",   sub: "Brass \u00B7 Victorian" },
+  { key: "watercolor",  emoji: "\uD83C\uDF3A", name: "Watercolor",  sub: "Soft \u00B7 Delicate" },
+  { key: "zombie",      emoji: "\uD83E\uDDDF", name: "Zombie",      sub: "Horror \u00B7 Undead" },
+  { key: "fantasy",     emoji: "\uD83E\uDDD9", name: "Fantasy Elf", sub: "Magic \u00B7 Enchanted" },
+  { key: "popart",      emoji: "\uD83C\uDFA8", name: "Pop Art",     sub: "Bold \u00B7 Graphic" },
+  { key: "ice",         emoji: "\u2744\uFE0F", name: "Ice & Frost", sub: "Frozen \u00B7 Crystal" },
+  { key: "neon",        emoji: "\uD83D\uDD2E", name: "Neon Glow",   sub: "Electric \u00B7 UV" },
 ];
 
 let selectedStyle = "avatar";

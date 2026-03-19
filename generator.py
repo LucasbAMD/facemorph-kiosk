@@ -101,29 +101,29 @@ STYLES = {
         ),
         "negative": _NEG_IDENTITY + ", photorealistic, real human, real skin, photograph",
         "negative_2": _NEG_QUALITY + ", office, plain wall",
-        "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.52},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.56},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     "anime": {
         "label": "Anime",
         "prompt": (
-            "same person redrawn as anime character, identical face shape and features, "
-            "same hairstyle same hair color same expression, "
+            "same person redrawn as anime character, preserving their exact face shape "
+            "nose jaw and eyes, same hairstyle same hair color same expression, "
             "thick black ink outlines, flat cel-shaded coloring, "
-            "sparkling anime eyes with light reflections"
+            "anime eyes with light reflections"
         ),
         "prompt_2": (
             "stunning 2D anime illustration, NOT a photograph, "
             "vibrant anime cityscape at sunset background, "
             "cherry blossom trees, glowing lanterns, dramatic clouds, "
-            "Studio Ghibli quality, manga illustration, vibrant colors, masterpiece"
+            "manga illustration, vibrant colors, masterpiece"
         ),
         "negative": _NEG_IDENTITY + ", photorealistic, real person, photograph, real skin texture",
         "negative_2": _NEG_QUALITY + ", 3d render, realistic lighting, office, plain background",
-        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.50},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.58},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "cyberpunk": {
         "label": "Cyberpunk",
@@ -189,10 +189,10 @@ STYLES = {
     "comicbook": {
         "label": "Comic Book",
         "prompt": (
-            "same person's identical face drawn with ink, no mask, face fully visible, "
-            "preserving exact eyes nose mouth jaw and expression, "
-            "heavy black ink outlines, halftone dot shading on skin, "
-            "bright saturated primary colors"
+            "same person's exact face drawn in comic ink style, no mask, "
+            "face fully visible preserving their real eyes nose mouth jaw, "
+            "heavy black ink outlines around features, halftone dot shading, "
+            "bright saturated primary colors, same hairstyle"
         ),
         "prompt_2": (
             "bold dynamic comic book illustration, "
@@ -203,9 +203,9 @@ STYLES = {
         ),
         "negative": _NEG_IDENTITY + ", superhero mask, domino mask, eye mask, face covered",
         "negative_2": _NEG_QUALITY + ", photorealistic, photograph, plain background",
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.55},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.76, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.60},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     "steampunk": {
         "label": "Steampunk",
@@ -229,11 +229,132 @@ STYLES = {
                         "controlnet_scale": 0.58},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
+    "watercolor": {
+        "label": "Watercolor",
+        "prompt": (
+            "same person's exact face and features painted in watercolor, "
+            "preserving their real eyes nose mouth jaw and expression, "
+            "soft translucent watercolor washes, visible paper texture, "
+            "delicate wet-on-wet paint bleeds, same hairstyle"
+        ),
+        "prompt_2": (
+            "beautiful watercolor painting on textured cotton paper, "
+            "soft floral garden background with bleeding colors, "
+            "splashes of diluted pigment, artistic drips at edges, "
+            "gentle pastel tones, fine art watercolor, masterpiece"
+        ),
+        "negative": _NEG_IDENTITY + ", photograph, digital art, oil painting",
+        "negative_2": _NEG_QUALITY + ", office, plain background, harsh colors",
+        "controlnet": {"strength": 0.76, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.58},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
+    },
+    "zombie": {
+        "label": "Zombie",
+        "prompt": (
+            "same person's exact face transformed into a zombie, "
+            "keeping their real facial structure eyes nose and jaw, "
+            "pale green decaying skin, dark hollow eye sockets, "
+            "torn clothing, same hairstyle but messy and dirty"
+        ),
+        "prompt_2": (
+            "cinematic horror movie scene, dark foggy graveyard at night, "
+            "creepy dead trees, cracked tombstones, full moon, "
+            "eerie green fog, dramatic horror lighting, "
+            "movie quality, highly detailed, masterpiece"
+        ),
+        "negative": _NEG_IDENTITY + ", cute, happy colors, bright, cheerful",
+        "negative_2": _NEG_QUALITY + ", office, plain background, daytime",
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.52},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    "fantasy": {
+        "label": "Fantasy Elf",
+        "prompt": (
+            "same person's exact face as a high fantasy elf, "
+            "preserving their real eyes nose mouth and expression, "
+            "elegant pointed elf ears, ethereal glowing skin, "
+            "ornate silver circlet on forehead, flowing elven robes"
+        ),
+        "prompt_2": (
+            "epic high fantasy scene, enchanted ancient forest, "
+            "magical golden light filtering through giant trees, "
+            "glowing fireflies, mystical stone ruins covered in moss, "
+            "fantasy art style, highly detailed, masterpiece"
+        ),
+        "negative": _NEG_IDENTITY + ", modern clothing, technology, urban",
+        "negative_2": _NEG_QUALITY + ", office, plain background, contemporary",
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    "popart": {
+        "label": "Pop Art",
+        "prompt": (
+            "same person's exact face in bold pop art style, "
+            "preserving their real facial features and expression, "
+            "flat bright neon color blocks on face, thick black outlines, "
+            "stylized high contrast portrait, same hairstyle"
+        ),
+        "prompt_2": (
+            "iconic pop art screen print, four-color offset print style, "
+            "vibrant pink yellow cyan and orange color palette, "
+            "repeating pattern background with bold graphic shapes, "
+            "gallery art, graphic design masterpiece"
+        ),
+        "negative": _NEG_IDENTITY + ", photorealistic, subtle colors, muted",
+        "negative_2": _NEG_QUALITY + ", office, plain background, photograph",
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.56},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    "ice": {
+        "label": "Ice & Frost",
+        "prompt": (
+            "same person's exact face with frost and ice effects, "
+            "preserving their real eyes nose mouth and expression, "
+            "crystalline ice forming on skin and hair, frozen eyelashes, "
+            "pale blue-white frosty skin, icicles hanging from clothing"
+        ),
+        "prompt_2": (
+            "magical frozen winter wonderland scene, "
+            "massive ice crystals and frozen waterfalls background, "
+            "shimmering aurora borealis in dark sky, falling snowflakes, "
+            "blue and white color palette, cinematic, masterpiece"
+        ),
+        "negative": _NEG_IDENTITY + ", warm colors, summer, tropical, green",
+        "negative_2": _NEG_QUALITY + ", office, plain background, indoor",
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    "neon": {
+        "label": "Neon Glow",
+        "prompt": (
+            "same person's exact face with vivid neon glow effect, "
+            "preserving their real facial features and expression, "
+            "glowing neon light outlines tracing face and body contours, "
+            "electric blue and hot pink light on skin, same hairstyle"
+        ),
+        "prompt_2": (
+            "dramatic neon light portrait in pitch black darkness, "
+            "vibrant electric blue pink and purple neon tubes, "
+            "light painting streaks, lens flares, glowing particles, "
+            "ultraviolet blacklight atmosphere, stunning, masterpiece"
+        ),
+        "negative": _NEG_IDENTITY + ", natural lighting, daytime, bright ambient",
+        "negative_2": _NEG_QUALITY + ", office, plain background, washed out",
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.56},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
 }
 
 STYLE_ORDER = [
     "avatar", "anime", "cyberpunk", "claymation",
     "oilpainting", "comicbook", "pixelart", "steampunk",
+    "watercolor", "zombie", "fantasy", "popart", "ice", "neon",
 ]
 
 
