@@ -243,9 +243,6 @@ def _load_pipeline():
         # Move to GPU
         pipe = pipe.to("cuda")
 
-        # Enable memory efficient attention for AMD
-        pipe.enable_attention_slicing()
-
         # Load IP-Adapter if available
         ip_bin  = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter_sdxl.safetensors"
         img_enc = IP_ADAPTER_DIR / "sdxl_models" / "image_encoder"
