@@ -117,10 +117,10 @@ STYLES = {
     "claymation": {
         "label": "Claymation",
         "prompt": (
-            "person sculpted as clay figure with visible sculpting tool marks, "
+            "same person sculpted as clay figure with visible sculpting tool marks, "
             "chunky exaggerated clay features, fingerprint impressions in clay, "
-            "layered clay textures with rough edges, big round clay eyes, "
-            "clay hair shaped in thick textured strands, "
+            "natural skin-colored clay with warm beige and peach tones, "
+            "big round clay eyes, clay hair shaped in thick textured strands, "
             "oversized hands and stubby proportions"
         ),
         "prompt_2": (
@@ -132,13 +132,14 @@ STYLES = {
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic, real human, real skin, photograph, "
-            "smooth skin, smooth plastic, airbrushed"
+            "smooth skin, smooth plastic, airbrushed, "
+            "purple skin, blue skin, green skin, grey skin, unnatural skin color"
         ),
         "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room, white background",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.40},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     # ── ANIME (One Piece) ─────────────────────────────────────────────
@@ -175,10 +176,11 @@ STYLES = {
     "cyberpunk": {
         "label": "Cyberpunk",
         "prompt": (
-            "person with subtle neon circuit tattoo lines on cheeks, "
+            "same person with subtle neon circuit tattoo lines on cheeks, "
             "chrome cybernetic implant near temple, LED strips woven in hair, "
             "futuristic jacket with glowing illuminated trim, "
-            "reflective cyberpunk visor pushed up on forehead"
+            "reflective cyberpunk visor pushed up on forehead, "
+            "same face same identity same skin tone"
         ),
         "prompt_2": (
             "cyberpunk city at night, rain-soaked neon-lit alley, "
@@ -190,9 +192,9 @@ STYLES = {
         "negative": _NEG_IDENTITY + ", natural lighting, daytime, sunny, nature",
         "negative_2": _NEG_QUALITY + ", office, plain room, indoor room, white wall",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.6,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── OIL PAINTING ──────────────────────────────────────────────────
@@ -224,9 +226,10 @@ STYLES = {
     "pixelart": {
         "label": "Pixel Art",
         "prompt": (
-            "person as pixel art RPG character sprite, "
+            "same person as pixel art RPG character sprite, "
             "visible square pixels, limited 16-bit retro color palette, "
             "dithering shading technique, blocky pixel features, "
+            "same face same identity same gender, "
             "same hairstyle and hair color rendered in pixel blocks"
         ),
         "prompt_2": (
@@ -239,19 +242,19 @@ STYLES = {
         "negative": _NEG_IDENTITY + ", photorealistic, smooth, high resolution, photograph",
         "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.35,
-        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
-                        "controlnet_scale": 0.30},
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.40},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     # ── COMIC BOOK ────────────────────────────────────────────────────
     "comicbook": {
         "label": "Comic Book",
         "prompt": (
-            "person drawn in bold comic book ink style, "
+            "same person drawn in bold comic book ink style, "
             "face fully visible with heavy black ink outlines around all features, "
             "halftone dot shading on skin, bright saturated primary colors, "
-            "dynamic heroic pose, same hairstyle"
+            "same pose same body position, same hairstyle"
         ),
         "prompt_2": (
             "bold dynamic comic book page illustration, "
@@ -266,9 +269,9 @@ STYLES = {
         ),
         "negative_2": _NEG_QUALITY + ", photorealistic, photograph, office, plain background",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.4,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     # ── STEAMPUNK ─────────────────────────────────────────────────────
@@ -299,11 +302,11 @@ STYLES = {
     "watercolor": {
         "label": "Watercolor",
         "prompt": (
-            "person painted in translucent watercolor washes, "
+            "same person painted in translucent watercolor washes, "
             "visible cold-pressed paper texture underneath, "
             "delicate wet-on-wet paint bleeds on edges of face and hair, "
             "soft color gradients, artistic paint drips, "
-            "same hairstyle and expression"
+            "same face same identity same gender, same hairstyle and expression"
         ),
         "prompt_2": (
             "beautiful watercolor painting on textured cotton paper, "
@@ -315,9 +318,9 @@ STYLES = {
         "negative": _NEG_IDENTITY + ", photograph, digital art, oil painting, sharp edges",
         "negative_2": _NEG_QUALITY + ", office, plain background, white wall, harsh colors",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.4,
+        "ip_adapter_scale": 0.5,
         "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+                        "controlnet_scale": 0.42},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     # ── ZOMBIE ────────────────────────────────────────────────────────
