@@ -147,7 +147,7 @@ async def clear_selection():
 
 # ── AI Generation ─────────────────────────────────────────────────────────────
 @app.post("/generate")
-async def generate(character: str = Form(...)):
+async def generate(character: str = Form(...), gender: str = Form("unknown")):
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
@@ -156,19 +156,32 @@ async def generate(character: str = Form(...)):
         raise HTTPException(503, "AI engine not ready - loading model...")
 
     detected = processor.get_detected_faces()
-    sel_count = sum(1 for f in detected if f["selected"])
-    if len(detected) > 0 and sel_count == 0:
+    sel_faces = [f for f in detected if f["selected"]]
+    if len(detected) > 0 and len(sel_faces) == 0:
         raise HTTPException(400, "Please select at least one person")
 
-    # Determine gender from recognized face name
-    gender = "unknown"
-    for f in detected:
-        if f["selected"] and f.get("name"):
-            gender = processor.get_gender_for_name(f["name"])
-            break
+    # Use UI gender selection; fallback to stored gender from face recognition
+    gender = gender.strip().lower()
+    if gender not in ("male", "female"):
+        gender = "unknown"
+        for f in sel_faces:
+            if f.get("name"):
+                stored = processor.get_gender_for_name(f["name"])
+                if stored in ("male", "female"):
+                    gender = stored
+                    break
+
+    # Extract face bounding boxes for each selected person
+    face_boxes = []
+    for f in sel_faces:
+        face_boxes.append({
+            "x": f["x"], "y": f["y"], "w": f["w"], "h": f["h"],
+            "name": f.get("name"),
+        })
 
     selected_mask = processor.get_selected_mask(frame)
-    started = comfy.generate(frame, character, selected_mask, gender=gender)
+    started = comfy.generate(frame, character, selected_mask,
+                             face_boxes=face_boxes, gender=gender)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Creating your avatar..."})

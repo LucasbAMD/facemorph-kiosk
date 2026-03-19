@@ -34,17 +34,19 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
-            "Na'vi alien portrait, blue skin, bioluminescent freckles, "
-            "large amber eyes, cat pupils, pointed ears, flat nose, "
-            "braided hair with glowing beads, Pandora jungle background, "
-            "masterpiece, cinematic lighting, ultra detailed"
+            "blue skin alien Na'vi from Avatar movie, "
+            "deep saturated blue skin color on entire face and body, "
+            "glowing cyan bioluminescent dots on cheeks, "
+            "yellow cat eyes, pointed elf ears, wide flat nose, "
+            "Pandora jungle, cinematic, masterpiece"
         ),
         "negative": (
-            "human skin, pink skin, normal ears, cartoon, anime, sketch, "
-            "blurry, low quality, deformed, ugly, text, watermark"
+            "human skin, white skin, pink skin, pale skin, normal skin color, "
+            "brown skin, realistic skin tone, normal human, "
+            "cartoon, anime, blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.92, "guidance": 0.0, "steps": 6},
-        "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
+        "turbo":  {"strength": 0.97, "guidance": 0.0, "steps": 8},
+        "base":   {"strength": 0.85, "guidance": 7.5, "steps": 20},
         "ip_scale": 0.6,
     },
     "claymation": {
@@ -66,17 +68,19 @@ STYLES = {
     "anime": {
         "label": "Anime",
         "positive": (
-            "anime character portrait, cel-shaded, vibrant colors, "
-            "large expressive eyes with reflections, stylized hair, "
-            "Studio Ghibli style, soft bokeh background, "
-            "masterpiece, best quality, detailed anime illustration"
+            "2D anime drawing, thick black ink outlines, "
+            "flat cel-shaded coloring, huge shiny anime eyes, "
+            "colorful spiky stylized hair, smooth simple skin, "
+            "manga illustration, Japanese animation style, "
+            "masterpiece, vibrant colors"
         ),
         "negative": (
-            "photorealistic, photograph, 3d render, blurry, low quality, "
-            "bad anatomy, deformed, western cartoon, text, watermark"
+            "photorealistic, real person, photograph, 3d render, "
+            "realistic face, realistic skin, natural lighting, "
+            "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 6},
-        "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
+        "turbo":  {"strength": 0.93, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.85, "guidance": 8.0, "steps": 20},
         "ip_scale": 0.55,
     },
     "ghost": {
@@ -162,21 +166,36 @@ def _load_pipeline():
                     image_encoder_folder=str(IMAGE_ENCODER),
                 )
 
-                # Validate IP-Adapter with a quick test inference
+                # Validate IP-Adapter by checking projection dimensions
+                # The IP-Adapter image encoder must match the UNet's expected dims
                 print("[Generator] Validating IP-Adapter compatibility...")
-                test_img = Image.new("RGB", (512, 512), (128, 128, 128))
-                test_src = Image.new("RGB", (1024, 1024), (128, 128, 128))
-                pipe.set_ip_adapter_scale(0.5)
-                with torch.inference_mode():
-                    pipe(
-                        prompt="test",
-                        image=test_src,
-                        ip_adapter_image=test_img,
-                        strength=0.9,
-                        num_inference_steps=1,
-                        guidance_scale=0.0,
-                        output_type="latent",
-                    )
+                try:
+                    from transformers import CLIPVisionModelWithProjection
+                    encoder = pipe.image_encoder
+                    if encoder is not None:
+                        # Get image encoder output dim
+                        enc_dim = encoder.config.hidden_size
+                        # SDXL expects 1280-dim from ViT-bigG, ViT-H gives 1024
+                        print(f"[Generator] Image encoder dim={enc_dim}")
+                        if enc_dim < 1280:
+                            raise ValueError(
+                                f"IP-Adapter image encoder dim={enc_dim} but "
+                                f"SDXL needs 1280. Wrong ip-adapter weights file."
+                            )
+                except (AttributeError, ImportError):
+                    # If we can't check, do a real test inference
+                    test_img = Image.new("RGB", (512, 512), (128, 128, 128))
+                    test_src = Image.new("RGB", (1024, 1024), (128, 128, 128))
+                    pipe.set_ip_adapter_scale(0.5)
+                    with torch.inference_mode():
+                        pipe(
+                            prompt="test",
+                            image=test_src,
+                            ip_adapter_image=test_img,
+                            strength=0.99,
+                            num_inference_steps=2,
+                            guidance_scale=0.0,
+                        )
                 _has_ip_adapter = True
                 print("[Generator] IP-Adapter loaded — identity preservation ON")
             except Exception as e:
@@ -350,11 +369,113 @@ def _get_face_image(frame):
         (512, 512), Image.LANCZOS)
 
 
+def _extract_person_crop(frame, box, padding_ratio=0.65):
+    """Extract a face/body crop from frame using a bounding box dict."""
+    x, y, w, h = box["x"], box["y"], box["w"], box["h"]
+    fh, fw = frame.shape[:2]
+
+    # The box is a body box — find the face within it
+    bx1, by1 = max(0, x), max(0, y)
+    bx2, by2 = min(fw, x + w), min(fh, y + h)
+    body_roi = frame[by1:by2, bx1:bx2]
+
+    # Try to detect face within body box
+    if body_roi.size > 0:
+        detector = _get_face_cascade()
+        gray = cv2.cvtColor(body_roi, cv2.COLOR_BGR2GRAY)
+        faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+        if len(faces) > 0:
+            fx, fy, fw2, fh2 = max(faces, key=lambda r: r[2] * r[3])
+            # Map back to full frame coordinates
+            abs_fx = bx1 + fx
+            abs_fy = by1 + fy
+            pad_x = int(fw2 * padding_ratio)
+            pad_y = int(fh2 * padding_ratio)
+            cx1 = max(0, abs_fx - pad_x)
+            cy1 = max(0, abs_fy - pad_y)
+            cx2 = min(fw, abs_fx + fw2 + pad_x)
+            cy2 = min(fh, abs_fy + fh2 + pad_y)
+            # Make roughly square
+            crop_w, crop_h = cx2 - cx1, cy2 - cy1
+            if crop_w > crop_h:
+                diff = crop_w - crop_h
+                cy1 = max(0, cy1 - diff // 2)
+                cy2 = min(fh, cy2 + diff // 2)
+            elif crop_h > crop_w:
+                diff = crop_h - crop_w
+                cx1 = max(0, cx1 - diff // 2)
+                cx2 = min(fw, cx2 + diff // 2)
+            crop = frame[cy1:cy2, cx1:cx2]
+            if crop.size > 0:
+                return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+
+    # Fallback: use top portion of body box as face area
+    face_h = min(by1 + int(h * 0.5), fh)
+    crop = frame[by1:face_h, bx1:bx2]
+    if crop.size > 0:
+        return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+
+    return extract_face_crop(frame, padding_ratio)
+
+
 # ── Generation ────────────────────────────────────────────────────────────────
-def generate_avatar(frame, style_key, gender="unknown"):
+def _build_prompts(style, gender):
+    """Build gender-aware positive and negative prompts."""
+    prompt = style["positive"]
+    neg = style["negative"]
+    if gender == "male":
+        prompt = f"male, man, masculine features, {prompt}"
+        neg = f"female, woman, feminine, breasts, {neg}"
+    elif gender == "female":
+        prompt = f"female, woman, feminine features, {prompt}"
+        neg = f"male, man, masculine, beard, {neg}"
+    return prompt, neg
+
+
+def _generate_single(pipe, source_pil, style, style_key, gender="unknown"):
+    """Generate one avatar from a single face crop PIL image."""
+    global _has_ip_adapter
+    import torch
+
+    params = style["turbo"] if _is_turbo else style["base"]
+    prompt, neg_prompt = _build_prompts(style, gender)
+
+    model_type = "Turbo" if _is_turbo else "Base"
+    print(f"[Generator] Style={style_key} Model={model_type} "
+          f"Steps={params['steps']} Strength={params['strength']} "
+          f"Gender={gender}")
+
+    generator = torch.Generator(device="cuda").manual_seed(
+        int(time.time()) % 2**32)
+
+    gen_kwargs = {
+        "prompt": prompt,
+        "negative_prompt": neg_prompt,
+        "image": source_pil,
+        "strength": params["strength"],
+        "num_inference_steps": params["steps"],
+        "guidance_scale": params["guidance"],
+        "generator": generator,
+    }
+
+    if _has_ip_adapter:
+        try:
+            pipe.set_ip_adapter_scale(style["ip_scale"])
+            gen_kwargs["ip_adapter_image"] = source_pil.resize(
+                (512, 512), Image.LANCZOS)
+        except Exception as e:
+            print(f"[Generator] IP-Adapter conditioning failed: {e}")
+
+    with torch.inference_mode():
+        result = pipe(**gen_kwargs).images[0]
+
+    return result
+
+
+def generate_avatar(frame, style_key, gender="unknown", face_boxes=None):
     """
-    Generate a stylized avatar from a webcam frame.
-    Uses IP-Adapter with a face crop for identity, falls back to plain img2img.
+    Generate stylized avatar(s) from a webcam frame.
+    If face_boxes is provided, generates one avatar per person and combines.
     gender: 'male', 'female', or 'unknown' — used to guide prompt.
     """
     global _has_ip_adapter
@@ -369,14 +490,6 @@ def generate_avatar(frame, style_key, gender="unknown"):
     try:
         import torch
 
-        params = style["turbo"] if _is_turbo else style["base"]
-        strength = params["strength"]
-        guidance = params["guidance"]
-        steps = params["steps"]
-
-        source_pil = extract_face_crop(frame)
-        source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
-
         with _pipe_lock:
             pipe = _pipe
 
@@ -384,54 +497,38 @@ def generate_avatar(frame, style_key, gender="unknown"):
         if gender == "unknown":
             gender = _detect_gender(frame)
 
-        # Build gender-aware prompt
-        prompt = style["positive"]
-        if gender == "male":
-            prompt = f"male, man, masculine features, {prompt}"
-        elif gender == "female":
-            prompt = f"female, woman, feminine features, {prompt}"
-
-        neg_prompt = style["negative"]
-        if gender == "male":
-            neg_prompt = f"female, woman, feminine, breasts, {neg_prompt}"
-        elif gender == "female":
-            neg_prompt = f"male, man, masculine, beard, {neg_prompt}"
-
-        model_type = "Turbo" if _is_turbo else "Base"
-        print(f"[Generator] Style={style_key} Model={model_type} "
-              f"Steps={steps} Strength={strength} Guidance={guidance} "
-              f"IP-Adapter={_has_ip_adapter} Gender={gender}")
+        # Determine face crops to generate
+        if face_boxes and len(face_boxes) > 1:
+            # Multi-person: extract each person's face
+            crops = []
+            for box in face_boxes:
+                crop = _extract_person_crop(frame, box)
+                crops.append(crop.resize((1024, 1024), Image.LANCZOS))
+            print(f"[Generator] Multi-person: {len(crops)} faces")
+        else:
+            # Single person (or no boxes): use largest face
+            if face_boxes and len(face_boxes) == 1:
+                crop = _extract_person_crop(frame, face_boxes[0])
+            else:
+                crop = extract_face_crop(frame)
+            crops = [crop.resize((1024, 1024), Image.LANCZOS)]
 
         start = time.time()
-        generator = torch.Generator(device="cuda").manual_seed(
-            int(time.time()) % 2**32)
-
-        gen_kwargs = {
-            "prompt": prompt,
-            "negative_prompt": neg_prompt,
-            "image": source_pil,
-            "strength": strength,
-            "num_inference_steps": steps,
-            "guidance_scale": guidance,
-            "generator": generator,
-        }
-
-        # Add IP-Adapter face conditioning if available
-        if _has_ip_adapter:
-            try:
-                face_pil = _get_face_image(frame)
-                pipe.set_ip_adapter_scale(style["ip_scale"])
-                gen_kwargs["ip_adapter_image"] = face_pil
-                print(f"[Generator] IP-Adapter face conditioning (scale={style['ip_scale']})")
-            except Exception as e:
-                print(f"[Generator] IP-Adapter conditioning failed: {e}")
-
-        with torch.inference_mode():
-            result = pipe(**gen_kwargs).images[0]
+        results = []
+        for i, source_pil in enumerate(crops):
+            if len(crops) > 1:
+                print(f"[Generator] Generating person {i+1}/{len(crops)}...")
+            result = _generate_single(pipe, source_pil, style, style_key, gender)
+            results.append(cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR))
 
         elapsed = time.time() - start
-        print(f"[Generator] Done in {elapsed:.1f}s")
-        return cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR), None
+        print(f"[Generator] Done in {elapsed:.1f}s ({len(results)} avatar(s))")
+
+        if len(results) == 1:
+            return results[0], None
+
+        # Combine multiple results into a side-by-side grid
+        return _combine_grid(results), None
 
     except Exception as e:
         import traceback
@@ -451,24 +548,15 @@ def generate_avatar(frame, style_key, gender="unknown"):
 
             _has_ip_adapter = False
 
-            params = style["turbo"] if _is_turbo else style["base"]
             source_pil = extract_face_crop(frame).resize((1024, 1024), Image.LANCZOS)
+            prompt, neg_prompt = _build_prompts(style, gender)
+            params = style["turbo"] if _is_turbo else style["base"]
             generator = torch.Generator(device="cuda").manual_seed(42)
-
-            # Re-use gender-aware prompts in fallback
-            fb_prompt = style["positive"]
-            fb_neg = style["negative"]
-            if gender == "male":
-                fb_prompt = f"male, man, masculine features, {fb_prompt}"
-                fb_neg = f"female, woman, feminine, breasts, {fb_neg}"
-            elif gender == "female":
-                fb_prompt = f"female, woman, feminine features, {fb_prompt}"
-                fb_neg = f"male, man, masculine, beard, {fb_neg}"
 
             with torch.inference_mode():
                 result = pipe(
-                    prompt=fb_prompt,
-                    negative_prompt=fb_neg,
+                    prompt=prompt,
+                    negative_prompt=neg_prompt,
                     image=source_pil,
                     strength=params["strength"],
                     num_inference_steps=params["steps"],
@@ -483,6 +571,60 @@ def generate_avatar(frame, style_key, gender="unknown"):
             import traceback
             traceback.print_exc()
             return None, f"Generation failed: {e2}"
+
+
+def _combine_grid(images):
+    """Combine multiple avatar images into a side-by-side grid."""
+    n = len(images)
+    if n == 0:
+        return None
+    if n == 1:
+        return images[0]
+
+    # Resize all to same height
+    target_h = min(img.shape[0] for img in images)
+    resized = []
+    for img in images:
+        if img.shape[0] != target_h:
+            scale = target_h / img.shape[0]
+            new_w = int(img.shape[1] * scale)
+            img = cv2.resize(img, (new_w, target_h))
+        resized.append(img)
+
+    # For 2-3 people: horizontal row
+    if n <= 3:
+        gap = 4
+        total_w = sum(img.shape[1] for img in resized) + gap * (n - 1)
+        canvas = np.zeros((target_h, total_w, 3), dtype=np.uint8)
+        x = 0
+        for img in resized:
+            canvas[:, x:x+img.shape[1]] = img
+            x += img.shape[1] + gap
+        return canvas
+
+    # 4+ people: 2-column grid
+    cols = 2
+    rows = (n + 1) // 2
+    target_w = min(img.shape[1] for img in resized)
+    cell_resized = []
+    for img in resized:
+        if img.shape[1] != target_w:
+            scale = target_w / img.shape[1]
+            new_h = int(img.shape[0] * scale)
+            img = cv2.resize(img, (target_w, new_h))
+        cell_resized.append(img)
+
+    cell_h = min(img.shape[0] for img in cell_resized)
+    gap = 4
+    canvas = np.zeros((cell_h * rows + gap * (rows - 1),
+                        target_w * cols + gap, 3), dtype=np.uint8)
+    for i, img in enumerate(cell_resized):
+        r, c = i // cols, i % cols
+        y = r * (cell_h + gap)
+        x = c * (target_w + gap)
+        canvas[y:y+cell_h, x:x+target_w] = img[:cell_h, :target_w]
+
+    return canvas
 
 
 # ── ComfyBridge-compatible wrapper ────────────────────────────────────────────
@@ -518,14 +660,15 @@ class ComfyBridge:
         self._message = "Generating avatar..."
         self._thread = threading.Thread(
             target=self._run,
-            args=(frame.copy(), style_key, gender),
+            args=(frame.copy(), style_key, gender, face_boxes),
             daemon=True,
         )
         self._thread.start()
         return True
 
-    def _run(self, frame, style_key, gender="unknown"):
-        img, err = generate_avatar(frame, style_key, gender=gender)
+    def _run(self, frame, style_key, gender="unknown", face_boxes=None):
+        img, err = generate_avatar(frame, style_key, gender=gender,
+                                   face_boxes=face_boxes)
         if img is not None:
             self._result = img
             self._status = "done"

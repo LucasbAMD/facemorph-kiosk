@@ -221,6 +221,19 @@
     cursor: pointer; display: none; text-transform: uppercase;
   }
   #name-btn:hover { background: rgba(0,212,255,0.06); }
+  /* Gender selector */
+  #gender-row {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  #gender-row .g-btn {
+    flex: 1; padding: 8px 4px; border: 1px solid #333; border-radius: 6px;
+    background: #1a1a1a; color: #888; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer; text-align: center;
+    text-transform: uppercase; transition: all 0.15s;
+  }
+  #gender-row .g-btn:hover { border-color: #555; color: #aaa; }
+  #gender-row .g-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+
   #transform-btn {
     width: 100%; padding: 16px;
     background: linear-gradient(135deg, var(--red), #cc1520);
@@ -340,6 +353,10 @@
     <div id="action-section">
       <div id="sel-status">Select a person to transform</div>
       <button id="name-btn" onclick="nameSelected()">Name Selected Person</button>
+      <div id="gender-row">
+        <button class="g-btn" onclick="setGender('male',this)">Male</button>
+        <button class="g-btn" onclick="setGender('female',this)">Female</button>
+      </div>
       <button id="transform-btn" onclick="doTransform()">GENERATE AVATAR</button>
     </div>
   </div>
@@ -376,6 +393,7 @@ const STYLES = [
 ];
 
 let selectedStyle = "avatar";
+let selectedGender = "unknown";
 let selCount = 0;
 let faceCount = 0;
 let pendingNameIdx = null;
@@ -400,6 +418,17 @@ function selectStyle(key, el) {
   selectedStyle = key;
   document.querySelectorAll(".style-card").forEach(c => c.classList.remove("active"));
   el.classList.add("active");
+}
+
+function setGender(g, el) {
+  if (selectedGender === g) {
+    selectedGender = "unknown";
+    el.classList.remove("active");
+  } else {
+    selectedGender = g;
+    document.querySelectorAll("#gender-row .g-btn").forEach(b => b.classList.remove("active"));
+    el.classList.add("active");
+  }
 }
 
 // ── AI status ────────────────────────────────────────────────────────────────
@@ -682,6 +711,7 @@ async function doTransform() {
 
   const fd = new FormData();
   fd.append("character", selectedStyle);
+  fd.append("gender", selectedGender);
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
     if (r.status === 400) {
