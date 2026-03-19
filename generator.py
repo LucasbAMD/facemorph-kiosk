@@ -68,6 +68,7 @@ _NEG_IDENTITY = (
     "beard, mustache, facial hair, goatee, stubble, "
     "mask, helmet, face covering, face paint, "
     "different face, different person, different race, different gender, "
+    "altered skin tone, darker skin, darkened skin, blackened skin, "
     "nudity, exposed chest, bare chest, cleavage, topless, nsfw"
 )
 _NEG_QUALITY = (
@@ -149,7 +150,7 @@ STYLES = {
             "person redrawn in One Piece anime style by Eiichiro Oda, "
             "bold black ink outlines, large expressive eyes with shiny highlights, "
             "exaggerated facial expression, vibrant flat cel-shaded coloring, "
-            "dynamic confident pose, same hairstyle and hair color"
+            "dynamic confident pose, same hairstyle and hair color, same skin tone"
         ),
         "prompt_2": (
             "One Piece anime illustration, vibrant pirate adventure scene, "
@@ -180,7 +181,7 @@ STYLES = {
             "chrome cybernetic implant near temple, LED strips woven in hair, "
             "futuristic jacket with glowing illuminated trim, "
             "reflective cyberpunk visor pushed up on forehead, "
-            "same face same identity same skin tone"
+            "same face same identity same skin tone same skin color"
         ),
         "prompt_2": (
             "cyberpunk city at night, rain-soaked neon-lit alley, "
@@ -229,7 +230,7 @@ STYLES = {
             "same person as pixel art RPG character sprite, "
             "visible square pixels, limited 16-bit retro color palette, "
             "dithering shading technique, blocky pixel features, "
-            "same face same identity same gender, "
+            "same face same identity same gender same skin tone, "
             "same hairstyle and hair color rendered in pixel blocks"
         ),
         "prompt_2": (
@@ -254,7 +255,7 @@ STYLES = {
             "same person drawn in bold comic book ink style, "
             "face fully visible with heavy black ink outlines around all features, "
             "halftone dot shading on skin, bright saturated primary colors, "
-            "same pose same body position, same hairstyle"
+            "same pose same body position, same hairstyle, same skin tone"
         ),
         "prompt_2": (
             "bold dynamic comic book page illustration, "
@@ -281,7 +282,7 @@ STYLES = {
             "person wearing ornate brass goggles pushed up on forehead, "
             "Victorian leather greatcoat with copper gear epaulettes, "
             "clockwork pocket watch chain, brass mechanical arm brace, "
-            "same facial features preserved exactly"
+            "same facial features same skin tone preserved exactly"
         ),
         "prompt_2": (
             "grand Victorian steampunk workshop interior, "
@@ -306,7 +307,7 @@ STYLES = {
             "visible cold-pressed paper texture underneath, "
             "delicate wet-on-wet paint bleeds on edges of face and hair, "
             "soft color gradients, artistic paint drips, "
-            "same face same identity same gender, same hairstyle and expression"
+            "same face same identity same gender same skin tone, same hairstyle and expression"
         ),
         "prompt_2": (
             "beautiful watercolor painting on textured cotton paper, "
@@ -357,7 +358,7 @@ STYLES = {
             "elegant long pointed elf ears, ethereal pale luminous skin, "
             "ornate silver mithril circlet on forehead with blue gem, "
             "flowing elven robes with leaf filigree embroidery, "
-            "same face same identity same gender, same expression preserved"
+            "same face same identity same gender same skin tone, same expression preserved"
         ),
         "prompt_2": (
             "epic Lord of the Rings fantasy scene, "
@@ -381,7 +382,7 @@ STYLES = {
             "same person in bold Andy Warhol pop art screen print style, "
             "flat bright neon color blocks on face and hair, "
             "thick black outlines around all features, "
-            "same face same identity same gender, "
+            "same face same identity same gender same skin tone, "
             "high contrast stylized portrait, halftone dot pattern on skin"
         ),
         "prompt_2": (
@@ -406,7 +407,7 @@ STYLES = {
             "same person with magical ice and frost covering skin and hair, "
             "crystalline ice formations growing on shoulders and clothing, "
             "frozen eyelashes with tiny icicles, pale blue-white frosty skin, "
-            "same face same identity same gender, "
+            "same face same identity same gender same skin tone, "
             "ice crystal crown forming on head, frost patterns on cheeks"
         ),
         "prompt_2": (
@@ -431,7 +432,7 @@ STYLES = {
             "same person lit by vivid neon lights, "
             "glowing neon light outlines tracing face and body contours, "
             "electric blue and hot pink neon reflections on skin, "
-            "same face same identity same gender, "
+            "same face same identity same gender same skin tone, "
             "same hairstyle with neon color highlights, "
             "dark shadows with vibrant neon rim lighting"
         ),
@@ -461,7 +462,7 @@ STYLES = {
             "oversized round head with mischievous wide grin showing tiny pointy teeth, "
             "large round glossy eyes, small pointy elf ears, "
             "chubby stubby body with short arms and legs, "
-            "smooth shiny vinyl toy surface, same face same identity"
+            "smooth shiny vinyl toy surface, same face same identity same skin tone"
         ),
         "prompt_2": (
             "cute designer vinyl art toy figure by Kasing Lung, "
@@ -489,7 +490,7 @@ STYLES = {
             "wearing dark flowing wizard robes with house crest embroidery, "
             "pointed wizard hat slightly tilted, round spectacles, "
             "holding a glowing magic wand casting bright sparkling spell, "
-            "same face same identity same gender, same expression"
+            "same face same identity same gender same skin tone, same expression"
         ),
         "prompt_2": (
             "Hogwarts School of Witchcraft and Wizardry interior, "
