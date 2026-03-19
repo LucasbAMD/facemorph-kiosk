@@ -18,6 +18,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+import logging
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
 from generator import ComfyBridge
 
 app = FastAPI(title="AMD-Adapt")

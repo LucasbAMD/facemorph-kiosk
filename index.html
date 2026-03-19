@@ -556,6 +556,9 @@ async function pollStatus() {
       document.getElementById("transform-btn").disabled = false;
     } else if (data.status === "idle") {
       clearInterval(pollTimer); pollTimer = null;
+      stopProgress();
+      document.getElementById("gen-overlay").classList.remove("on");
+      document.getElementById("transform-btn").disabled = false;
     }
   } catch {}
 }

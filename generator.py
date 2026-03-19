@@ -21,6 +21,16 @@ from PIL import Image
 
 warnings.filterwarnings("ignore", message=".*upcast_vae.*")
 warnings.filterwarnings("ignore", message=".*enable_vae_slicing.*")
+warnings.filterwarnings("ignore", message=".*local_dir_use_symlinks.*")
+warnings.filterwarnings("ignore", message=".*clean_up_tokenization_spaces.*")
+warnings.filterwarnings("ignore", message=".*The following part of your input was truncated.*")
+
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+import logging
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("diffusers").setLevel(logging.ERROR)
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 # ── Model paths ───────────────────────────────────────────────────────────────
 SDXL_TURBO_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
@@ -31,16 +41,19 @@ SDXL_BASE_ID = "stabilityai/stable-diffusion-xl-base-1.0"
 CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
 DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
-# ── Common negative terms to prevent hallucinated facial features ─────────────
-_FACE_LOCK_NEG = (
+# ── Common negative terms — split across dual CLIP encoders ───────────────────
+# neg1 = identity/body issues (CLIP-L, <=77 tokens)
+# neg2 = quality/content issues (CLIP-G, <=77 tokens)
+_NEG_IDENTITY = (
     "beard, mustache, facial hair, goatee, stubble, "
-    "mask, helmet, visor, face covering, face paint, "
-    "different face, different person, aged face, wrinkles, "
-    "different race, different ethnicity, different gender, gender swap, "
-    "nudity, exposed chest, exposed breasts, bare chest, cleavage, "
-    "revealing clothing, topless, shirtless, nsfw, "
+    "mask, helmet, face covering, face paint, "
+    "different face, different person, different race, different gender, "
+    "nudity, exposed chest, bare chest, cleavage, topless, nsfw"
+)
+_NEG_QUALITY = (
     "deformed hands, extra fingers, fused fingers, missing fingers, "
-    "blurry hands, bad anatomy, low quality, lowres, "
+    "bad anatomy, blurry, low quality, lowres, "
+    "text, watermark, deformed, ugly"
 )
 
 # ── Style definitions ─────────────────────────────────────────────────────────
@@ -65,13 +78,8 @@ STYLES = {
             "floating jellyfish seeds, blue misty atmosphere, "
             "ultra detailed, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "race change, bare skin, skimpy outfit, "
-            "human skin, pink skin, normal skin color, "
-            "office, indoor room, plain wall, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", human skin, pink skin, normal skin color, office, plain wall",
+        "negative_2": _NEG_QUALITY + ", realistic photo, indoor room",
         "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
@@ -91,11 +99,8 @@ STYLES = {
             "warm studio spotlight, soft shadows, "
             "Aardman animations, Wallace and Gromit quality, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "photorealistic, real human, real skin, photograph, "
-            "office, plain wall, blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", photorealistic, real human, real skin, photograph",
+        "negative_2": _NEG_QUALITY + ", office, plain wall",
         "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.52},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
@@ -114,12 +119,8 @@ STYLES = {
             "cherry blossom trees, glowing lanterns, dramatic clouds, "
             "Studio Ghibli quality, manga illustration, vibrant colors, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "photorealistic, real person, photograph, real skin texture, "
-            "3d render, realistic lighting, office, plain background, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", photorealistic, real person, photograph, real skin texture",
+        "negative_2": _NEG_QUALITY + ", 3d render, realistic lighting, office, plain background",
         "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
@@ -139,11 +140,8 @@ STYLES = {
             "steam vents, flying vehicles, "
             "Blade Runner cinematic style, neon noir, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "natural lighting, daytime, sunny, office, plain room, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", natural lighting, daytime, sunny",
+        "negative_2": _NEG_QUALITY + ", office, plain room",
         "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.53},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
@@ -163,11 +161,8 @@ STYLES = {
             "candlelight flickering, old master museum painting, "
             "baroque masterpiece, gallery quality artwork"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "photograph, digital art, modern, plain background, office, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", photograph, digital art, modern",
+        "negative_2": _NEG_QUALITY + ", plain background, office",
         "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 35,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
@@ -185,11 +180,8 @@ STYLES = {
             "tiled ground, HUD elements and health bar, "
             "classic SNES Final Fantasy style, nostalgic pixel art, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "photorealistic, smooth, high resolution, photograph, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", photorealistic, smooth, high resolution, photograph",
+        "negative_2": _NEG_QUALITY,
         "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
@@ -209,12 +201,8 @@ STYLES = {
             "action comic panel layout, "
             "classic comic art style, dynamic composition, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "superhero mask, domino mask, eye mask, face covered, "
-            "photorealistic, photograph, real skin, plain background, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", superhero mask, domino mask, eye mask, face covered",
+        "negative_2": _NEG_QUALITY + ", photorealistic, photograph, plain background",
         "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
@@ -235,12 +223,8 @@ STYLES = {
             "copper and bronze palette, warm dramatic lighting, "
             "industrial revolution aesthetic, masterpiece"
         ),
-        "negative": (
-            _FACE_LOCK_NEG +
-            "added beard, added mustache, added facial hair, rugged face, "
-            "modern, futuristic, neon, office, plain room, "
-            "blurry, deformed, text, watermark"
-        ),
+        "negative": _NEG_IDENTITY + ", added beard, added facial hair, rugged face",
+        "negative_2": _NEG_QUALITY + ", modern, futuristic, neon, office",
         "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 35,
                         "controlnet_scale": 0.58},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
@@ -414,6 +398,7 @@ def generate_scene(frame, style_key):
         prompt = style["prompt"]
         prompt_2 = style.get("prompt_2", prompt)
         neg_prompt = style["negative"]
+        neg_prompt_2 = style.get("negative_2", neg_prompt)
 
         # Prepare source image at 1024x1024 for SDXL
         h, w = frame.shape[:2]
@@ -441,7 +426,7 @@ def generate_scene(frame, style_key):
                     prompt=prompt,
                     prompt_2=prompt_2,
                     negative_prompt=neg_prompt,
-                    negative_prompt_2=neg_prompt,
+                    negative_prompt_2=neg_prompt_2,
                     image=source_pil,
                     control_image=depth_image,
                     strength=params["strength"],
@@ -456,7 +441,7 @@ def generate_scene(frame, style_key):
                     prompt=prompt,
                     prompt_2=prompt_2,
                     negative_prompt=neg_prompt,
-                    negative_prompt_2=neg_prompt,
+                    negative_prompt_2=neg_prompt_2,
                     image=source_pil,
                     strength=params["strength"],
                     num_inference_steps=params["steps"],
