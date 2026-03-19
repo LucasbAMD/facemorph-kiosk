@@ -46,6 +46,13 @@ DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 IP_ADAPTER_FACEID_REPO = "h94/IP-Adapter-FaceID"
 IP_ADAPTER_FACEID_WEIGHT = "ip-adapter-faceid_sdxl.bin"
 
+# Real-ESRGAN — neural 2x upscaler for sharper output
+REALESRGAN_MODEL_URL = (
+    "https://github.com/xinntao/Real-ESRGAN/releases/download/"
+    "v0.2.1/RealESRGAN_x2plus.pth"
+)
+REALESRGAN_MODEL_PATH = Path.home() / "kiosk_models" / "RealESRGAN_x2plus.pth"
+
 # ── Common negative terms — split across dual CLIP encoders ───────────────────
 # neg1 = identity/body issues (CLIP-L, <=77 tokens)
 # neg2 = quality/content issues (CLIP-G, <=77 tokens)
@@ -377,9 +384,63 @@ _depth_estimator = None
 _depth_processor = None
 _face_analyzer = None  # InsightFace for IP-Adapter FaceID
 _ip_adapter_loaded = False
+_upscaler = None  # Real-ESRGAN 2x upscaler
 _pipe_lock = threading.Lock()
 _pipe_ready = False
 _pipe_mode = "none"  # "controlnet" or "turbo"
+
+
+def _try_load_upscaler():
+    """Optionally load Real-ESRGAN 2x upscaler for sharper output."""
+    global _upscaler
+
+    try:
+        import torch
+        from realesrgan import RealESRGANer
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+
+        if not REALESRGAN_MODEL_PATH.exists():
+            print("[Generator]   Real-ESRGAN model not found — skipping upscaler")
+            print(f"[Generator]   Expected at: {REALESRGAN_MODEL_PATH}")
+            return
+
+        print("[Generator]   Loading Real-ESRGAN 2x upscaler...")
+        model = RRDBNet(
+            num_in_ch=3, num_out_ch=3, num_feat=64,
+            num_block=23, num_grow_ch=32, scale=2,
+        )
+        upsampler = RealESRGANer(
+            scale=2,
+            model_path=str(REALESRGAN_MODEL_PATH),
+            model=model,
+            half=True,
+            device="cuda",
+        )
+
+        with _pipe_lock:
+            _upscaler = upsampler
+        print("[Generator]   Real-ESRGAN 2x ready! Output will be upscaled to 2048x2048.")
+
+    except ImportError:
+        print("[Generator]   realesrgan/basicsr not installed — no upscaling.")
+        print("[Generator]   Install with: pip install realesrgan")
+    except Exception as e:
+        print(f"[Generator]   Real-ESRGAN not available: {e}")
+
+
+def _upscale_image(cv2_image):
+    """Upscale a BGR image using Real-ESRGAN. Returns upscaled image or original."""
+    with _pipe_lock:
+        upscaler = _upscaler
+    if upscaler is None:
+        return cv2_image
+
+    try:
+        output, _ = upscaler.enhance(cv2_image, outscale=2)
+        return output
+    except Exception as e:
+        print(f"[Generator]   Upscale failed: {e}")
+        return cv2_image
 
 
 def _try_load_ip_adapter(pipe):
@@ -492,7 +553,8 @@ def _load_pipeline():
             _pipe_ready = True
             print("[Generator] Ready! mode=ControlNet+SDXL_Base (best quality)")
 
-            # ── Try loading IP-Adapter FaceID (optional enhancement) ───
+            # ── Try loading optional enhancements ───
+            _try_load_upscaler()
             _try_load_ip_adapter(pipe)
             return
 
@@ -667,13 +729,25 @@ def generate_scene(frame, style_key):
                     generator=generator,
                 ).images[0]
 
-        elapsed = time.time() - start
-        print(f"[Generator] Done in {elapsed:.1f}s")
+        gen_elapsed = time.time() - start
+        print(f"[Generator] Generated in {gen_elapsed:.1f}s")
+
+        result_cv = cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR)
+
+        # ── Upscale with Real-ESRGAN for sharper output ──────────────
+        if _upscaler is not None:
+            print("[Generator]   Upscaling 2x with Real-ESRGAN...")
+            up_start = time.time()
+            result_cv = _upscale_image(result_cv)
+            print(f"[Generator]   Upscaled to {result_cv.shape[1]}x"
+                  f"{result_cv.shape[0]} in {time.time()-up_start:.1f}s")
 
         # Resize back to original aspect ratio
-        result_cv = cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR)
         result_cv = cv2.resize(result_cv, (w, h),
                                interpolation=cv2.INTER_LANCZOS4)
+
+        elapsed = time.time() - start
+        print(f"[Generator] Total time: {elapsed:.1f}s")
         return result_cv, None
 
     except Exception as e:

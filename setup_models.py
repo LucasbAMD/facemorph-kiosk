@@ -32,7 +32,7 @@ def main():
     print("=" * 55)
 
     # ── Check required packages ────────────────────────────────────────────
-    print("\n[1/6] Checking Python packages...")
+    print("\n[1/8] Checking Python packages...")
     required = {
         "torch": "torch (with ROCm)",
         "diffusers": "diffusers>=0.27.0",
@@ -62,7 +62,7 @@ def main():
         print(f"  VRAM: {vram:.1f} GB")
 
     # ── Check/download SDXL Turbo (existing) ──────────────────────────────
-    print("\n[2/6] Checking SDXL Turbo model...")
+    print("\n[2/8] Checking SDXL Turbo model...")
     sdxl_turbo = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
                   "sd_xl_turbo_1.0_fp16.safetensors")
     if sdxl_turbo.exists():
@@ -73,7 +73,7 @@ def main():
         print("         Turbo fallback mode will not be available.")
 
     # ── Download ControlNet Depth SDXL ────────────────────────────────────
-    print("\n[3/6] Downloading ControlNet Depth for SDXL...")
+    print("\n[3/8] Downloading ControlNet Depth for SDXL...")
     print("       (This preserves your pose and scene structure)")
     print("       Model: diffusers/controlnet-depth-sdxl-1.0")
     try:
@@ -91,7 +91,7 @@ def main():
         print("         Will fall back to Turbo-only mode.")
 
     # ── Download Depth-Anything-V2 depth estimator ─────────────────────────
-    print("\n[4/6] Downloading depth estimator (Depth-Anything-V2)...")
+    print("\n[4/8] Downloading depth estimator (Depth-Anything-V2)...")
     print("       Model: depth-anything/Depth-Anything-V2-Small-hf")
     try:
         from transformers import AutoImageProcessor, AutoModelForDepthEstimation
@@ -105,7 +105,29 @@ def main():
         print("         Will fall back to Turbo-only mode.")
 
     # ── Download IP-Adapter FaceID for SDXL ─────────────────────────────
-    print("\n[5/6] Downloading IP-Adapter FaceID for SDXL...")
+    # ── Download Real-ESRGAN 2x upscaler ─────────────────────────────
+    print("\n[5/8] Downloading Real-ESRGAN 2x upscaler...")
+    print("       (Upscales output from 1024 to 2048 for sharper results)")
+    models_dir = Path.home() / "kiosk_models"
+    models_dir.mkdir(exist_ok=True)
+    esrgan_path = models_dir / "RealESRGAN_x2plus.pth"
+    if esrgan_path.exists():
+        size_mb = esrgan_path.stat().st_size // (1024 * 1024)
+        print(f"  [OK] RealESRGAN_x2plus.pth already exists ({size_mb} MB)")
+    else:
+        try:
+            import urllib.request
+            url = ("https://github.com/xinntao/Real-ESRGAN/releases/download/"
+                   "v0.2.1/RealESRGAN_x2plus.pth")
+            print(f"  [..] Downloading from GitHub releases...")
+            urllib.request.urlretrieve(url, str(esrgan_path))
+            size_mb = esrgan_path.stat().st_size // (1024 * 1024)
+            print(f"  [OK] RealESRGAN_x2plus.pth downloaded ({size_mb} MB)")
+        except Exception as e:
+            print(f"  [WARN] Could not download Real-ESRGAN: {e}")
+            print("         Output will not be upscaled (still works, just lower res).")
+
+    print("\n[6/8] Downloading IP-Adapter FaceID for SDXL...")
     print("       (This preserves your face identity during avatar style)")
     print("       Model: h94/IP-Adapter-FaceID")
     try:
@@ -121,7 +143,7 @@ def main():
         print("         Avatar style will work without face ID preservation.")
 
     # ── Download InsightFace buffalo_l model ───────────────────────────
-    print("\n[6/6] Checking InsightFace face analysis model...")
+    print("\n[7/8] Checking InsightFace face analysis model...")
     try:
         from insightface.app import FaceAnalysis
         print("  [..] Downloading buffalo_l model (if needed)...")

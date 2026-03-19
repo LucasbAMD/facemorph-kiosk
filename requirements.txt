@@ -9,3 +9,4 @@ accelerate>=0.25.0
 safetensors>=0.4.0
 insightface>=0.7.0
 onnxruntime>=1.16.0
+realesrgan>=0.3.0
