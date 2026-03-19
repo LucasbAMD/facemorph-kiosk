@@ -386,9 +386,9 @@ def _try_load_ip_adapter(pipe):
         print("[Generator]   Loading InsightFace for face embedding...")
         app = FaceAnalysis(
             name="buffalo_l",
-            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            providers=["CPUExecutionProvider"],
         )
-        app.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
+        app.prepare(ctx_id=-1, det_thresh=0.5, det_size=(640, 640))
 
         print("[Generator]   Loading IP-Adapter FaceID for SDXL...")
         pipe.load_ip_adapter(
