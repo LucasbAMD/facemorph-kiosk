@@ -76,6 +76,7 @@ _NEG_QUALITY = (
 # strength ~0.78-0.85 controls how much the image deviates from original.
 
 STYLES = {
+    # ── AVATAR ────────────────────────────────────────────────────────
     "avatar": {
         "label": "Avatar",
         "prompt": (
@@ -101,272 +102,340 @@ STYLES = {
         "use_ip_adapter": True,
         "ip_adapter_scale": 0.5,
         "controlnet": {"strength": 0.88, "guidance": 14.0, "steps": 40,
-                        "controlnet_scale": 0.42},
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
+    # ── CLAYMATION ────────────────────────────────────────────────────
     "claymation": {
         "label": "Claymation",
         "prompt": (
-            "same person's identical face sculpted in smooth clay, "
-            "preserving exact jaw nose eyes and expression, clean-shaven, "
-            "round chunky clay body, visible fingerprint textures, "
-            "big expressive clay eyes, smooth clay hair matching their hairstyle"
+            "person sculpted as clay figure with visible sculpting tool marks, "
+            "chunky exaggerated clay features, fingerprint impressions in clay, "
+            "layered clay textures with rough edges, big round clay eyes, "
+            "clay hair shaped in thick textured strands, "
+            "oversized hands and stubby proportions"
         ),
         "prompt_2": (
-            "incredible stop-motion claymation scene, "
-            "miniature clay furniture and props on detailed tabletop set, "
-            "painted cardboard sky backdrop, cotton ball clouds, "
-            "warm studio spotlight, soft shadows, "
-            "Aardman animations, Wallace and Gromit quality, masterpiece"
+            "stop-motion animation movie scene, detailed miniature set, "
+            "tiny clay props and furniture on tabletop, "
+            "painted paper backdrop of rolling hills and blue sky, "
+            "cotton ball clouds, warm studio spotlight with soft shadows, "
+            "Aardman Animations Shaun the Sheep quality, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", photorealistic, real human, real skin, photograph",
-        "negative_2": _NEG_QUALITY + ", office, plain wall",
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.56},
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, real human, real skin, photograph, "
+            "smooth skin, smooth plastic, airbrushed"
+        ),
+        "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room, white background",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
+    # ── ANIME (One Piece) ─────────────────────────────────────────────
     "anime": {
         "label": "Anime",
         "prompt": (
-            "same person redrawn as anime character, preserving their exact face shape "
-            "nose jaw and eyes, same hairstyle same hair color same expression, "
-            "thick black ink outlines, flat cel-shaded coloring, "
-            "anime eyes with light reflections"
+            "person redrawn in One Piece anime style by Eiichiro Oda, "
+            "bold black ink outlines, large expressive eyes with shiny highlights, "
+            "exaggerated facial expression, vibrant flat cel-shaded coloring, "
+            "dynamic confident pose, same hairstyle and hair color"
         ),
         "prompt_2": (
-            "stunning 2D anime illustration, NOT a photograph, "
-            "vibrant anime cityscape at sunset background, "
-            "cherry blossom trees, glowing lanterns, dramatic clouds, "
-            "manga illustration, vibrant colors, masterpiece"
+            "One Piece anime illustration, vibrant pirate adventure scene, "
+            "tropical ocean harbor with pirate ships in background, "
+            "bright blue sky with dramatic clouds, palm trees and island, "
+            "Toei Animation style, shonen manga art, "
+            "colorful and energetic, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", photorealistic, real person, photograph, real skin texture",
-        "negative_2": _NEG_QUALITY + ", 3d render, realistic lighting, office, plain background",
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.58},
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
+            "real skin texture, 3d render"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", realistic lighting, office, plain background, "
+            "white wall, indoor room"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.32},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── CYBERPUNK ─────────────────────────────────────────────────────
     "cyberpunk": {
         "label": "Cyberpunk",
         "prompt": (
-            "same person identical face preserved exactly, same eyes nose jaw, "
-            "subtle neon circuit tattoo lines on cheeks, "
-            "chrome cybernetic accent near temple, LED strips in hair, "
-            "futuristic jacket with illuminated trim"
+            "person with subtle neon circuit tattoo lines on cheeks, "
+            "chrome cybernetic implant near temple, LED strips woven in hair, "
+            "futuristic jacket with glowing illuminated trim, "
+            "reflective cyberpunk visor pushed up on forehead"
         ),
         "prompt_2": (
-            "incredible cyberpunk scene at night, "
-            "neon-lit rain-soaked city alley, massive holographic billboards, "
-            "pink and cyan neon signs, puddles reflecting neon, "
-            "steam vents, flying vehicles, "
-            "Blade Runner cinematic style, neon noir, masterpiece"
+            "cyberpunk city at night, rain-soaked neon-lit alley, "
+            "massive holographic billboards and advertisements, "
+            "pink and cyan neon signs, wet street reflecting neon colors, "
+            "steam vents and flying vehicles overhead, "
+            "Blade Runner 2049 cinematic style, neon noir, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", natural lighting, daytime, sunny",
-        "negative_2": _NEG_QUALITY + ", office, plain room",
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.53},
+        "negative": _NEG_IDENTITY + ", natural lighting, daytime, sunny, nature",
+        "negative_2": _NEG_QUALITY + ", office, plain room, indoor room, white wall",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── OIL PAINTING ──────────────────────────────────────────────────
     "oilpainting": {
         "label": "Oil Painting",
         "prompt": (
-            "same person's identical face painted with visible brushstrokes, "
-            "preserving exact facial features eyes nose mouth and expression, "
-            "rich thick impasto technique, warm golden Rembrandt lighting, "
-            "dramatic chiaroscuro shadows and glowing highlights"
+            "person painted with thick visible oil paint brushstrokes, "
+            "rich impasto technique with raised paint texture, "
+            "warm golden Rembrandt lighting on face, "
+            "dramatic chiaroscuro with deep shadows and glowing highlights, "
+            "oil paint blending visible on cheeks and forehead"
         ),
         "prompt_2": (
-            "magnificent classical oil painting on canvas, "
+            "classical oil painting on stretched canvas, "
             "grand Renaissance palace interior background, "
-            "rich velvet curtains, ornate gold frames, marble columns, "
-            "candlelight flickering, old master museum painting, "
-            "baroque masterpiece, gallery quality artwork"
+            "rich velvet curtains, ornate gilded frames on walls, marble columns, "
+            "candlelight glow, old master museum painting, "
+            "baroque masterpiece, gallery quality fine art"
         ),
-        "negative": _NEG_IDENTITY + ", photograph, digital art, modern",
-        "negative_2": _NEG_QUALITY + ", plain background, office",
-        "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.55},
+        "negative": _NEG_IDENTITY + ", photograph, digital art, modern, flat colors",
+        "negative_2": _NEG_QUALITY + ", plain background, office, white wall, indoor room",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
+    # ── PIXEL ART ─────────────────────────────────────────────────────
     "pixelart": {
         "label": "Pixel Art",
         "prompt": (
-            "same person as pixel art character, identical face shape and features, "
-            "same hairstyle and hair color, "
-            "visible square pixels, limited retro color palette, dithering"
+            "person as pixel art RPG character sprite, "
+            "visible square pixels, limited 16-bit retro color palette, "
+            "dithering shading technique, blocky pixel features, "
+            "same hairstyle and hair color rendered in pixel blocks"
         ),
         "prompt_2": (
-            "retro 16-bit pixel art video game screenshot, "
-            "colorful RPG game level background, pixel art trees, 8-bit clouds, "
-            "tiled ground, HUD elements and health bar, "
-            "classic SNES Final Fantasy style, nostalgic pixel art, masterpiece"
+            "retro 16-bit SNES video game screenshot, "
+            "pixel art fantasy village background with tiled stone path, "
+            "pixel art trees and bushes, 8-bit clouds and blue sky, "
+            "RPG game HUD with health bar at top, "
+            "Final Fantasy VI style, nostalgic pixel art, masterpiece"
         ),
         "negative": _NEG_IDENTITY + ", photorealistic, smooth, high resolution, photograph",
-        "negative_2": _NEG_QUALITY,
-        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.50},
+        "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.35,
+        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.30},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
+    # ── COMIC BOOK ────────────────────────────────────────────────────
     "comicbook": {
         "label": "Comic Book",
         "prompt": (
-            "same person's exact face drawn in comic ink style, no mask, "
-            "face fully visible preserving their real eyes nose mouth jaw, "
-            "heavy black ink outlines around features, halftone dot shading, "
-            "bright saturated primary colors, same hairstyle"
+            "person drawn in bold comic book ink style, "
+            "face fully visible with heavy black ink outlines around all features, "
+            "halftone dot shading on skin, bright saturated primary colors, "
+            "dynamic heroic pose, same hairstyle"
         ),
         "prompt_2": (
-            "bold dynamic comic book illustration, "
-            "dramatic speed lines and pop art bursts background, "
-            "Ben-Day dots pattern, bold color blocks, "
-            "action comic panel layout, "
-            "classic comic art style, dynamic composition, masterpiece"
+            "bold dynamic comic book page illustration, "
+            "dramatic explosion and speed lines background, "
+            "Ben-Day dots pattern, bold POW and ZAP effects, "
+            "cityscape rooftop at sunset behind, "
+            "classic Marvel comic art style, dynamic composition, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", superhero mask, domino mask, eye mask, face covered",
-        "negative_2": _NEG_QUALITY + ", photorealistic, photograph, plain background",
-        "controlnet": {"strength": 0.76, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.60},
+        "negative": (
+            _NEG_IDENTITY + ", superhero mask, domino mask, eye mask, "
+            "face covered, helmet"
+        ),
+        "negative_2": _NEG_QUALITY + ", photorealistic, photograph, office, plain background",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
+    # ── STEAMPUNK ─────────────────────────────────────────────────────
     "steampunk": {
         "label": "Steampunk",
         "prompt": (
-            "same person identical face preserved exactly, same eyes nose jaw mouth, "
-            "clean-shaven face matching the real person precisely, "
-            "ornate brass goggles pushed up on forehead, "
-            "Victorian leather coat with copper gears and clockwork accessories"
+            "person wearing ornate brass goggles pushed up on forehead, "
+            "Victorian leather greatcoat with copper gear epaulettes, "
+            "clockwork pocket watch chain, brass mechanical arm brace, "
+            "same facial features preserved exactly"
         ),
         "prompt_2": (
-            "incredible steampunk scene, "
-            "grand Victorian workshop background, "
-            "massive spinning brass gears, steam pipes, pressure gauges, "
-            "leather-bound books, amber gaslight glow, "
-            "copper and bronze palette, warm dramatic lighting, "
-            "industrial revolution aesthetic, masterpiece"
+            "grand Victorian steampunk workshop interior, "
+            "massive spinning brass gears and cogs on walls, "
+            "copper steam pipes with pressure gauges, leather-bound books, "
+            "amber gaslight glow, bronze mechanical inventions, "
+            "warm dramatic lighting, industrial revolution aesthetic, masterpiece"
         ),
         "negative": _NEG_IDENTITY + ", added beard, added facial hair, rugged face",
-        "negative_2": _NEG_QUALITY + ", modern, futuristic, neon, office",
-        "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.58},
+        "negative_2": _NEG_QUALITY + ", modern, futuristic, neon, office, plain wall",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.38},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
+    # ── WATERCOLOR ────────────────────────────────────────────────────
     "watercolor": {
         "label": "Watercolor",
         "prompt": (
-            "same person's exact face and features painted in watercolor, "
-            "preserving their real eyes nose mouth jaw and expression, "
-            "soft translucent watercolor washes, visible paper texture, "
-            "delicate wet-on-wet paint bleeds, same hairstyle"
+            "person painted in translucent watercolor washes, "
+            "visible cold-pressed paper texture underneath, "
+            "delicate wet-on-wet paint bleeds on edges of face and hair, "
+            "soft color gradients, artistic paint drips, "
+            "same hairstyle and expression"
         ),
         "prompt_2": (
             "beautiful watercolor painting on textured cotton paper, "
-            "soft floral garden background with bleeding colors, "
-            "splashes of diluted pigment, artistic drips at edges, "
-            "gentle pastel tones, fine art watercolor, masterpiece"
+            "soft impressionist garden background with bleeding flower colors, "
+            "wisteria and roses in loose watercolor washes, "
+            "splashes of diluted pigment, gentle pastel sky, "
+            "fine art watercolor exhibition quality, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", photograph, digital art, oil painting",
-        "negative_2": _NEG_QUALITY + ", office, plain background, harsh colors",
-        "controlnet": {"strength": 0.76, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.58},
+        "negative": _NEG_IDENTITY + ", photograph, digital art, oil painting, sharp edges",
+        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, harsh colors",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
+    # ── ZOMBIE ────────────────────────────────────────────────────────
     "zombie": {
         "label": "Zombie",
         "prompt": (
-            "same person's exact face transformed into a zombie, "
-            "keeping their real facial structure eyes nose and jaw, "
-            "pale green decaying skin, dark hollow eye sockets, "
-            "torn clothing, same hairstyle but messy and dirty"
+            "person transformed into a terrifying zombie, "
+            "pale green-grey decaying skin with exposed veins, "
+            "dark hollow sunken eye sockets with milky white eyes, "
+            "cracked bleeding lips, torn and bloodied clothing, "
+            "same hairstyle but matted dirty and disheveled"
         ),
         "prompt_2": (
             "cinematic horror movie scene, dark foggy graveyard at night, "
-            "creepy dead trees, cracked tombstones, full moon, "
-            "eerie green fog, dramatic horror lighting, "
-            "movie quality, highly detailed, masterpiece"
+            "creepy dead twisted trees, cracked mossy tombstones, "
+            "huge full moon through clouds, eerie green fog rolling, "
+            "dramatic horror film lighting, The Walking Dead quality, "
+            "highly detailed, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", cute, happy colors, bright, cheerful",
-        "negative_2": _NEG_QUALITY + ", office, plain background, daytime",
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.52},
+        "negative": _NEG_IDENTITY + ", cute, happy colors, bright, cheerful, clean skin",
+        "negative_2": _NEG_QUALITY + ", office, plain background, daytime, white wall",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.84, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── FANTASY ELF ───────────────────────────────────────────────────
     "fantasy": {
         "label": "Fantasy Elf",
         "prompt": (
-            "same person's exact face as a high fantasy elf, "
-            "preserving their real eyes nose mouth and expression, "
-            "elegant pointed elf ears, ethereal glowing skin, "
-            "ornate silver circlet on forehead, flowing elven robes"
+            "person as a high fantasy elf warrior, "
+            "elegant long pointed elf ears, ethereal pale luminous skin, "
+            "ornate silver mithril circlet on forehead with blue gem, "
+            "flowing elven robes with leaf filigree embroidery, "
+            "same facial features and expression preserved"
         ),
         "prompt_2": (
-            "epic high fantasy scene, enchanted ancient forest, "
-            "magical golden light filtering through giant trees, "
-            "glowing fireflies, mystical stone ruins covered in moss, "
-            "fantasy art style, highly detailed, masterpiece"
+            "epic Lord of the Rings fantasy scene, "
+            "enchanted ancient elven forest of Rivendell, "
+            "magical golden light filtering through towering ancient trees, "
+            "glowing fireflies, mystical elven stone ruins covered in moss, "
+            "fantasy concept art, highly detailed, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", modern clothing, technology, urban",
-        "negative_2": _NEG_QUALITY + ", office, plain background, contemporary",
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.55},
+        "negative": _NEG_IDENTITY + ", modern clothing, technology, urban, contemporary",
+        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, indoor room",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── POP ART ───────────────────────────────────────────────────────
     "popart": {
         "label": "Pop Art",
         "prompt": (
-            "same person's exact face in bold pop art style, "
-            "preserving their real facial features and expression, "
-            "flat bright neon color blocks on face, thick black outlines, "
-            "stylized high contrast portrait, same hairstyle"
+            "person in bold Andy Warhol pop art screen print style, "
+            "flat bright neon color blocks on face and hair, "
+            "thick black outlines around all features, "
+            "high contrast stylized portrait, halftone dot pattern on skin"
         ),
         "prompt_2": (
-            "iconic pop art screen print, four-color offset print style, "
-            "vibrant pink yellow cyan and orange color palette, "
-            "repeating pattern background with bold graphic shapes, "
-            "gallery art, graphic design masterpiece"
+            "iconic Andy Warhol pop art print, vibrant color offset, "
+            "hot pink yellow cyan and orange color palette, "
+            "bold graphic shapes and repeating pattern background, "
+            "Warhol Marilyn Monroe series style, "
+            "modern art gallery exhibition piece, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", photorealistic, subtle colors, muted",
-        "negative_2": _NEG_QUALITY + ", office, plain background, photograph",
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.56},
+        "negative": _NEG_IDENTITY + ", photorealistic, subtle colors, muted, soft",
+        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, photograph",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.33},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── ICE & FROST ───────────────────────────────────────────────────
     "ice": {
         "label": "Ice & Frost",
         "prompt": (
-            "same person's exact face with frost and ice effects, "
-            "preserving their real eyes nose mouth and expression, "
-            "crystalline ice forming on skin and hair, frozen eyelashes, "
-            "pale blue-white frosty skin, icicles hanging from clothing"
+            "person with magical ice and frost covering skin and hair, "
+            "crystalline ice formations growing on shoulders and clothing, "
+            "frozen eyelashes with tiny icicles, pale blue-white frosty skin, "
+            "ice crystal crown forming on head, frost patterns on cheeks"
         ),
         "prompt_2": (
-            "magical frozen winter wonderland scene, "
-            "massive ice crystals and frozen waterfalls background, "
-            "shimmering aurora borealis in dark sky, falling snowflakes, "
-            "blue and white color palette, cinematic, masterpiece"
+            "magical frozen ice kingdom scene, "
+            "massive ice crystal formations and frozen waterfall background, "
+            "shimmering aurora borealis dancing across dark sky, "
+            "gently falling snowflakes, ice palace spires, "
+            "Frozen movie quality, blue and white cinematic, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", warm colors, summer, tropical, green",
-        "negative_2": _NEG_QUALITY + ", office, plain background, indoor",
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.55},
+        "negative": _NEG_IDENTITY + ", warm colors, summer, tropical, green, fire",
+        "negative_2": _NEG_QUALITY + ", office, plain background, indoor room, white wall",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── NEON / UV GLOW ────────────────────────────────────────────────
     "neon": {
         "label": "Neon Glow",
         "prompt": (
-            "same person's exact face with vivid neon glow effect, "
-            "preserving their real facial features and expression, "
+            "person lit by vivid neon lights, "
             "glowing neon light outlines tracing face and body contours, "
-            "electric blue and hot pink light on skin, same hairstyle"
+            "electric blue and hot pink neon reflections on skin, "
+            "same hairstyle with neon color highlights, "
+            "dark shadows with vibrant neon rim lighting"
         ),
         "prompt_2": (
-            "dramatic neon light portrait in pitch black darkness, "
-            "vibrant electric blue pink and purple neon tubes, "
-            "light painting streaks, lens flares, glowing particles, "
+            "dramatic neon portrait in dark nightclub environment, "
+            "vibrant electric blue pink and purple neon tube signs, "
+            "neon light painting streaks, colorful lens flares, "
+            "glowing particles floating in air, DJ booth in background, "
             "ultraviolet blacklight atmosphere, stunning, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", natural lighting, daytime, bright ambient",
-        "negative_2": _NEG_QUALITY + ", office, plain background, washed out",
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.56},
+        "negative": (
+            _NEG_IDENTITY + ", natural lighting, daytime, bright ambient, "
+            "different ethnicity, different race"
+        ),
+        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, washed out",
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.6,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.38},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
 }
