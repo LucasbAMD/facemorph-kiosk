@@ -9,4 +9,3 @@ accelerate>=0.25.0
 safetensors>=0.4.0
 scikit-learn
 mediapipe
-rembg[gpu]
