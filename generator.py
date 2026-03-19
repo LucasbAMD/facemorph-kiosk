@@ -243,20 +243,10 @@ def _load_pipeline():
         # Move to GPU
         pipe = pipe.to("cuda")
 
-        # Load IP-Adapter if available
-        ip_bin  = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter_sdxl.safetensors"
-        img_enc = IP_ADAPTER_DIR / "sdxl_models" / "image_encoder"
-        if ip_bin.exists() and img_enc.exists():
-            print("[Generator] Loading IP-Adapter SDXL...")
-            pipe.load_ip_adapter(
-                str(IP_ADAPTER_DIR),
-                subfolder="sdxl_models",
-                weight_name="ip-adapter_sdxl.safetensors",
-            )
-            print("[Generator] IP-Adapter loaded — face identity preservation active")
-        else:
-            print("[Generator] WARN: IP-Adapter not found — run setup_models.py first")
-            print(f"[Generator]       Expected: {ip_bin}")
+        # IP-Adapter disabled for now — dimension mismatch with current diffusers
+        # version. Basic img2img works reliably without it.
+        # Will be re-enabled once diffusers version is pinned.
+        print("[Generator] Using img2img without IP-Adapter")
 
         with _pipe_lock:
             _pipe = pipe
@@ -418,10 +408,8 @@ def generate_character(frame, char_key, selection_mask=None,
         cfg      = CHARACTER_PROMPTS.get(char_key, CHARACTER_PROMPTS["navi"])
         positive, negative = get_prompts(char_key, gender)
         denoise  = cfg.get("denoise", 0.65)
-        ip_weight = cfg.get("ip_weight", 0.6)
 
-        # ── Prepare images ─────────────────────────────────────────────────
-        # Source image — resize to 1024x1024 for SDXL (keeps aspect, pads)
+        # ── Prepare source image ───────────────────────────────────────────
         h, w = frame.shape[:2]
         scale = 1024 / max(h, w)
         nh = int((h * scale) // 64) * 64
@@ -429,45 +417,26 @@ def generate_character(frame, char_key, selection_mask=None,
         resized = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
         source_pil = Image.fromarray(cv2.cvtColor(resized, cv2.COLOR_BGR2RGB))
 
-        # Face crop for IP-Adapter — use original full-res frame for best quality
-        face_pil = _extract_face(frame)
-
         # ── Run pipeline ───────────────────────────────────────────────────
         with _pipe_lock:
             pipe = _pipe
 
-        has_ip = hasattr(pipe, '_ip_adapter_scales') or hasattr(pipe, 'unet') and \
-                 hasattr(pipe.unet, 'encoder_hid_proj')
-
-        print(f"[Generator] Running {'IP-Adapter + ' if has_ip else ''}img2img...")
+        print(f"[Generator] Running img2img — character={char_key} gender={gender}")
         start = time.time()
 
         generator = torch.Generator(device="cuda").manual_seed(
             int(time.time()) % 2**32)
 
         with torch.inference_mode():
-            if has_ip:
-                pipe.set_ip_adapter_scale(ip_weight)
-                result = pipe(
-                    prompt=positive,
-                    negative_prompt=negative,
-                    image=source_pil,
-                    ip_adapter_image=face_pil,
-                    strength=denoise,
-                    num_inference_steps=4,
-                    guidance_scale=0.0,
-                    generator=generator,
-                ).images[0]
-            else:
-                result = pipe(
-                    prompt=positive,
-                    negative_prompt=negative,
-                    image=source_pil,
-                    strength=denoise,
-                    num_inference_steps=4,
-                    guidance_scale=0.0,
-                    generator=generator,
-                ).images[0]
+            result = pipe(
+                prompt=positive,
+                negative_prompt=negative,
+                image=source_pil,
+                strength=denoise,
+                num_inference_steps=4,
+                guidance_scale=0.0,
+                generator=generator,
+            ).images[0]
 
         elapsed = time.time() - start
         print(f"[Generator] Done in {elapsed:.1f}s — output {result.size}")
