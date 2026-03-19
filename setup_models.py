@@ -32,7 +32,7 @@ def main():
     print("=" * 55)
 
     # ── Check required packages ────────────────────────────────────────────
-    print("\n[1/4] Checking Python packages...")
+    print("\n[1/6] Checking Python packages...")
     required = {
         "torch": "torch (with ROCm)",
         "diffusers": "diffusers>=0.27.0",
@@ -62,7 +62,7 @@ def main():
         print(f"  VRAM: {vram:.1f} GB")
 
     # ── Check/download SDXL Turbo (existing) ──────────────────────────────
-    print("\n[2/4] Checking SDXL Turbo model...")
+    print("\n[2/6] Checking SDXL Turbo model...")
     sdxl_turbo = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
                   "sd_xl_turbo_1.0_fp16.safetensors")
     if sdxl_turbo.exists():
@@ -73,7 +73,7 @@ def main():
         print("         Turbo fallback mode will not be available.")
 
     # ── Download ControlNet Depth SDXL ────────────────────────────────────
-    print("\n[3/4] Downloading ControlNet Depth for SDXL...")
+    print("\n[3/6] Downloading ControlNet Depth for SDXL...")
     print("       (This preserves your pose and scene structure)")
     print("       Model: diffusers/controlnet-depth-sdxl-1.0")
     try:
@@ -91,7 +91,7 @@ def main():
         print("         Will fall back to Turbo-only mode.")
 
     # ── Download Depth-Anything-V2 depth estimator ─────────────────────────
-    print("\n[4/4] Downloading depth estimator (Depth-Anything-V2)...")
+    print("\n[4/6] Downloading depth estimator (Depth-Anything-V2)...")
     print("       Model: depth-anything/Depth-Anything-V2-Small-hf")
     try:
         from transformers import AutoImageProcessor, AutoModelForDepthEstimation
@@ -103,6 +103,36 @@ def main():
     except Exception as e:
         print(f"  [WARN] Could not download depth estimator: {e}")
         print("         Will fall back to Turbo-only mode.")
+
+    # ── Download IP-Adapter FaceID for SDXL ─────────────────────────────
+    print("\n[5/6] Downloading IP-Adapter FaceID for SDXL...")
+    print("       (This preserves your face identity during avatar style)")
+    print("       Model: h94/IP-Adapter-FaceID")
+    try:
+        from huggingface_hub import hf_hub_download
+        print("  [..] Downloading ip-adapter-faceid_sdxl.bin...")
+        hf_hub_download(
+            repo_id="h94/IP-Adapter-FaceID",
+            filename="ip-adapter-faceid_sdxl.bin",
+        )
+        print("  [OK] IP-Adapter FaceID SDXL cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download IP-Adapter FaceID: {e}")
+        print("         Avatar style will work without face ID preservation.")
+
+    # ── Download InsightFace buffalo_l model ───────────────────────────
+    print("\n[6/6] Checking InsightFace face analysis model...")
+    try:
+        from insightface.app import FaceAnalysis
+        print("  [..] Downloading buffalo_l model (if needed)...")
+        app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+        app.prepare(ctx_id=-1, det_size=(160, 160))
+        print("  [OK] InsightFace buffalo_l cached")
+    except ImportError:
+        print("  [WARN] InsightFace not installed.")
+        print("         Install with: pip install insightface onnxruntime-gpu")
+    except Exception as e:
+        print(f"  [WARN] Could not download InsightFace model: {e}")
 
     # ── Download SDXL Base (optional, for highest quality) ────────────────
     print("\n[Bonus] Pre-caching SDXL Base 1.0 pipeline components...")

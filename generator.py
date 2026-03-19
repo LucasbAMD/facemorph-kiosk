@@ -1,10 +1,11 @@
 """
 generator.py — AMD-Adapt AI Scene Style Transfer
 
-Best quality mode: SDXL Base + ControlNet Depth
+Best quality mode: SDXL Base + ControlNet Depth + IP-Adapter FaceID
   - Extracts depth map from camera frame to preserve structure
   - Uses SDXL Base (not Turbo) for highest quality output
-  - ~20-30s per generation but dramatically better results
+  - IP-Adapter FaceID preserves facial identity for styles that need it
+  - ~25-40s per generation but dramatically better results
 
 Fallback mode: SDXL Turbo img2img
   - Fast (~5s) but lower quality
@@ -41,6 +42,10 @@ SDXL_BASE_ID = "stabilityai/stable-diffusion-xl-base-1.0"
 CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
 DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
+# IP-Adapter FaceID — preserves facial identity during style transfer
+IP_ADAPTER_FACEID_REPO = "h94/IP-Adapter-FaceID"
+IP_ADAPTER_FACEID_WEIGHT = "ip-adapter-faceid_sdxl.bin"
+
 # ── Common negative terms — split across dual CLIP encoders ───────────────────
 # neg1 = identity/body issues (CLIP-L, <=77 tokens)
 # neg2 = quality/content issues (CLIP-G, <=77 tokens)
@@ -67,21 +72,23 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "prompt": (
-            "same person with their exact face shape and expression, "
-            "skin transformed to vivid deep blue color, cyan bioluminescent "
-            "freckles and dots on cheeks and forehead, golden cat-slit eyes, "
-            "tall pointed ears, leather warrior chest plate and shoulder armor"
+            "Na'vi alien warrior portrait, vivid deep blue skin covering entire face "
+            "and body, glowing cyan bioluminescent freckles and dots on cheeks and "
+            "forehead, golden cat-slit eyes, tall pointed ears, "
+            "leather warrior chest plate and shoulder armor"
         ),
         "prompt_2": (
-            "cinematic alien jungle planet scene, bioluminescent forest, "
-            "massive glowing trees, floating seeds, blue misty atmosphere, "
-            "sci-fi fantasy movie still, "
+            "cinematic still from Avatar movie on planet Pandora, "
+            "lush bioluminescent jungle, massive glowing trees, floating seeds, "
+            "blue misty atmosphere, James Cameron cinematography, "
             "ultra detailed, masterpiece"
         ),
         "negative": _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin, pale skin",
         "negative_2": _NEG_QUALITY + ", realistic photo, office, indoor room, plain wall",
-        "controlnet": {"strength": 0.85, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.48},
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.6,
+        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 40,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
@@ -362,9 +369,68 @@ STYLE_ORDER = [
 _pipe = None
 _depth_estimator = None
 _depth_processor = None
+_face_analyzer = None  # InsightFace for IP-Adapter FaceID
+_ip_adapter_loaded = False
 _pipe_lock = threading.Lock()
 _pipe_ready = False
 _pipe_mode = "none"  # "controlnet" or "turbo"
+
+
+def _try_load_ip_adapter(pipe):
+    """Optionally load IP-Adapter FaceID + InsightFace for face-preserving styles."""
+    global _face_analyzer, _ip_adapter_loaded
+
+    try:
+        from insightface.app import FaceAnalysis
+
+        print("[Generator]   Loading InsightFace for face embedding...")
+        app = FaceAnalysis(
+            name="buffalo_l",
+            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+        )
+        app.prepare(ctx_id=0, det_thresh=0.5, det_size=(640, 640))
+
+        print("[Generator]   Loading IP-Adapter FaceID for SDXL...")
+        pipe.load_ip_adapter(
+            IP_ADAPTER_FACEID_REPO,
+            subfolder="",
+            weight_name=IP_ADAPTER_FACEID_WEIGHT,
+        )
+        # Default scale to 0 so non-IP-Adapter styles are unaffected
+        pipe.set_ip_adapter_scale(0.0)
+
+        with _pipe_lock:
+            _face_analyzer = app
+        _ip_adapter_loaded = True
+        print("[Generator]   IP-Adapter FaceID ready! Avatar style will preserve your face.")
+
+    except ImportError:
+        print("[Generator]   InsightFace not installed — IP-Adapter FaceID disabled.")
+        print("[Generator]   Install with: pip install insightface onnxruntime-gpu")
+    except Exception as e:
+        print(f"[Generator]   IP-Adapter FaceID not available: {e}")
+        print("[Generator]   Avatar style will use ControlNet-only mode.")
+
+
+def _extract_face_embedding(frame_bgr):
+    """Extract face embedding from a BGR frame using InsightFace.
+    Returns a torch tensor of shape (1, 1, 512) or None if no face found."""
+    import torch
+
+    with _pipe_lock:
+        app = _face_analyzer
+    if app is None:
+        return None
+
+    faces = app.get(frame_bgr)
+    if not faces:
+        print("[Generator]   No face detected for IP-Adapter — skipping face ID")
+        return None
+
+    # Use the largest face (most prominent in frame)
+    face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+    embedding = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
+    return embedding.to(dtype=torch.float16, device="cuda")
 
 
 def _load_pipeline():
@@ -419,6 +485,9 @@ def _load_pipeline():
             _pipe_mode = "controlnet"
             _pipe_ready = True
             print("[Generator] Ready! mode=ControlNet+SDXL_Base (best quality)")
+
+            # ── Try loading IP-Adapter FaceID (optional enhancement) ───
+            _try_load_ip_adapter(pipe)
             return
 
         except Exception as e:
@@ -537,13 +606,27 @@ def generate_scene(frame, style_key):
         generator = torch.Generator(device="cuda").manual_seed(
             int(time.time()) % 2**32)
 
+        # ── IP-Adapter FaceID: extract face embedding if style needs it ──
+        use_ip = (style.get("use_ip_adapter", False)
+                  and _ip_adapter_loaded and mode == "controlnet")
+        face_embeds = None
+        if use_ip:
+            print("[Generator]   Extracting face embedding (IP-Adapter FaceID)...")
+            face_embeds = _extract_face_embedding(frame)
+            if face_embeds is not None:
+                ip_scale = style.get("ip_adapter_scale", 0.6)
+                pipe.set_ip_adapter_scale(ip_scale)
+                print(f"[Generator]   Face found — IP-Adapter scale={ip_scale}")
+            else:
+                pipe.set_ip_adapter_scale(0.0)
+
         with torch.inference_mode():
             if mode == "controlnet":
                 # Extract depth map for structural preservation
                 print("[Generator]   Estimating depth...")
                 depth_image = _estimate_depth(source_pil)
 
-                result = pipe(
+                pipe_kwargs = dict(
                     prompt=prompt,
                     prompt_2=prompt_2,
                     negative_prompt=neg_prompt,
@@ -555,7 +638,15 @@ def generate_scene(frame, style_key):
                     guidance_scale=params["guidance"],
                     controlnet_conditioning_scale=params["controlnet_scale"],
                     generator=generator,
-                ).images[0]
+                )
+                if face_embeds is not None:
+                    pipe_kwargs["ip_adapter_image_embeds"] = [face_embeds]
+
+                result = pipe(**pipe_kwargs).images[0]
+
+                # Reset IP-Adapter scale so next style isn't affected
+                if use_ip:
+                    pipe.set_ip_adapter_scale(0.0)
             else:
                 # Turbo fallback
                 result = pipe(
