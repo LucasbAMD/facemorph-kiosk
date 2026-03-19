@@ -403,9 +403,10 @@ STYLES = {
     "ice": {
         "label": "Ice & Frost",
         "prompt": (
-            "person with magical ice and frost covering skin and hair, "
+            "same person with magical ice and frost covering skin and hair, "
             "crystalline ice formations growing on shoulders and clothing, "
             "frozen eyelashes with tiny icicles, pale blue-white frosty skin, "
+            "same face same identity same gender, "
             "ice crystal crown forming on head, frost patterns on cheeks"
         ),
         "prompt_2": (
@@ -413,14 +414,14 @@ STYLES = {
             "massive ice crystal formations and frozen waterfall background, "
             "shimmering aurora borealis dancing across dark sky, "
             "gently falling snowflakes, ice palace spires, "
-            "Frozen movie quality, blue and white cinematic, masterpiece"
+            "fantasy ice magic cinematic, blue and white lighting, masterpiece"
         ),
         "negative": _NEG_IDENTITY + ", warm colors, summer, tropical, green, fire",
         "negative_2": _NEG_QUALITY + ", office, plain background, indoor room, white wall",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── NEON / UV GLOW ────────────────────────────────────────────────
