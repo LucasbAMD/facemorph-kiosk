@@ -50,12 +50,9 @@ SDXL_BASE_ID = "RunDiffusion/Juggernaut-XL-v9"
 CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
 DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
-# IP-Adapter FaceID Plus v2 — preserves facial identity + visual appearance
-# Plus v2 uses BOTH face recognition embeddings AND CLIP image features,
-# which dramatically improves identity preservation (gender, skin tone, etc.)
+# IP-Adapter FaceID — preserves facial identity during style transfer
 IP_ADAPTER_FACEID_REPO = "h94/IP-Adapter-FaceID"
-IP_ADAPTER_FACEID_WEIGHT = "ip-adapter-faceid-plusv2_sdxl.bin"
-IP_ADAPTER_CLIP_ENCODER = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+IP_ADAPTER_FACEID_WEIGHT = "ip-adapter-faceid_sdxl.bin"
 
 # Real-ESRGAN — neural 2x upscaler for sharper output
 REALESRGAN_MODEL_URL = (
@@ -524,10 +521,7 @@ _pipe = None
 _depth_estimator = None
 _depth_processor = None
 _face_analyzer = None  # InsightFace for IP-Adapter FaceID
-_clip_image_processor = None  # CLIP processor for FaceID Plus v2
-_clip_image_encoder = None  # CLIP vision encoder for FaceID Plus v2
 _ip_adapter_loaded = False
-_ip_adapter_mode = "none"  # "plusv2" or "basic" or "none"
 _upscaler = None  # Real-ESRGAN 2x upscaler
 _pipe_lock = threading.Lock()
 _pipe_ready = False
@@ -588,9 +582,8 @@ def _upscale_image(cv2_image):
 
 
 def _try_load_ip_adapter(pipe):
-    """Optionally load IP-Adapter FaceID Plus v2 (with fallback to basic FaceID)."""
-    global _face_analyzer, _ip_adapter_loaded, _ip_adapter_mode
-    global _clip_image_processor, _clip_image_encoder
+    """Optionally load IP-Adapter FaceID + InsightFace for face-preserving styles."""
+    global _face_analyzer, _ip_adapter_loaded
 
     try:
         from insightface.app import FaceAnalysis
@@ -602,51 +595,20 @@ def _try_load_ip_adapter(pipe):
         )
         app.prepare(ctx_id=-1, det_thresh=0.5, det_size=(640, 640))
 
-        # ── Try FaceID Plus v2 first (best identity preservation) ────────
-        try:
-            import torch
-            from transformers import CLIPVisionModelWithProjection, CLIPImageProcessor
+        print("[Generator]   Loading IP-Adapter FaceID for SDXL...")
+        pipe.load_ip_adapter(
+            IP_ADAPTER_FACEID_REPO,
+            subfolder=None,
+            weight_name=IP_ADAPTER_FACEID_WEIGHT,
+            image_encoder_folder=None,
+        )
+        # Default scale to 0 so non-IP-Adapter styles are unaffected
+        pipe.set_ip_adapter_scale(0.0)
 
-            print("[Generator]   Loading CLIP image encoder for FaceID Plus v2...")
-            clip_encoder = CLIPVisionModelWithProjection.from_pretrained(
-                IP_ADAPTER_CLIP_ENCODER,
-                torch_dtype=torch.float16,
-            ).to("cuda")
-            clip_processor = CLIPImageProcessor.from_pretrained(IP_ADAPTER_CLIP_ENCODER)
-
-            print("[Generator]   Loading IP-Adapter FaceID Plus v2 for SDXL...")
-            pipe.load_ip_adapter(
-                IP_ADAPTER_FACEID_REPO,
-                subfolder=None,
-                weight_name=IP_ADAPTER_FACEID_WEIGHT,
-                image_encoder_folder=None,
-            )
-            pipe.set_ip_adapter_scale(0.0)
-
-            with _pipe_lock:
-                _face_analyzer = app
-                _clip_image_processor = clip_processor
-                _clip_image_encoder = clip_encoder
-            _ip_adapter_loaded = True
-            _ip_adapter_mode = "plusv2"
-            print("[Generator]   IP-Adapter FaceID Plus v2 ready! Best face preservation.")
-
-        except Exception as e:
-            # ── Fall back to basic FaceID ─────────────────────────────────
-            print(f"[Generator]   Plus v2 not available ({e}), trying basic FaceID...")
-            pipe.load_ip_adapter(
-                IP_ADAPTER_FACEID_REPO,
-                subfolder=None,
-                weight_name="ip-adapter-faceid_sdxl.bin",
-                image_encoder_folder=None,
-            )
-            pipe.set_ip_adapter_scale(0.0)
-
-            with _pipe_lock:
-                _face_analyzer = app
-            _ip_adapter_loaded = True
-            _ip_adapter_mode = "basic"
-            print("[Generator]   IP-Adapter FaceID (basic) ready.")
+        with _pipe_lock:
+            _face_analyzer = app
+        _ip_adapter_loaded = True
+        print("[Generator]   IP-Adapter FaceID ready! Avatar style will preserve your face.")
 
     except ImportError:
         print("[Generator]   InsightFace not installed — IP-Adapter FaceID disabled.")
@@ -657,22 +619,12 @@ def _try_load_ip_adapter(pipe):
 
 
 def _extract_face_embedding(frame_bgr):
-    """Extract face embedding from a BGR frame using InsightFace (+ CLIP for Plus v2).
-
-    For Plus v2 mode: concatenates InsightFace (512-dim) + CLIP (1024-dim) embeddings
-    along the last dimension. The UNet's FaceID Plus projection layer splits them
-    internally using id_embeddings_dim.
-
-    For basic mode: returns just the InsightFace embedding (512-dim).
-
-    Returns a torch tensor or None if no face found.
-    """
+    """Extract face embedding from a BGR frame using InsightFace.
+    Returns a torch tensor of shape (2, 1, 512) or None if no face found."""
     import torch
 
     with _pipe_lock:
         app = _face_analyzer
-        clip_proc = _clip_image_processor
-        clip_enc = _clip_image_encoder
     if app is None:
         return None
 
@@ -683,46 +635,11 @@ def _extract_face_embedding(frame_bgr):
 
     # Use the largest face (most prominent in frame)
     face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
-    face_embed = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
-    face_embed = face_embed.to(dtype=torch.float16, device="cuda")
+    embedding = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
+    embedding = embedding.to(dtype=torch.float16, device="cuda")
     # Concatenate with zeros (negative embed) so diffusers can chunk(2)
-    neg_face_embed = torch.zeros_like(face_embed)
-    face_embeds = torch.cat([face_embed, neg_face_embed], dim=0)  # (2, 1, 512)
-
-    # For Plus v2: also extract CLIP image embedding and concatenate
-    if _ip_adapter_mode == "plusv2" and clip_proc is not None and clip_enc is not None:
-        try:
-            # Crop face region for CLIP encoding
-            bbox = face.bbox.astype(int)
-            x1, y1, x2, y2 = bbox
-            # Pad the crop for better CLIP features (captures hair, shoulders, etc.)
-            h, w = frame_bgr.shape[:2]
-            pad_w = int((x2 - x1) * 0.3)
-            pad_h = int((y2 - y1) * 0.3)
-            x1 = max(0, x1 - pad_w)
-            y1 = max(0, y1 - pad_h)
-            x2 = min(w, x2 + pad_w)
-            y2 = min(h, y2 + pad_h)
-            face_crop = frame_bgr[y1:y2, x1:x2]
-            face_crop_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
-            face_pil = Image.fromarray(face_crop_rgb)
-
-            clip_inputs = clip_proc(images=face_pil, return_tensors="pt")
-            clip_inputs = {k: v.to("cuda", dtype=torch.float16) for k, v in clip_inputs.items()}
-            with torch.inference_mode():
-                clip_out = clip_enc(**clip_inputs)
-                clip_embed = clip_out.image_embeds.unsqueeze(1)  # (1, 1, 1024)
-            neg_clip_embed = torch.zeros_like(clip_embed)
-            clip_embeds = torch.cat([clip_embed, neg_clip_embed], dim=0)  # (2, 1, 1024)
-
-            # Concatenate face + CLIP along last dim for FaceID Plus projection
-            combined = torch.cat([face_embeds, clip_embeds], dim=-1)  # (2, 1, 1536)
-            return combined
-        except Exception as e:
-            print(f"[Generator]   CLIP encoding failed ({e}), using face-only embedding")
-            return face_embeds
-
-    return face_embeds
+    neg_embedding = torch.zeros_like(embedding)
+    return torch.cat([embedding, neg_embedding], dim=0)
 
 
 def _load_pipeline():
@@ -930,12 +847,12 @@ def generate_scene(frame, style_key):
         generator = torch.Generator(device="cuda").manual_seed(
             int(time.time()) % 2**32)
 
-        # ── IP-Adapter FaceID: extract face embedding (+ CLIP for Plus v2) ──
+        # ── IP-Adapter FaceID: extract face embedding if style needs it ──
         use_ip = (style.get("use_ip_adapter", False)
                   and _ip_adapter_loaded and mode == "controlnet")
         face_embeds = None
         if use_ip:
-            print(f"[Generator]   Extracting face embedding (IP-Adapter FaceID {_ip_adapter_mode})...")
+            print("[Generator]   Extracting face embedding (IP-Adapter FaceID)...")
             face_embeds = _extract_face_embedding(frame)
             if face_embeds is not None:
                 ip_scale = style.get("ip_adapter_scale", 0.6)
