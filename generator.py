@@ -36,6 +36,9 @@ _FACE_LOCK_NEG = (
     "beard, mustache, facial hair, goatee, stubble, "
     "mask, helmet, visor, face covering, face paint, "
     "different face, different person, aged face, wrinkles, "
+    "different race, different ethnicity, different gender, gender swap, "
+    "nudity, exposed chest, exposed breasts, bare chest, cleavage, "
+    "revealing clothing, topless, shirtless, nsfw, "
 )
 
 # ── Style definitions ─────────────────────────────────────────────────────────
@@ -48,24 +51,28 @@ STYLES = {
         "label": "Avatar",
         "positive": (
             "incredible cinematic still from Avatar movie on planet Pandora, "
-            "same person with their exact face transformed with vivid deep blue skin, "
-            "glowing cyan bioluminescent freckles and markings across face and body, "
+            "same person same gender same ethnicity with blue Na'vi skin, "
+            "preserve the exact face structure expression and identity of the person, "
+            "glowing cyan bioluminescent freckles and markings on face, "
             "large golden cat-slit eyes, tall pointed elf ears, flat wide nose, "
-            "keep the person's facial structure and expression, "
-            "tribal bone necklace and woven leaf clothing, "
+            "wearing full coverage Na'vi warrior armor with leather chest plate, "
+            "bone and shell shoulder pads, woven fabric tunic fully covering torso, "
+            "tribal necklace over armored clothing, "
             "lush alien jungle background with massive glowing trees, "
             "bioluminescent plants, floating jellyfish seeds, blue misty atmosphere, "
             "James Cameron Avatar film style, ultra detailed, masterpiece"
         ),
         "negative": (
             _FACE_LOCK_NEG +
-            "human skin, white skin, pink skin, pale skin, normal skin color, "
+            "race change, skin color change, "
+            "bare skin, skimpy outfit, "
+            "human skin, pink skin, normal skin color, "
             "office, indoor room, plain wall, realistic photo, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.88, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.45},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
