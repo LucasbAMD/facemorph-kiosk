@@ -31,79 +31,92 @@ SDXL_BASE_ID = "stabilityai/stable-diffusion-xl-base-1.0"
 CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
 DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
+# ── Common negative terms to prevent hallucinated facial features ─────────────
+_FACE_LOCK_NEG = (
+    "beard, mustache, facial hair, goatee, stubble, "
+    "mask, helmet, visor, face covering, face paint, "
+    "different face, different person, aged face, wrinkles, "
+)
+
 # ── Style definitions ─────────────────────────────────────────────────────────
 # Each style has prompts and params for both ControlNet and Turbo modes.
-# ControlNet mode uses lower strength since depth map preserves structure.
+# controlnet_scale ~0.35-0.45 preserves pose/layout while allowing style.
+# strength ~0.85-0.93 controls how much the image changes overall.
 
 STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
             "incredible cinematic still from Avatar movie on planet Pandora, "
-            "person completely transformed into a Na'vi alien with vivid deep blue skin, "
+            "same person with their exact face transformed with vivid deep blue skin, "
             "glowing cyan bioluminescent freckles and markings across face and body, "
             "large golden cat-slit eyes, tall pointed elf ears, flat wide nose, "
+            "keep the person's facial structure and expression, "
             "tribal bone necklace and woven leaf clothing, "
             "lush alien jungle background with massive glowing trees, "
             "bioluminescent plants, floating jellyfish seeds, blue misty atmosphere, "
             "James Cameron Avatar film style, ultra detailed, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
             "human skin, white skin, pink skin, pale skin, normal skin color, "
             "office, indoor room, plain wall, realistic photo, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.92, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.40},
         "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
         "positive": (
             "incredible stop-motion claymation scene, "
-            "person sculpted entirely from colorful plasticine clay, "
+            "same person's face sculpted in smooth clay, keeping their features, "
+            "clean-shaven clay face matching the person's actual appearance, "
             "round chunky body with visible fingerprint textures in the clay, "
-            "oversized head with big clay eyes, smooth clay hair, "
+            "big expressive clay eyes, smooth clay hair matching their hairstyle, "
             "miniature clay furniture and props on a detailed tabletop set, "
             "painted cardboard sky backdrop with cotton ball clouds, "
             "warm studio spotlight casting soft shadows, "
             "Aardman animations style, Wallace and Gromit quality, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
             "photorealistic, real human, real skin, photograph, "
-            "blurry, deformed, text, watermark"
+            "office, plain wall, blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.90, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "controlnet": {"strength": 0.88, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.42},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "anime": {
         "label": "Anime",
         "positive": (
             "stunning 2D anime illustration, NOT a photograph, "
-            "person completely redrawn as anime character with thick black ink outlines, "
-            "flat cel-shaded coloring with no realistic shading, "
+            "same person redrawn as anime character keeping their face shape, "
+            "thick black ink outlines, flat cel-shaded coloring, "
             "huge sparkling anime eyes with light reflections, "
-            "colorful stylized spiky hair, small pointed chin, "
+            "stylized hair matching their actual hairstyle and color, "
             "background completely replaced with vibrant anime cityscape at sunset, "
             "cherry blossom trees, glowing lanterns, dramatic clouds, "
             "Studio Ghibli quality, manga illustration, vibrant colors, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
             "photorealistic, real person, photograph, real skin texture, "
             "3d render, realistic lighting, office, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.93, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.30},
+        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "cyberpunk": {
         "label": "Cyberpunk",
         "positive": (
             "incredible cyberpunk scene at night, "
-            "person with glowing neon circuit tattoos across face and arms, "
-            "chrome cybernetic eye implant, LED strips in hair, "
+            "same person's face preserved with subtle neon circuit tattoo lines, "
+            "small chrome cybernetic accent near temple, LED strips in hair, "
             "wearing futuristic jacket with illuminated trim, "
             "background completely transformed into neon-lit rain-soaked city alley, "
             "massive holographic billboards, pink and cyan neon signs, "
@@ -111,78 +124,84 @@ STYLES = {
             "Blade Runner cinematic style, neon noir, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
             "natural lighting, daytime, sunny, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.90, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "controlnet": {"strength": 0.88, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.40},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "oilpainting": {
         "label": "Oil Painting",
         "positive": (
             "magnificent classical oil painting on canvas, "
-            "person painted with rich thick visible brushstrokes and heavy impasto, "
-            "warm golden Rembrandt lighting with dramatic chiaroscuro, "
-            "deep shadows and glowing highlights on skin, "
+            "same person's face painted with visible brushstrokes, keeping features, "
+            "rich thick impasto technique, warm golden Rembrandt lighting, "
+            "dramatic chiaroscuro shadows and glowing highlights, "
             "background transformed into grand Renaissance palace interior, "
             "rich velvet curtains, ornate gold frames, marble columns, "
             "candlelight flickering, old master museum painting, "
             "baroque masterpiece, gallery quality artwork"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
             "photograph, digital art, modern, plain background, office, "
             "blurry, deformed, text, watermark"
         ),
         "controlnet": {"strength": 0.88, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+                        "controlnet_scale": 0.40},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "pixelart": {
         "label": "Pixel Art",
         "positive": (
             "retro 16-bit pixel art video game screenshot, "
-            "person as chunky pixel art character with visible square pixels, "
-            "limited retro color palette with dithering patterns, "
+            "same person as pixel art character keeping their hair and face shape, "
+            "visible square pixels, limited retro color palette, dithering, "
             "background as colorful retro RPG game level, "
             "pixel art trees, 8-bit clouds, tiled ground, "
             "HUD elements and health bar at top, "
             "classic SNES Final Fantasy style, nostalgic pixel art, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
             "photorealistic, smooth, high resolution, photograph, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.93, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.30},
+        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "comicbook": {
         "label": "Comic Book",
         "positive": (
             "bold dynamic comic book illustration, "
-            "person drawn with heavy black ink outlines and halftone dot shading, "
-            "bright saturated primary colors, dramatic heroic pose, "
-            "background with dramatic speed lines, POW burst effects, "
-            "Ben-Day dots pattern everywhere, bold color blocks, "
-            "action comic panel layout, speech bubble in corner, "
-            "Jack Kirby Marvel comic art style, dynamic composition, masterpiece"
+            "same person drawn with their actual face visible, no mask, "
+            "heavy black ink outlines and halftone dot shading on skin, "
+            "bright saturated primary colors, confident pose, "
+            "background with dramatic speed lines and pop art bursts, "
+            "Ben-Day dots pattern, bold color blocks, "
+            "action comic panel layout, "
+            "classic comic art style, dynamic composition, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
+            "superhero mask, domino mask, eye mask, face covered, "
             "photorealistic, photograph, real skin, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.92, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.30},
+        "controlnet": {"strength": 0.88, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.42},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "steampunk": {
         "label": "Steampunk",
         "positive": (
             "incredible steampunk scene, "
-            "person wearing ornate brass goggles on forehead, "
+            "same person's clean-shaven face preserved exactly as they are, "
+            "wearing ornate brass goggles pushed up on forehead, "
             "Victorian leather coat with copper gears and clockwork accessories, "
-            "mechanical arm with visible brass pistons, "
             "background transformed into grand Victorian workshop, "
             "massive spinning brass gears on walls, steam pipes everywhere, "
             "pressure gauges, leather-bound books, amber gaslight glow, "
@@ -190,11 +209,13 @@ STYLES = {
             "industrial revolution aesthetic, masterpiece"
         ),
         "negative": (
+            _FACE_LOCK_NEG +
+            "added beard, added mustache, added facial hair, rugged face, "
             "modern, futuristic, neon, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.90, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "controlnet": {"strength": 0.86, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
 }
