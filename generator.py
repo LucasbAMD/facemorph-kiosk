@@ -568,7 +568,10 @@ def _extract_face_embedding(frame_bgr):
     # Use the largest face (most prominent in frame)
     face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
     embedding = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
-    return embedding.to(dtype=torch.float16, device="cuda")
+    embedding = embedding.to(dtype=torch.float16, device="cuda")
+    # Concatenate with zeros (negative embed) so diffusers can chunk(2)
+    neg_embedding = torch.zeros_like(embedding)
+    return torch.cat([embedding, neg_embedding], dim=0)
 
 
 def _load_pipeline():
