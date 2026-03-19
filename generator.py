@@ -43,18 +43,18 @@ _FACE_LOCK_NEG = (
 
 # ── Style definitions ─────────────────────────────────────────────────────────
 # Each style has prompts and params for both ControlNet and Turbo modes.
-# controlnet_scale ~0.35-0.45 preserves pose/layout while allowing style.
-# strength ~0.85-0.93 controls how much the image changes overall.
+# controlnet_scale ~0.50-0.58 preserves face/pose/layout from depth map.
+# strength ~0.78-0.85 controls how much the image deviates from original.
 
 STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
             "incredible cinematic still from Avatar movie on planet Pandora, "
-            "same person same gender same ethnicity with blue Na'vi skin, "
-            "preserve the exact face structure expression and identity of the person, "
+            "same person same gender same ethnicity, identical face shape jaw nose and eyes, "
+            "person's face with vivid deep blue Na'vi skin applied over their real features, "
             "glowing cyan bioluminescent freckles and markings on face, "
-            "large golden cat-slit eyes, tall pointed elf ears, flat wide nose, "
+            "golden cat-slit eyes, tall pointed elf ears, "
             "wearing full coverage Na'vi warrior armor with leather chest plate, "
             "bone and shell shoulder pads, woven fabric tunic fully covering torso, "
             "tribal necklace over armored clothing, "
@@ -70,16 +70,16 @@ STYLES = {
             "office, indoor room, plain wall, realistic photo, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.88, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
         "positive": (
             "incredible stop-motion claymation scene, "
-            "same person's face sculpted in smooth clay, keeping their features, "
-            "clean-shaven clay face matching the person's actual appearance, "
+            "same person's identical face sculpted in smooth clay preserving their exact features, "
+            "clean-shaven clay face with same jaw nose eyes and expression as the real person, "
             "round chunky body with visible fingerprint textures in the clay, "
             "big expressive clay eyes, smooth clay hair matching their hairstyle, "
             "miniature clay furniture and props on a detailed tabletop set, "
@@ -92,18 +92,18 @@ STYLES = {
             "photorealistic, real human, real skin, photograph, "
             "office, plain wall, blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.88, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.42},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.52},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "anime": {
         "label": "Anime",
         "positive": (
             "stunning 2D anime illustration, NOT a photograph, "
-            "same person redrawn as anime character keeping their face shape, "
+            "same person redrawn as anime character preserving their identical face shape and features, "
+            "same hairstyle same hair color same expression as the real person, "
             "thick black ink outlines, flat cel-shaded coloring, "
-            "huge sparkling anime eyes with light reflections, "
-            "stylized hair matching their actual hairstyle and color, "
+            "sparkling anime eyes with light reflections, "
             "background completely replaced with vibrant anime cityscape at sunset, "
             "cherry blossom trees, glowing lanterns, dramatic clouds, "
             "Studio Ghibli quality, manga illustration, vibrant colors, masterpiece"
@@ -114,15 +114,16 @@ STYLES = {
             "3d render, realistic lighting, office, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
-        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "cyberpunk": {
         "label": "Cyberpunk",
         "positive": (
             "incredible cyberpunk scene at night, "
-            "same person's face preserved with subtle neon circuit tattoo lines, "
+            "same person with their identical face preserved exactly, same eyes nose jaw, "
+            "subtle neon circuit tattoo lines on cheeks, "
             "small chrome cybernetic accent near temple, LED strips in hair, "
             "wearing futuristic jacket with illuminated trim, "
             "background completely transformed into neon-lit rain-soaked city alley, "
@@ -135,15 +136,16 @@ STYLES = {
             "natural lighting, daytime, sunny, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.88, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.53},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "oilpainting": {
         "label": "Oil Painting",
         "positive": (
             "magnificent classical oil painting on canvas, "
-            "same person's face painted with visible brushstrokes, keeping features, "
+            "same person's identical face painted with visible brushstrokes, "
+            "preserving their exact facial features eyes nose mouth and expression, "
             "rich thick impasto technique, warm golden Rembrandt lighting, "
             "dramatic chiaroscuro shadows and glowing highlights, "
             "background transformed into grand Renaissance palace interior, "
@@ -156,15 +158,16 @@ STYLES = {
             "photograph, digital art, modern, plain background, office, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.88, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     "pixelart": {
         "label": "Pixel Art",
         "positive": (
             "retro 16-bit pixel art video game screenshot, "
-            "same person as pixel art character keeping their hair and face shape, "
+            "same person as pixel art character with identical face shape and features, "
+            "same hairstyle and hair color as real person, "
             "visible square pixels, limited retro color palette, dithering, "
             "background as colorful retro RPG game level, "
             "pixel art trees, 8-bit clouds, tiled ground, "
@@ -176,15 +179,16 @@ STYLES = {
             "photorealistic, smooth, high resolution, photograph, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.90, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
-        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "comicbook": {
         "label": "Comic Book",
         "positive": (
             "bold dynamic comic book illustration, "
-            "same person drawn with their actual face visible, no mask, "
+            "same person's identical face drawn with ink, no mask, face fully visible, "
+            "preserving their exact eyes nose mouth jaw and expression, "
             "heavy black ink outlines and halftone dot shading on skin, "
             "bright saturated primary colors, confident pose, "
             "background with dramatic speed lines and pop art bursts, "
@@ -198,15 +202,16 @@ STYLES = {
             "photorealistic, photograph, real skin, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.88, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.42},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "steampunk": {
         "label": "Steampunk",
         "positive": (
             "incredible steampunk scene, "
-            "same person's clean-shaven face preserved exactly as they are, "
+            "same person with their identical face preserved exactly, same eyes nose jaw mouth, "
+            "clean-shaven face matching the real person precisely, "
             "wearing ornate brass goggles pushed up on forehead, "
             "Victorian leather coat with copper gears and clockwork accessories, "
             "background transformed into grand Victorian workshop, "
@@ -221,8 +226,8 @@ STYLES = {
             "modern, futuristic, neon, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.86, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.45},
+        "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.58},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
 }
