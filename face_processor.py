@@ -38,7 +38,7 @@ STYLE_CONFIG = {
     "avatar":     {"label": "Avatar",     "subtitle": "Blue Alien · Pandora",    "emoji": "🔵", "color": "#00d4ff"},
     "claymation": {"label": "Claymation", "subtitle": "Clay · Stop Motion",      "emoji": "🎨", "color": "#e67e22"},
     "anime":      {"label": "Anime",      "subtitle": "Ghibli · Cel Shaded",     "emoji": "✨", "color": "#ff69b4"},
-    "ghost":      {"label": "Ghost",      "subtitle": "Spectral · Ethereal",     "emoji": "👻", "color": "#aaddff"},
+    "ghost":      {"label": "Cyberpunk",   "subtitle": "Neon · Chrome · Future",  "emoji": "🤖", "color": "#ff00ff"},
 }
 STYLE_ORDER = ["avatar", "claymation", "anime", "ghost"]
 

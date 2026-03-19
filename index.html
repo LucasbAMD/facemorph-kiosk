@@ -389,7 +389,7 @@ const STYLES = [
   { key: "avatar",     emoji: "\uD83D\uDD35", name: "Avatar",     sub: "Blue Alien \u00B7 Pandora" },
   { key: "claymation", emoji: "\uD83C\uDFA8", name: "Claymation", sub: "Clay \u00B7 Stop Motion" },
   { key: "anime",      emoji: "\u2728",       name: "Anime",      sub: "Ghibli \u00B7 Cel Shaded" },
-  { key: "ghost",      emoji: "\uD83D\uDC7B", name: "Ghost",      sub: "Spectral \u00B7 Ethereal" },
+  { key: "ghost",      emoji: "\uD83E\uDD16", name: "Cyberpunk",  sub: "Neon \u00B7 Chrome \u00B7 Future" },
 ];
 
 let selectedStyle = "avatar";
@@ -697,6 +697,9 @@ async function doTransform() {
   const btn = document.getElementById("transform-btn");
   btn.disabled = true;
 
+  // Always clear any leaked poll timer from a previous generation
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
   const online = await checkAI();
   if (!online) {
     toast("AI Engine still loading - please wait");
@@ -744,7 +747,7 @@ async function pollStatus() {
     const r = await fetch("/generate_status");
     const data = await r.json();
     if (data.status === "done" && data.image) {
-      clearInterval(pollTimer);
+      clearInterval(pollTimer); pollTimer = null;
       stopProgress();
       setProgress(100, "Done!");
       setTimeout(() => {
@@ -755,16 +758,21 @@ async function pollStatus() {
         document.getElementById("transform-btn").disabled = false;
       }, 300);
     } else if (data.status === "error") {
-      clearInterval(pollTimer);
+      clearInterval(pollTimer); pollTimer = null;
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
       toast("Error: " + (data.message || "unknown"));
       document.getElementById("transform-btn").disabled = false;
+    } else if (data.status === "idle") {
+      // No generation in progress — stale poll timer, clean up
+      clearInterval(pollTimer); pollTimer = null;
     }
   } catch {}
 }
 
 function closeResult() {
+  // Clear any lingering poll timer
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
   currentResultDataUrl = null;

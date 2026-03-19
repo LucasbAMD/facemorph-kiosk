@@ -87,19 +87,20 @@ STYLES = {
         "ip_scale": 0.55,
     },
     "ghost": {
-        "label": "Ghost",
+        "label": "Cyberpunk",
         "positive": (
-            "spectral ghost portrait, translucent pale glowing skin, "
-            "wispy edges dissolving into mist, hollow glowing eyes, "
-            "ghostly floating hair, dark haunted fog and moonlight, "
-            "masterpiece, cinematic horror lighting"
+            "cyberpunk portrait, neon pink and cyan lighting on face, "
+            "chrome cybernetic implants on temple and jawline, "
+            "glowing circuit tattoos, LED eyes, mirrored visor, "
+            "rain-soaked futuristic city background with holograms, "
+            "masterpiece, cinematic neon lighting"
         ),
         "negative": (
-            "solid opaque body, normal skin, warm colors, happy, bright, "
-            "cartoon, anime, blurry, low quality, text, watermark"
+            "natural lighting, daytime, medieval, fantasy, "
+            "cartoon, anime, blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 6},
-        "base":   {"strength": 0.75, "guidance": 7.5, "steps": 20},
+        "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "base":   {"strength": 0.80, "guidance": 7.5, "steps": 20},
         "ip_scale": 0.6,
     },
 }
