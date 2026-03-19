@@ -327,10 +327,11 @@ STYLES = {
     "zombie": {
         "label": "Zombie",
         "prompt": (
-            "person transformed into a terrifying zombie, "
+            "same person transformed into a terrifying zombie, "
             "pale green-grey decaying skin with exposed veins, "
             "dark hollow sunken eye sockets with milky white eyes, "
             "cracked bleeding lips, torn and bloodied clothing, "
+            "same face same identity same gender, "
             "same hairstyle but matted dirty and disheveled"
         ),
         "prompt_2": (
@@ -343,9 +344,9 @@ STYLES = {
         "negative": _NEG_IDENTITY + ", cute, happy colors, bright, cheerful, clean skin",
         "negative_2": _NEG_QUALITY + ", office, plain background, daytime, white wall",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.84, "guidance": 13.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.80, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── FANTASY ELF ───────────────────────────────────────────────────
