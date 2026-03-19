@@ -34,6 +34,13 @@ latest_frame = None
 frame_lock = threading.Lock()
 capture_running = False
 
+# ── Motion detection state ────────────────────────────────────────────────────
+prev_gray = None
+motion_lock = threading.Lock()
+stable_since: float = 0.0        # timestamp when scene became stable
+motion_score: float = 999.0      # current frame-diff score (lower = more stable)
+MOTION_THRESHOLD = 3.0           # below this = "holding still"
+
 
 # ── Camera ────────────────────────────────────────────────────────────────────
 def start_capture(camera_index: int = 0):
@@ -57,7 +64,7 @@ def start_capture(camera_index: int = 0):
             cap.set(cv2.CAP_PROP_FPS, 30)
 
     def loop():
-        global latest_frame
+        global latest_frame, prev_gray, stable_since, motion_score
         while capture_running:
             with cap_lock:
                 ok = cap and cap.isOpened()
@@ -69,6 +76,23 @@ def start_capture(camera_index: int = 0):
             if ret:
                 with frame_lock:
                     latest_frame = frame
+                # Motion detection: compare grayscale frames
+                small = cv2.resize(frame, (320, 180))
+                gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+                gray = cv2.GaussianBlur(gray, (21, 21), 0)
+                with motion_lock:
+                    if prev_gray is not None:
+                        diff = cv2.absdiff(prev_gray, gray)
+                        score = float(np.mean(diff))
+                        motion_score = score
+                        if score < MOTION_THRESHOLD:
+                            if stable_since == 0.0:
+                                stable_since = time.time()
+                        else:
+                            stable_since = 0.0
+                    else:
+                        stable_since = 0.0
+                    prev_gray = gray
             else:
                 time.sleep(0.033)
 
@@ -153,6 +177,23 @@ async def comfy_status():
         "available": comfy.check_available(),
         "mode": comfy.get_mode(),
     })
+
+
+@app.get("/motion_status")
+async def motion_status_endpoint():
+    with motion_lock:
+        dur = (time.time() - stable_since) if stable_since > 0 else 0.0
+        score = motion_score
+    return JSONResponse({"stable_seconds": round(dur, 2), "motion_score": round(score, 2)})
+
+
+@app.post("/motion_reset")
+async def motion_reset():
+    """Reset stable timer (called when generation starts to prevent re-trigger)."""
+    global stable_since
+    with motion_lock:
+        stable_since = 0.0
+    return JSONResponse({"ok": True})
 
 
 @app.get("/status")
