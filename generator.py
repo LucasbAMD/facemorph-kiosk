@@ -34,20 +34,14 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
-            "cinematic portrait of a Na'vi alien from Avatar movie, "
-            "deep blue skin with cyan bioluminescent freckle patterns, "
-            "large luminous amber-gold eyes with cat-like pupils, "
-            "pointed elongated ears, flat wide nose, "
-            "braided dark hair with glowing beads, "
-            "lush bioluminescent Pandora jungle background, "
-            "volumetric fog, firefly particles, "
-            "masterpiece, ultra detailed, photorealistic, 8k, cinematic lighting"
+            "Na'vi alien portrait, blue skin, bioluminescent freckles, "
+            "large amber eyes, cat pupils, pointed ears, flat nose, "
+            "braided hair with glowing beads, Pandora jungle background, "
+            "masterpiece, cinematic lighting, ultra detailed"
         ),
         "negative": (
-            "human skin, pink skin, normal ears, small eyes, "
-            "cartoon, anime, painting, sketch, drawing, "
-            "blurry, low quality, deformed, ugly, mutation, extra limbs, "
-            "text, watermark, signature, multiple people"
+            "human skin, pink skin, normal ears, cartoon, anime, sketch, "
+            "blurry, low quality, deformed, ugly, text, watermark"
         ),
         "turbo":  {"strength": 0.92, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
@@ -56,18 +50,14 @@ STYLES = {
     "claymation": {
         "label": "Claymation",
         "positive": (
-            "adorable claymation character figurine, "
-            "smooth matte plasticine clay texture, round soft features, "
-            "chunky proportions, visible fingerprint marks on clay, "
-            "Aardman Animations style like Wallace and Gromit, "
-            "soft studio lighting, miniature set background, "
-            "stop-motion animation still, handcrafted look, "
-            "masterpiece, highly detailed, professional photography of clay figure"
+            "claymation character figurine, plasticine clay texture, "
+            "round soft features, chunky proportions, fingerprint marks, "
+            "Wallace and Gromit style, studio lighting, miniature set, "
+            "masterpiece, stop-motion still"
         ),
         "negative": (
-            "photorealistic skin, real human, CGI, 3D render, smooth plastic, "
-            "blurry, low quality, deformed, ugly, "
-            "text, watermark, multiple people, anime, cartoon drawing"
+            "photorealistic, real human, CGI, 3D render, smooth plastic, "
+            "blurry, low quality, deformed, text, watermark"
         ),
         "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
@@ -76,20 +66,14 @@ STYLES = {
     "anime": {
         "label": "Anime",
         "positive": (
-            "stunning anime character portrait, "
-            "clean sharp cel-shaded art style, vibrant saturated colors, "
-            "large expressive detailed eyes with light reflections, "
-            "smooth flawless anime skin, defined jawline, "
-            "stylized colorful hair, dynamic lighting, "
-            "soft pastel bokeh background with cherry blossoms, "
-            "Studio Ghibli meets Makoto Shinkai style, "
-            "masterpiece, best quality, ultra detailed anime illustration"
+            "anime character portrait, cel-shaded, vibrant colors, "
+            "large expressive eyes with reflections, stylized hair, "
+            "Studio Ghibli style, soft bokeh background, "
+            "masterpiece, best quality, detailed anime illustration"
         ),
         "negative": (
-            "photorealistic, photograph, 3d render, CGI, "
-            "blurry, low quality, bad anatomy, deformed eyes, extra fingers, "
-            "western cartoon, chibi, sketch, rough lines, "
-            "text, watermark, multiple people, ugly"
+            "photorealistic, photograph, 3d render, blurry, low quality, "
+            "bad anatomy, deformed, western cartoon, text, watermark"
         ),
         "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
@@ -98,20 +82,14 @@ STYLES = {
     "ghost": {
         "label": "Ghost",
         "positive": (
-            "ethereal spectral ghost portrait, "
-            "translucent pale glowing skin with blue-white luminescence, "
-            "wispy transparent edges dissolving into smoke and mist, "
-            "hollow glowing eyes with otherworldly light, "
-            "flowing ghostly hair floating weightlessly, "
-            "dark haunted atmosphere with fog and moonlight, "
-            "spectral aura and particle effects, ectoplasm wisps, "
-            "masterpiece, ultra detailed, cinematic horror lighting, 8k"
+            "spectral ghost portrait, translucent pale glowing skin, "
+            "wispy edges dissolving into mist, hollow glowing eyes, "
+            "ghostly floating hair, dark haunted fog and moonlight, "
+            "masterpiece, cinematic horror lighting"
         ),
         "negative": (
-            "solid opaque body, normal skin color, warm colors, "
-            "happy, bright, sunny, cartoon, anime, "
-            "blurry, low quality, deformed, ugly, "
-            "text, watermark, multiple people, costume, mask"
+            "solid opaque body, normal skin, warm colors, happy, bright, "
+            "cartoon, anime, blurry, low quality, text, watermark"
         ),
         "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.75, "guidance": 7.5, "steps": 20},
@@ -183,10 +161,30 @@ def _load_pipeline():
                     weight_name="ip-adapter_sdxl.bin",
                     image_encoder_folder=str(IMAGE_ENCODER),
                 )
+
+                # Validate IP-Adapter with a quick test inference
+                print("[Generator] Validating IP-Adapter compatibility...")
+                test_img = Image.new("RGB", (512, 512), (128, 128, 128))
+                test_src = Image.new("RGB", (1024, 1024), (128, 128, 128))
+                pipe.set_ip_adapter_scale(0.5)
+                with torch.inference_mode():
+                    pipe(
+                        prompt="test",
+                        image=test_src,
+                        ip_adapter_image=test_img,
+                        strength=0.9,
+                        num_inference_steps=1,
+                        guidance_scale=0.0,
+                        output_type="latent",
+                    )
                 _has_ip_adapter = True
                 print("[Generator] IP-Adapter loaded — identity preservation ON")
             except Exception as e:
-                print(f"[Generator] IP-Adapter failed: {e}")
+                print(f"[Generator] IP-Adapter incompatible, disabling: {e}")
+                try:
+                    pipe.unload_ip_adapter()
+                except Exception:
+                    pass
                 _has_ip_adapter = False
         else:
             print("[Generator] IP-Adapter not found — run: python setup_models.py")
@@ -293,6 +291,25 @@ def extract_face_crop(frame, padding_ratio=0.65):
     return Image.fromarray(cv2.cvtColor(frame[y1:y1+size, x1:x1+size], cv2.COLOR_BGR2RGB))
 
 
+def _detect_gender(frame):
+    """Detect gender from the largest face using insightface. Returns 'male', 'female', or 'unknown'."""
+    if _face_app is not None:
+        try:
+            with _face_app_lock:
+                faces = _face_app.get(frame)
+            if faces:
+                face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]))
+                # insightface gender: 0=female, 1=male
+                if hasattr(face, 'gender'):
+                    return "male" if face.gender == 1 else "female"
+                # some versions use 'sex' attribute
+                if hasattr(face, 'sex'):
+                    return "male" if face.sex == "M" else "female"
+        except Exception:
+            pass
+    return "unknown"
+
+
 def _get_face_image(frame):
     """Extract a face crop resized to 512x512 for IP-Adapter conditioning."""
     # Try insightface
@@ -334,10 +351,11 @@ def _get_face_image(frame):
 
 
 # ── Generation ────────────────────────────────────────────────────────────────
-def generate_avatar(frame, style_key):
+def generate_avatar(frame, style_key, gender="unknown"):
     """
     Generate a stylized avatar from a webcam frame.
     Uses IP-Adapter with a face crop for identity, falls back to plain img2img.
+    gender: 'male', 'female', or 'unknown' — used to guide prompt.
     """
     global _has_ip_adapter
 
@@ -362,18 +380,35 @@ def generate_avatar(frame, style_key):
         with _pipe_lock:
             pipe = _pipe
 
+        # Auto-detect gender from insightface if not provided
+        if gender == "unknown":
+            gender = _detect_gender(frame)
+
+        # Build gender-aware prompt
+        prompt = style["positive"]
+        if gender == "male":
+            prompt = f"male, man, masculine features, {prompt}"
+        elif gender == "female":
+            prompt = f"female, woman, feminine features, {prompt}"
+
+        neg_prompt = style["negative"]
+        if gender == "male":
+            neg_prompt = f"female, woman, feminine, breasts, {neg_prompt}"
+        elif gender == "female":
+            neg_prompt = f"male, man, masculine, beard, {neg_prompt}"
+
         model_type = "Turbo" if _is_turbo else "Base"
         print(f"[Generator] Style={style_key} Model={model_type} "
               f"Steps={steps} Strength={strength} Guidance={guidance} "
-              f"IP-Adapter={_has_ip_adapter}")
+              f"IP-Adapter={_has_ip_adapter} Gender={gender}")
 
         start = time.time()
         generator = torch.Generator(device="cuda").manual_seed(
             int(time.time()) % 2**32)
 
         gen_kwargs = {
-            "prompt": style["positive"],
-            "negative_prompt": style["negative"],
+            "prompt": prompt,
+            "negative_prompt": neg_prompt,
             "image": source_pil,
             "strength": strength,
             "num_inference_steps": steps,
@@ -420,10 +455,20 @@ def generate_avatar(frame, style_key):
             source_pil = extract_face_crop(frame).resize((1024, 1024), Image.LANCZOS)
             generator = torch.Generator(device="cuda").manual_seed(42)
 
+            # Re-use gender-aware prompts in fallback
+            fb_prompt = style["positive"]
+            fb_neg = style["negative"]
+            if gender == "male":
+                fb_prompt = f"male, man, masculine features, {fb_prompt}"
+                fb_neg = f"female, woman, feminine, breasts, {fb_neg}"
+            elif gender == "female":
+                fb_prompt = f"female, woman, feminine features, {fb_prompt}"
+                fb_neg = f"male, man, masculine, beard, {fb_neg}"
+
             with torch.inference_mode():
                 result = pipe(
-                    prompt=style["positive"],
-                    negative_prompt=style["negative"],
+                    prompt=fb_prompt,
+                    negative_prompt=fb_neg,
                     image=source_pil,
                     strength=params["strength"],
                     num_inference_steps=params["steps"],
@@ -464,7 +509,8 @@ class ComfyBridge:
         self.available = is_ready()
         return self.available
 
-    def generate(self, frame, style_key, selection_mask=None, face_boxes=None):
+    def generate(self, frame, style_key, selection_mask=None, face_boxes=None,
+                 gender="unknown"):
         if self._status == "generating":
             return False
         self._status = "generating"
@@ -472,14 +518,14 @@ class ComfyBridge:
         self._message = "Generating avatar..."
         self._thread = threading.Thread(
             target=self._run,
-            args=(frame.copy(), style_key),
+            args=(frame.copy(), style_key, gender),
             daemon=True,
         )
         self._thread.start()
         return True
 
-    def _run(self, frame, style_key):
-        img, err = generate_avatar(frame, style_key)
+    def _run(self, frame, style_key, gender="unknown"):
+        img, err = generate_avatar(frame, style_key, gender=gender)
         if img is not None:
             self._result = img
             self._status = "done"

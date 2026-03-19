@@ -160,8 +160,15 @@ async def generate(character: str = Form(...)):
     if len(detected) > 0 and sel_count == 0:
         raise HTTPException(400, "Please select at least one person")
 
+    # Determine gender from recognized face name
+    gender = "unknown"
+    for f in detected:
+        if f["selected"] and f.get("name"):
+            gender = processor.get_gender_for_name(f["name"])
+            break
+
     selected_mask = processor.get_selected_mask(frame)
-    started = comfy.generate(frame, character, selected_mask)
+    started = comfy.generate(frame, character, selected_mask, gender=gender)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Creating your avatar..."})
