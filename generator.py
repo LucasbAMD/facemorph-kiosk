@@ -67,22 +67,22 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "prompt": (
-            "Na'vi alien from Avatar movie, same person's face shape and expression, "
-            "entire body covered in vivid deep blue skin, glowing cyan bioluminescent "
-            "freckles and dots across face and arms, golden cat-slit eyes, "
-            "tall pointed elf ears, full coverage warrior armor with leather chest plate"
+            "same person with their exact face shape and expression, "
+            "skin transformed to vivid deep blue color, cyan bioluminescent "
+            "freckles and dots on cheeks and forehead, golden cat-slit eyes, "
+            "tall pointed ears, leather warrior chest plate and shoulder armor"
         ),
         "prompt_2": (
-            "cinematic still from James Cameron Avatar on planet Pandora, "
-            "lush alien bioluminescent jungle, massive glowing trees, "
-            "floating jellyfish seeds, blue misty atmosphere, "
-            "movie quality, ultra detailed, masterpiece"
+            "cinematic alien jungle planet scene, bioluminescent forest, "
+            "massive glowing trees, floating seeds, blue misty atmosphere, "
+            "sci-fi fantasy movie still, "
+            "ultra detailed, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin color, pale",
+        "negative": _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin, pale skin",
         "negative_2": _NEG_QUALITY + ", realistic photo, office, indoor room, plain wall",
-        "controlnet": {"strength": 0.90, "guidance": 14.0, "steps": 35,
-                        "controlnet_scale": 0.38},
-        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.85, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.48},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
