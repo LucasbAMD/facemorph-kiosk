@@ -3,49 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AMD-Adapt</title>
+<title>AMD Adapt - ROCm AI Photo Booth</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap');
+
   :root {
-    --bg:     #0a0a0a;
-    --card:   #141414;
-    --border: #222;
-    --text:   #f0f0f0;
-    --dim:    #666;
-    --accent: #00d4ff;
-    --red:    #ED1C24;
-    --green:  #22dd44;
-    --gold:   #ffcc00;
+    --bg:      #050508;
+    --card:    #0d0d12;
+    --card-hi: #14141c;
+    --border:  #1a1a25;
+    --text:    #eaeaef;
+    --dim:     #555568;
+    --accent:  #00d4ff;
+    --red:     #ED1C24;
+    --green:   #22dd44;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%; background: var(--bg); color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
     overflow: hidden; user-select: none;
   }
   body { display: flex; flex-direction: column; }
 
   /* ── Header ── */
   header {
-    height: 52px; min-height: 52px; display: flex;
+    height: 56px; min-height: 56px; display: flex;
     align-items: center; justify-content: space-between;
-    padding: 0 24px; background: #111;
-    border-bottom: 2px solid var(--red); flex-shrink: 0;
+    padding: 0 28px;
+    background: linear-gradient(180deg, #0f0f14 0%, #0a0a0f 100%);
+    border-bottom: 1px solid #1a1a25;
+    flex-shrink: 0; position: relative; z-index: 5;
   }
-  .logo { display: flex; align-items: center; gap: 12px; }
+  header::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--red) 0%, var(--red) 30%, transparent 100%);
+  }
+  .logo { display: flex; align-items: center; gap: 14px; }
   .logo-badge {
     background: var(--red); color: #fff; font-weight: 900;
-    font-size: 1rem; padding: 3px 10px; letter-spacing: 2px;
+    font-size: 0.95rem; padding: 4px 12px; letter-spacing: 2px;
+    clip-path: polygon(0 0, 100% 0, 95% 100%, 0 100%);
   }
   .logo-text {
-    font-size: 1rem; font-weight: 300;
-    letter-spacing: 4px; color: #bbb;
+    font-size: 0.85rem; font-weight: 300;
+    letter-spacing: 6px; color: #888; text-transform: uppercase;
+  }
+  .logo-sep {
+    width: 1px; height: 20px; background: #333; margin: 0 4px;
+  }
+  .logo-tagline {
+    font-size: 0.62rem; font-weight: 300;
+    letter-spacing: 1.5px; color: #555;
   }
   #ai-badge {
-    font-size: 0.72rem; padding: 4px 12px; border-radius: 20px;
-    background: #1a1a1a; border: 1px solid #444; color: #555;
-    transition: all 0.3s;
+    font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid #333;
+    color: #444; letter-spacing: 1.5px; font-weight: 600;
+    transition: all 0.5s ease;
   }
-  #ai-badge.online { border-color: var(--green); color: var(--green); }
+  #ai-badge.online {
+    border-color: var(--green); color: var(--green);
+    box-shadow: 0 0 12px rgba(34,221,68,0.15);
+  }
 
   /* ── Layout ── */
   #main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
@@ -55,133 +76,217 @@
     flex: 1; position: relative; background: #000;
     overflow: hidden; min-width: 0;
   }
+  #cam-panel::before {
+    content: ''; position: absolute; inset: 0; z-index: 1;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
   #feed {
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: contain; display: block;
   }
 
-  /* Overlays */
+  /* ── Overlays ── */
   .overlay {
     position: absolute; inset: 0; display: none;
     flex-direction: column; align-items: center;
-    justify-content: center; gap: 16px; z-index: 10;
+    justify-content: center; gap: 18px; z-index: 10;
   }
   .overlay.on { display: flex; }
-  #gen-overlay { background: rgba(0,0,0,0.82); }
-  #result-overlay { background: rgba(0,0,0,0.94); }
+  #gen-overlay {
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.92) 100%);
+    backdrop-filter: blur(8px);
+  }
+  #result-overlay {
+    background: rgba(5,5,8,0.96);
+    backdrop-filter: blur(4px);
+  }
 
   .spinner {
-    width: 48px; height: 48px;
-    border: 4px solid #333; border-top-color: var(--accent);
-    border-radius: 50%; animation: spin 0.8s linear infinite;
+    width: 52px; height: 52px;
+    border: 3px solid rgba(255,255,255,0.06);
+    border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  #gen-msg { color: var(--accent); font-size: 0.95rem; letter-spacing: 1px; }
+  #gen-msg {
+    color: var(--accent); font-size: 1rem;
+    letter-spacing: 1.5px; font-weight: 600;
+  }
   .progress-wrap {
-    width: 300px; max-width: 80%; background: #222;
-    border-radius: 8px; height: 6px; overflow: hidden;
+    width: 320px; max-width: 80%; background: rgba(255,255,255,0.05);
+    border-radius: 10px; height: 5px; overflow: hidden;
   }
   #progress-bar {
-    height: 100%; width: 0%; background: var(--accent);
-    border-radius: 8px; transition: width 0.4s ease;
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), #0088ff);
+    border-radius: 10px; transition: width 0.5s ease;
   }
-  #progress-label { font-size: 0.68rem; color: #555; letter-spacing: 1px; }
-  #elapsed { font-size: 0.6rem; color: #333; }
+  #progress-label {
+    font-size: 0.65rem; color: var(--dim);
+    letter-spacing: 1.5px; font-weight: 400;
+  }
+  #elapsed { font-size: 0.6rem; color: #333; font-weight: 300; }
 
-  /* Result */
-  #result-img { max-height: 76vh; max-width: 92%; border-radius: 8px; }
-  .result-btns { display: flex; gap: 10px; }
-  .result-btns button {
-    padding: 12px 28px; border: none; border-radius: 6px;
-    font-size: 0.9rem; font-weight: 700; letter-spacing: 1px;
-    cursor: pointer;
+  /* ── Result ── */
+  #result-img {
+    max-height: 74vh; max-width: 90%;
+    border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
-  #save-btn { background: var(--green); color: #000; }
-  #close-btn { background: var(--red); color: #fff; }
+  .result-btns { display: flex; gap: 12px; margin-top: 4px; }
+  .result-btns button {
+    padding: 14px 32px; border: none; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+  }
+  #save-btn {
+    background: var(--green); color: #000;
+    box-shadow: 0 4px 20px rgba(34,221,68,0.25);
+  }
+  #save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(34,221,68,0.35); }
+  #close-btn { background: rgba(255,255,255,0.08); color: #aaa; }
+  #close-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
   /* ── Sidebar ── */
   #sidebar {
-    width: 280px; min-width: 280px; background: var(--card);
+    width: 300px; min-width: 300px;
+    background: linear-gradient(180deg, var(--card) 0%, #080810 100%);
     border-left: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden;
   }
-  .sec-title {
-    font-size: 0.6rem; letter-spacing: 3px; color: var(--dim);
-    text-transform: uppercase; padding: 14px 16px 10px;
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
+
+  /* ── Sidebar header ── */
+  .sidebar-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-header h2 {
+    font-size: 0.65rem; letter-spacing: 4px; color: var(--dim);
+    text-transform: uppercase; font-weight: 600; margin-bottom: 4px;
+  }
+  .sidebar-header p {
+    font-size: 0.7rem; color: #444; font-weight: 300;
   }
 
   /* ── Style grid ── */
-  .sec-title.styles { border-bottom: none; padding-bottom: 6px; }
   #style-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 6px; padding: 0 14px 14px; flex: 1; min-height: 0;
+    gap: 8px; padding: 16px 16px; flex: 1; min-height: 0;
     overflow-y: auto; align-content: start;
   }
   .style-card {
-    background: #1a1a1a; border: 2px solid #2a2a2a; border-radius: 10px;
-    padding: 10px 6px; text-align: center; cursor: pointer;
-    transition: all 0.15s;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 14px 8px 12px; text-align: center; cursor: pointer;
+    transition: all 0.2s ease; position: relative; overflow: hidden;
   }
-  .style-card:hover { border-color: #444; background: #222; }
-  .style-card.active { border-color: var(--accent); background: rgba(0,212,255,0.06); }
+  .style-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top, rgba(255,255,255,0.03) 0%, transparent 70%);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .style-card:hover {
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    transform: translateY(-1px);
+  }
+  .style-card:hover::before { opacity: 1; }
+  .style-card.active {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.05);
+    box-shadow: 0 0 20px rgba(0,212,255,0.08), inset 0 1px 0 rgba(0,212,255,0.1);
+  }
+  .style-card.active::before { opacity: 1; }
   .style-card.active .style-name { color: var(--accent); }
-  .style-emoji { font-size: 1.5rem; margin-bottom: 4px; }
-  .style-name { font-size: 0.76rem; font-weight: 700; letter-spacing: 0.5px; }
-  .style-sub { font-size: 0.55rem; color: var(--dim); margin-top: 2px; }
+
+  .style-emoji { font-size: 1.6rem; margin-bottom: 6px; position: relative; z-index: 1; }
+  .style-name {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.5px; position: relative; z-index: 1;
+    transition: color 0.2s;
+  }
+  .style-sub {
+    font-size: 0.52rem; color: var(--dim);
+    margin-top: 3px; position: relative; z-index: 1;
+    letter-spacing: 0.5px;
+  }
   .style-card.ready .style-name::after {
-    content: " \2726"; color: var(--accent); font-size: 0.6rem;
+    content: ""; display: inline-block;
+    width: 5px; height: 5px; background: var(--accent);
+    border-radius: 50%; margin-left: 6px; vertical-align: middle;
+    box-shadow: 0 0 6px var(--accent);
   }
 
-  /* ── Transform button area ── */
+  /* ── Action section ── */
   #action-section {
-    padding: 14px; border-top: 1px solid var(--border);
+    padding: 16px 16px 20px;
+    border-top: 1px solid var(--border);
     flex-shrink: 0; margin-top: auto;
+    background: rgba(0,0,0,0.2);
   }
-  /* Gender selector */
-  #gender-row {
-    display: flex; gap: 6px; margin-bottom: 10px;
-  }
-  #gender-row .g-btn {
-    flex: 1; padding: 8px 4px; border: 1px solid #333; border-radius: 6px;
-    background: #1a1a1a; color: #888; font-size: 0.72rem; font-weight: 700;
-    letter-spacing: 1px; cursor: pointer; text-align: center;
-    text-transform: uppercase; transition: all 0.15s;
-  }
-  #gender-row .g-btn:hover { border-color: #555; color: #aaa; }
-  #gender-row .g-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
 
   #transform-btn {
-    width: 100%; padding: 16px;
-    background: linear-gradient(135deg, var(--red), #cc1520);
-    color: #fff; border: none; border-radius: 10px;
-    font-size: 1rem; font-weight: 800; letter-spacing: 2px;
+    width: 100%; padding: 18px;
+    background: linear-gradient(135deg, var(--red) 0%, #b8101a 50%, var(--red) 100%);
+    background-size: 200% 100%;
+    color: #fff; border: none; border-radius: 12px;
+    font-size: 0.95rem; font-weight: 800; letter-spacing: 3px;
     cursor: pointer; text-transform: uppercase;
-    transition: opacity 0.15s;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 24px rgba(237,28,36,0.2);
+    position: relative; overflow: hidden;
   }
-  #transform-btn:hover { opacity: 0.9; }
-  #transform-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #transform-btn::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 200% 0; }
+    50% { background-position: -200% 0; }
+  }
+  #transform-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 32px rgba(237,28,36,0.35);
+  }
+  #transform-btn:active { transform: translateY(0); }
+  #transform-btn:disabled {
+    opacity: 0.25; cursor: not-allowed;
+    transform: none; box-shadow: none;
+  }
+  #transform-btn:disabled::before { animation: none; }
 
   #mode-label {
-    font-size: 0.6rem; color: #444; text-align: center;
-    padding: 8px 0 0; letter-spacing: 1px;
+    font-size: 0.55rem; color: #333; text-align: center;
+    padding: 10px 0 0; letter-spacing: 1.5px; font-weight: 300;
   }
-  #mode-label span { color: var(--accent); }
+  #mode-label span { color: var(--accent); font-weight: 600; }
 
-  /* Toast */
+  /* ── Toast ── */
   #toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    color: #fff; padding: 10px 24px; border-radius: 8px;
-    font-size: 0.82rem; display: none; z-index: 99;
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    color: #fff; padding: 12px 28px; border-radius: 10px;
+    font-size: 0.8rem; display: none; z-index: 99;
     white-space: nowrap; pointer-events: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    font-weight: 500; letter-spacing: 0.5px;
   }
-  #toast.on { display: block; }
+  #toast.on { display: block; animation: slideUp 0.3s ease; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -190,7 +295,9 @@
 <header>
   <div class="logo">
     <span class="logo-badge">AMD</span>
-    <span class="logo-text">ADAPT</span>
+    <span class="logo-text">Adapt</span>
+    <span class="logo-sep"></span>
+    <span class="logo-tagline">ROCm-Accelerated AI Photo Booth</span>
   </div>
   <div id="ai-badge">AI ENGINE</div>
 </header>
@@ -216,24 +323,20 @@
       <img id="result-img" src="" alt="Result">
       <div class="result-btns">
         <button id="save-btn" onclick="savePhoto()">Save Photo</button>
-        <button id="close-btn" onclick="closeResult()">Back to Camera</button>
+        <button id="close-btn" onclick="closeResult()">Try Another</button>
       </div>
     </div>
   </div>
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <!-- Style selector -->
-    <div class="sec-title styles">Choose Your Style</div>
+    <div class="sidebar-header">
+      <h2>Choose Your Style</h2>
+      <p>Select a style, then hit transform</p>
+    </div>
     <div id="style-grid"></div>
-
-    <!-- Actions -->
     <div id="action-section">
-      <div id="gender-row">
-        <button class="g-btn" onclick="setGender('male',this)">Male</button>
-        <button class="g-btn" onclick="setGender('female',this)">Female</button>
-      </div>
-      <button id="transform-btn" onclick="doTransform()">TRANSFORM SCENE</button>
+      <button id="transform-btn" onclick="doTransform()">Transform Scene</button>
       <div id="mode-label"></div>
     </div>
   </div>
@@ -242,24 +345,21 @@
 <div id="toast"></div>
 
 <script>
-// ── Styles ───────────────────────────────────────────────────────────────────
 const STYLES = [
-  { key: "avatar",      emoji: "\uD83D\uDD35", name: "Avatar",      sub: "Blue Alien \u00B7 Pandora" },
+  { key: "avatar",      emoji: "\uD83D\uDD35", name: "Avatar",      sub: "Na'vi \u00B7 Pandora" },
   { key: "anime",       emoji: "\u2728",       name: "Anime",       sub: "Cel Shaded \u00B7 Manga" },
-  { key: "cyberpunk",   emoji: "\uD83E\uDD16", name: "Cyberpunk",   sub: "Neon \u00B7 Chrome \u00B7 Future" },
+  { key: "cyberpunk",   emoji: "\uD83E\uDD16", name: "Cyberpunk",   sub: "Neon Noir \u00B7 Chrome" },
   { key: "claymation",  emoji: "\uD83C\uDFA8", name: "Claymation",  sub: "Clay \u00B7 Stop Motion" },
-  { key: "oilpainting", emoji: "\uD83D\uDDBC\uFE0F", name: "Oil Painting", sub: "Renaissance \u00B7 Brushstrokes" },
-  { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Bold Ink \u00B7 Halftone" },
+  { key: "oilpainting", emoji: "\uD83D\uDDBC\uFE0F", name: "Oil Painting", sub: "Renaissance \u00B7 Canvas" },
+  { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Ink \u00B7 Halftone" },
   { key: "pixelart",    emoji: "\uD83D\uDC7E", name: "Pixel Art",   sub: "Retro \u00B7 16-Bit" },
-  { key: "steampunk",   emoji: "\u2699\uFE0F", name: "Steampunk",   sub: "Brass \u00B7 Gears \u00B7 Victorian" },
+  { key: "steampunk",   emoji: "\u2699\uFE0F", name: "Steampunk",   sub: "Brass \u00B7 Victorian" },
 ];
 
 let selectedStyle = "avatar";
-let selectedGender = "unknown";
 let pollTimer = null;
 let currentResultDataUrl = null;
 
-// ── Build style grid ─────────────────────────────────────────────────────────
 function buildStyleGrid(aiReady) {
   const grid = document.getElementById("style-grid");
   grid.innerHTML = STYLES.map(s => `
@@ -277,33 +377,19 @@ function selectStyle(key, el) {
   el.classList.add("active");
 }
 
-function setGender(g, el) {
-  if (selectedGender === g) {
-    selectedGender = "unknown";
-    el.classList.remove("active");
-  } else {
-    selectedGender = g;
-    document.querySelectorAll("#gender-row .g-btn").forEach(b => b.classList.remove("active"));
-    el.classList.add("active");
-  }
-}
-
-// ── AI status ────────────────────────────────────────────────────────────────
 async function checkAI() {
   try {
     const r = await fetch("/comfy_status");
     const d = await r.json();
     const b = document.getElementById("ai-badge");
-    b.textContent = d.available ? "AI ENGINE READY" : "AI ENGINE LOADING...";
+    b.textContent = d.available ? "AI READY" : "AI LOADING\u2026";
     b.classList.toggle("online", !!d.available);
-    // Show pipeline mode
     const ml = document.getElementById("mode-label");
     if (d.mode) ml.innerHTML = "Pipeline: <span>" + d.mode + "</span>";
     return d.available;
   } catch { return false; }
 }
 
-// ── Save photo ───────────────────────────────────────────────────────────────
 function savePhoto() {
   if (!currentResultDataUrl) return;
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -317,21 +403,17 @@ function savePhoto() {
   toast("Photo saved!", "ok");
 }
 
-// ── Transform + progress ─────────────────────────────────────────────────────
-let genStart = 0;
-let progressTmr = null;
-let elapsedTmr = null;
-let stageIdx = 0;
+let genStart = 0, progressTmr = null, elapsedTmr = null, stageIdx = 0;
 
 const STAGES = [
-  { pct: 5,  label: "Capturing scene..." },
-  { pct: 12, label: "Analyzing depth..." },
-  { pct: 25, label: "Transforming scene..." },
-  { pct: 45, label: "Applying style..." },
-  { pct: 60, label: "Rendering details..." },
-  { pct: 75, label: "Refining composition..." },
-  { pct: 88, label: "Almost there..." },
-  { pct: 95, label: "Final touches..." },
+  { pct: 5,  label: "Capturing scene\u2026" },
+  { pct: 12, label: "Analyzing depth\u2026" },
+  { pct: 25, label: "Transforming scene\u2026" },
+  { pct: 45, label: "Applying style\u2026" },
+  { pct: 60, label: "Rendering details\u2026" },
+  { pct: 75, label: "Refining composition\u2026" },
+  { pct: 88, label: "Almost there\u2026" },
+  { pct: 95, label: "Final touches\u2026" },
 ];
 const STAGE_TIMES = [1500, 2500, 4000, 4000, 4000, 4000, 3000, 3000];
 
@@ -341,23 +423,19 @@ function setProgress(pct, label) {
 }
 
 function startProgress() {
-  stageIdx = 0;
-  genStart = Date.now();
-  setProgress(0, "Starting AI engine...");
-
+  stageIdx = 0; genStart = Date.now();
+  setProgress(0, "Starting AI engine\u2026");
   function advance() {
     if (stageIdx >= STAGES.length) return;
-    const s = STAGES[stageIdx];
-    setProgress(s.pct, s.label);
+    setProgress(STAGES[stageIdx].pct, STAGES[stageIdx].label);
     stageIdx++;
     if (stageIdx < STAGES.length)
       progressTmr = setTimeout(advance, STAGE_TIMES[stageIdx - 1] || 3000);
   }
   advance();
-
   elapsedTmr = setInterval(() => {
-    const s = Math.floor((Date.now() - genStart) / 1000);
-    document.getElementById("elapsed").textContent = s + "s";
+    document.getElementById("elapsed").textContent =
+      Math.floor((Date.now() - genStart) / 1000) + "s";
   }, 1000);
 }
 
@@ -369,33 +447,24 @@ function stopProgress() {
 async function doTransform() {
   const btn = document.getElementById("transform-btn");
   btn.disabled = true;
-
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-
   const online = await checkAI();
-  if (!online) {
-    toast("AI Engine still loading - please wait");
-    btn.disabled = false;
-    return;
-  }
+  if (!online) { toast("AI Engine still loading"); btn.disabled = false; return; }
 
   document.getElementById("gen-overlay").classList.add("on");
   document.getElementById("gen-msg").textContent =
-    "Transforming scene into " + STYLES.find(s => s.key === selectedStyle).name + "...";
+    "Transforming into " + STYLES.find(s => s.key === selectedStyle).name + "\u2026";
   startProgress();
 
   const fd = new FormData();
   fd.append("character", selectedStyle);
-  fd.append("gender", selectedGender);
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
     if (r.status >= 400) {
       const d = await r.json();
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
-      toast(d.detail || "Error starting generation");
-      btn.disabled = false;
-      return;
+      toast(d.detail || "Error"); btn.disabled = false; return;
     }
     const data = await r.json();
     if (data.status === "generating" || data.status === "busy") {
@@ -403,14 +472,12 @@ async function doTransform() {
     } else {
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
-      toast(data.message || "Error");
-      btn.disabled = false;
+      toast(data.message || "Error"); btn.disabled = false;
     }
   } catch {
     stopProgress();
     document.getElementById("gen-overlay").classList.remove("on");
-    toast("Connection error");
-    btn.disabled = false;
+    toast("Connection error"); btn.disabled = false;
   }
 }
 
@@ -420,8 +487,7 @@ async function pollStatus() {
     const data = await r.json();
     if (data.status === "done" && data.image) {
       clearInterval(pollTimer); pollTimer = null;
-      stopProgress();
-      setProgress(100, "Done!");
+      stopProgress(); setProgress(100, "Done!");
       setTimeout(() => {
         document.getElementById("gen-overlay").classList.remove("on");
         currentResultDataUrl = data.image;
@@ -430,8 +496,7 @@ async function pollStatus() {
         document.getElementById("transform-btn").disabled = false;
       }, 300);
     } else if (data.status === "error") {
-      clearInterval(pollTimer); pollTimer = null;
-      stopProgress();
+      clearInterval(pollTimer); pollTimer = null; stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
       toast("Error: " + (data.message || "unknown"));
       document.getElementById("transform-btn").disabled = false;
@@ -448,16 +513,15 @@ function closeResult() {
   currentResultDataUrl = null;
 }
 
-// ── Toast ────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.style.background = type === "ok" ? "#1a7a3a" : "#c0392b";
+  t.style.background = type === "ok"
+    ? "rgba(26,122,58,0.9)" : "rgba(192,57,43,0.9)";
   t.classList.add("on");
   setTimeout(() => t.classList.remove("on"), 3500);
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   buildStyleGrid(false);
   const online = await checkAI();

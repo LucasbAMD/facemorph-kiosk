@@ -120,7 +120,7 @@ async def video_feed():
 
 # ── AI Generation ─────────────────────────────────────────────────────────────
 @app.post("/generate")
-async def generate(character: str = Form(...), gender: str = Form("unknown")):
+async def generate(character: str = Form(...)):
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
@@ -128,11 +128,7 @@ async def generate(character: str = Form(...), gender: str = Form("unknown")):
     if not comfy.check_available():
         raise HTTPException(503, "AI engine not ready - loading model...")
 
-    gender = gender.strip().lower()
-    if gender not in ("male", "female"):
-        gender = "unknown"
-
-    started = comfy.generate(frame, character, gender=gender)
+    started = comfy.generate(frame, character)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Transforming scene..."})

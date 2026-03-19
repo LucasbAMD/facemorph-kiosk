@@ -366,20 +366,7 @@ def _estimate_depth(pil_image):
 
 
 # ── Generation ────────────────────────────────────────────────────────────────
-def _build_prompts(style, gender):
-    """Build gender-aware positive and negative prompts."""
-    prompt = style["positive"]
-    neg = style["negative"]
-    if gender == "male":
-        prompt = f"male man, {prompt}"
-        neg = f"female, woman, {neg}"
-    elif gender == "female":
-        prompt = f"female woman, {prompt}"
-        neg = f"male, man, beard, {neg}"
-    return prompt, neg
-
-
-def generate_scene(frame, style_key, gender="unknown"):
+def generate_scene(frame, style_key):
     """
     Transform entire camera frame into the given style.
     Uses ControlNet+depth if available, otherwise Turbo img2img.
@@ -397,7 +384,8 @@ def generate_scene(frame, style_key, gender="unknown"):
 
         mode = _pipe_mode
         params = style.get(mode, style["turbo"])
-        prompt, neg_prompt = _build_prompts(style, gender)
+        prompt = style["positive"]
+        neg_prompt = style["negative"]
 
         # Prepare source image at 1024x1024 for SDXL
         h, w = frame.shape[:2]
@@ -409,7 +397,7 @@ def generate_scene(frame, style_key, gender="unknown"):
 
         print(f"[Generator] Style={style_key} Mode={mode} "
               f"Steps={params['steps']} Strength={params['strength']} "
-              f"Gender={gender} Frame={w}x{h}")
+              f"Frame={w}x{h}")
 
         start = time.time()
         generator = torch.Generator(device="cuda").manual_seed(
@@ -486,7 +474,7 @@ class ComfyBridge:
     def get_mode(self):
         return get_mode()
 
-    def generate(self, frame, style_key, gender="unknown"):
+    def generate(self, frame, style_key):
         if self._status == "generating":
             return False
         self._status = "generating"
@@ -494,14 +482,14 @@ class ComfyBridge:
         self._message = "Transforming scene..."
         self._thread = threading.Thread(
             target=self._run,
-            args=(frame.copy(), style_key, gender),
+            args=(frame.copy(), style_key),
             daemon=True,
         )
         self._thread.start()
         return True
 
-    def _run(self, frame, style_key, gender="unknown"):
-        img, err = generate_scene(frame, style_key, gender=gender)
+    def _run(self, frame, style_key):
+        img, err = generate_scene(frame, style_key)
         if img is not None:
             self._result = img
             self._status = "done"
