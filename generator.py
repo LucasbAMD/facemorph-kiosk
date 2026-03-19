@@ -37,15 +37,18 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
-            "blue skin alien Na'vi from Avatar movie, "
-            "deep saturated blue skin color on entire face and body, "
-            "glowing cyan bioluminescent dots on cheeks, "
-            "yellow cat eyes, pointed elf ears, wide flat nose, "
-            "Pandora jungle, cinematic, masterpiece"
+            "blue skin alien warrior standing in bioluminescent jungle, "
+            "deep vivid blue skin covering entire face neck and body, "
+            "glowing cyan freckle dots across cheeks and forehead, "
+            "golden cat-slit eyes, long pointed ears, wide flat nose, "
+            "dark braided hair with luminous beads, tribal bone necklace, "
+            "towering alien trees with hanging vines behind, "
+            "floating glowing seeds and fireflies in misty air, "
+            "cinematic film still, masterpiece"
         ),
         "negative": (
-            "human skin, white skin, pink skin, pale skin, normal skin color, "
-            "brown skin, realistic skin tone, normal human, "
+            "human skin, white skin, pink skin, pale skin, normal skin, "
+            "brown skin, realistic skin tone, normal ears, "
             "cartoon, anime, blurry, deformed, text, watermark"
         ),
         "turbo":  {"strength": 0.97, "guidance": 0.0, "steps": 8},
@@ -55,10 +58,13 @@ STYLES = {
     "claymation": {
         "label": "Claymation",
         "positive": (
-            "claymation character figurine, plasticine clay texture, "
-            "round soft features, chunky proportions, fingerprint marks, "
-            "Wallace and Gromit style, studio lighting, miniature set, "
-            "masterpiece, stop-motion still"
+            "adorable claymation figure in miniature clay world, "
+            "smooth matte plasticine texture, round chunky proportions, "
+            "visible thumbprint marks on clay surface, "
+            "tiny handmade clay furniture and props on tabletop set, "
+            "miniature painted backdrop with rolling hills, "
+            "warm soft studio spotlight from above, "
+            "stop-motion animation frame, masterpiece"
         ),
         "negative": (
             "photorealistic, real human, CGI, 3D render, smooth plastic, "
@@ -71,11 +77,13 @@ STYLES = {
     "anime": {
         "label": "Anime",
         "positive": (
-            "2D anime drawing, thick black ink outlines, "
-            "flat cel-shaded coloring, huge shiny anime eyes, "
-            "colorful spiky stylized hair, smooth simple skin, "
-            "manga illustration, Japanese animation style, "
-            "masterpiece, vibrant colors"
+            "2D anime character in dramatic scene, "
+            "thick black ink outlines, flat cel-shaded coloring, "
+            "huge sparkling anime eyes with bright reflections, "
+            "colorful wild stylized hair blowing in wind, "
+            "cherry blossom petals floating through the air, "
+            "rooftop overlooking glowing anime city at sunset, "
+            "manga illustration style, masterpiece, vibrant colors"
         ),
         "negative": (
             "photorealistic, real person, photograph, 3d render, "
@@ -89,14 +97,17 @@ STYLES = {
     "ghost": {
         "label": "Cyberpunk",
         "positive": (
-            "cyberpunk portrait, neon pink and cyan lighting on face, "
-            "chrome cybernetic implants on temple and jawline, "
-            "glowing circuit tattoos, LED eyes, mirrored visor, "
-            "rain-soaked futuristic city background with holograms, "
-            "masterpiece, cinematic neon lighting"
+            "cyberpunk street warrior in neon-lit alley, "
+            "face lit by pink and cyan neon signs, "
+            "chrome cybernetic implants on temple and jaw, "
+            "glowing circuit-pattern tattoos on skin, "
+            "holographic advertisements and kanji signs behind, "
+            "rain falling through colored laser beams, "
+            "wet reflective street with puddles, steam rising, "
+            "cinematic neon noir, masterpiece"
         ),
         "negative": (
-            "natural lighting, daytime, medieval, fantasy, "
+            "natural lighting, daytime, sunny, medieval, fantasy, "
             "cartoon, anime, blurry, deformed, text, watermark"
         ),
         "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 7},
@@ -160,7 +171,33 @@ def _load_pipeline():
             pass
 
         # ── Load IP-Adapter for identity preservation ─────────────────────
+        # Check compatibility BEFORE loading to avoid first-generation crash.
+        # The ip-adapter_sdxl.bin requires a ViT-bigG encoder (projection_dim
+        # 1280), but the available image encoder outputs 1024 (ViT-H).
+        # This causes RuntimeError: mat1(1x1024) * mat2(1280x8192) on every
+        # first inference, then falls back. Skip loading entirely if wrong.
+        _ip_compatible = False
         if IP_ADAPTER_BIN.exists() and IMAGE_ENCODER.exists():
+            try:
+                from transformers import CLIPVisionModelWithProjection
+                _test_enc = CLIPVisionModelWithProjection.from_pretrained(
+                    str(IMAGE_ENCODER))
+                proj_dim = getattr(_test_enc.config, "projection_dim", None)
+                hidden_dim = getattr(_test_enc.config, "hidden_size", None)
+                out_dim = proj_dim or hidden_dim or 0
+                del _test_enc
+                print(f"[Generator] IP-Adapter image encoder: "
+                      f"projection_dim={proj_dim} hidden_size={hidden_dim}")
+                if out_dim >= 1280:
+                    _ip_compatible = True
+                else:
+                    print(f"[Generator] IP-Adapter SKIPPED — encoder outputs "
+                          f"{out_dim}-dim but SDXL needs 1280. "
+                          f"Need ip-adapter-plus_sdxl_vit-h.bin for ViT-H.")
+            except Exception as e:
+                print(f"[Generator] Could not check IP-Adapter compatibility: {e}")
+
+        if _ip_compatible:
             try:
                 print("[Generator] Loading IP-Adapter SDXL...")
                 pipe.load_ip_adapter(
@@ -169,52 +206,19 @@ def _load_pipeline():
                     weight_name="ip-adapter_sdxl.bin",
                     image_encoder_folder=str(IMAGE_ENCODER),
                 )
-
-                # Validate IP-Adapter by checking projection dimensions
-                # The IP-Adapter image encoder must match the UNet's expected dims
-                print("[Generator] Validating IP-Adapter compatibility...")
-                try:
-                    from transformers import CLIPVisionModelWithProjection
-                    encoder = pipe.image_encoder
-                    if encoder is not None:
-                        # Get image encoder output dim
-                        enc_dim = encoder.config.hidden_size
-                        # SDXL expects 1280-dim from ViT-bigG, ViT-H gives 1024
-                        print(f"[Generator] Image encoder dim={enc_dim}")
-                        if enc_dim < 1280:
-                            raise ValueError(
-                                f"IP-Adapter image encoder dim={enc_dim} but "
-                                f"SDXL needs 1280. Wrong ip-adapter weights file."
-                            )
-                except (AttributeError, ImportError):
-                    # If we can't check, do a real test inference
-                    test_img = Image.new("RGB", (512, 512), (128, 128, 128))
-                    test_src = Image.new("RGB", (1024, 1024), (128, 128, 128))
-                    pipe.set_ip_adapter_scale(0.5)
-                    with torch.inference_mode():
-                        pipe(
-                            prompt="test",
-                            image=test_src,
-                            ip_adapter_image=test_img,
-                            strength=0.99,
-                            num_inference_steps=2,
-                            guidance_scale=0.0,
-                        )
                 _has_ip_adapter = True
                 print("[Generator] IP-Adapter loaded — identity preservation ON")
             except Exception as e:
-                print(f"[Generator] IP-Adapter incompatible, disabling: {e}")
+                print(f"[Generator] IP-Adapter load failed: {e}")
                 try:
                     pipe.unload_ip_adapter()
                 except Exception:
                     pass
                 _has_ip_adapter = False
         else:
-            print("[Generator] IP-Adapter not found — run: python setup_models.py")
-            if not IP_ADAPTER_BIN.exists():
-                print(f"  Missing: {IP_ADAPTER_BIN}")
-            if not IMAGE_ENCODER.exists():
-                print(f"  Missing: {IMAGE_ENCODER}")
+            _has_ip_adapter = False
+            if not IP_ADAPTER_BIN.exists() or not IMAGE_ENCODER.exists():
+                print("[Generator] IP-Adapter not found — run: python setup_models.py")
 
         # Initialize insightface for better face detection (optional)
         _init_insightface()
