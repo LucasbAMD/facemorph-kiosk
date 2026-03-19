@@ -39,72 +39,78 @@ _FACE_LOCK_NEG = (
     "different race, different ethnicity, different gender, gender swap, "
     "nudity, exposed chest, exposed breasts, bare chest, cleavage, "
     "revealing clothing, topless, shirtless, nsfw, "
+    "deformed hands, extra fingers, fused fingers, missing fingers, "
+    "blurry hands, bad anatomy, low quality, lowres, "
 )
 
 # ── Style definitions ─────────────────────────────────────────────────────────
-# Each style has prompts and params for both ControlNet and Turbo modes.
+# Each style uses dual SDXL prompts to stay within 77-token CLIP limits:
+#   prompt   = subject/identity (CLIP-L, 77 tokens)
+#   prompt_2 = scene/style/background (CLIP-G, 77 tokens)
 # controlnet_scale ~0.50-0.58 preserves face/pose/layout from depth map.
 # strength ~0.78-0.85 controls how much the image deviates from original.
 
 STYLES = {
     "avatar": {
         "label": "Avatar",
-        "positive": (
-            "incredible cinematic still from Avatar movie on planet Pandora, "
+        "prompt": (
             "same person same gender same ethnicity, identical face shape jaw nose and eyes, "
-            "person's face with vivid deep blue Na'vi skin applied over their real features, "
-            "glowing cyan bioluminescent freckles and markings on face, "
+            "vivid deep blue Na'vi skin, cyan bioluminescent freckles on face, "
             "golden cat-slit eyes, tall pointed elf ears, "
-            "wearing full coverage Na'vi warrior armor with leather chest plate, "
-            "bone and shell shoulder pads, woven fabric tunic fully covering torso, "
-            "tribal necklace over armored clothing, "
-            "lush alien jungle background with massive glowing trees, "
-            "bioluminescent plants, floating jellyfish seeds, blue misty atmosphere, "
-            "James Cameron Avatar film style, ultra detailed, masterpiece"
+            "full coverage warrior armor, leather chest plate, shoulder pads, woven tunic"
+        ),
+        "prompt_2": (
+            "cinematic still from Avatar on Pandora, James Cameron film style, "
+            "lush alien jungle, massive glowing trees, bioluminescent plants, "
+            "floating jellyfish seeds, blue misty atmosphere, "
+            "ultra detailed, masterpiece"
         ),
         "negative": (
             _FACE_LOCK_NEG +
-            "race change, skin color change, "
-            "bare skin, skimpy outfit, "
+            "race change, bare skin, skimpy outfit, "
             "human skin, pink skin, normal skin color, "
-            "office, indoor room, plain wall, realistic photo, "
+            "office, indoor room, plain wall, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 40,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
-        "positive": (
+        "prompt": (
+            "same person's identical face sculpted in smooth clay, "
+            "preserving exact jaw nose eyes and expression, clean-shaven, "
+            "round chunky clay body, visible fingerprint textures, "
+            "big expressive clay eyes, smooth clay hair matching their hairstyle"
+        ),
+        "prompt_2": (
             "incredible stop-motion claymation scene, "
-            "same person's identical face sculpted in smooth clay preserving their exact features, "
-            "clean-shaven clay face with same jaw nose eyes and expression as the real person, "
-            "round chunky body with visible fingerprint textures in the clay, "
-            "big expressive clay eyes, smooth clay hair matching their hairstyle, "
-            "miniature clay furniture and props on a detailed tabletop set, "
-            "painted cardboard sky backdrop with cotton ball clouds, "
-            "warm studio spotlight casting soft shadows, "
-            "Aardman animations style, Wallace and Gromit quality, masterpiece"
+            "miniature clay furniture and props on detailed tabletop set, "
+            "painted cardboard sky backdrop, cotton ball clouds, "
+            "warm studio spotlight, soft shadows, "
+            "Aardman animations, Wallace and Gromit quality, masterpiece"
         ),
         "negative": (
             _FACE_LOCK_NEG +
             "photorealistic, real human, real skin, photograph, "
             "office, plain wall, blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 35,
+        "controlnet": {"strength": 0.82, "guidance": 11.0, "steps": 40,
                         "controlnet_scale": 0.52},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "anime": {
         "label": "Anime",
-        "positive": (
-            "stunning 2D anime illustration, NOT a photograph, "
-            "same person redrawn as anime character preserving their identical face shape and features, "
-            "same hairstyle same hair color same expression as the real person, "
+        "prompt": (
+            "same person redrawn as anime character, identical face shape and features, "
+            "same hairstyle same hair color same expression, "
             "thick black ink outlines, flat cel-shaded coloring, "
-            "sparkling anime eyes with light reflections, "
-            "background completely replaced with vibrant anime cityscape at sunset, "
+            "sparkling anime eyes with light reflections"
+        ),
+        "prompt_2": (
+            "stunning 2D anime illustration, NOT a photograph, "
+            "vibrant anime cityscape at sunset background, "
             "cherry blossom trees, glowing lanterns, dramatic clouds, "
             "Studio Ghibli quality, manga illustration, vibrant colors, masterpiece"
         ),
@@ -114,21 +120,23 @@ STYLES = {
             "3d render, realistic lighting, office, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
+        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 40,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "cyberpunk": {
         "label": "Cyberpunk",
-        "positive": (
-            "incredible cyberpunk scene at night, "
-            "same person with their identical face preserved exactly, same eyes nose jaw, "
+        "prompt": (
+            "same person identical face preserved exactly, same eyes nose jaw, "
             "subtle neon circuit tattoo lines on cheeks, "
-            "small chrome cybernetic accent near temple, LED strips in hair, "
-            "wearing futuristic jacket with illuminated trim, "
-            "background completely transformed into neon-lit rain-soaked city alley, "
-            "massive holographic billboards, pink and cyan neon signs, "
-            "puddles reflecting neon lights, steam vents, flying vehicles above, "
+            "chrome cybernetic accent near temple, LED strips in hair, "
+            "futuristic jacket with illuminated trim"
+        ),
+        "prompt_2": (
+            "incredible cyberpunk scene at night, "
+            "neon-lit rain-soaked city alley, massive holographic billboards, "
+            "pink and cyan neon signs, puddles reflecting neon, "
+            "steam vents, flying vehicles, "
             "Blade Runner cinematic style, neon noir, masterpiece"
         ),
         "negative": (
@@ -136,19 +144,21 @@ STYLES = {
             "natural lighting, daytime, sunny, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 40,
                         "controlnet_scale": 0.53},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "oilpainting": {
         "label": "Oil Painting",
-        "positive": (
-            "magnificent classical oil painting on canvas, "
+        "prompt": (
             "same person's identical face painted with visible brushstrokes, "
-            "preserving their exact facial features eyes nose mouth and expression, "
+            "preserving exact facial features eyes nose mouth and expression, "
             "rich thick impasto technique, warm golden Rembrandt lighting, "
-            "dramatic chiaroscuro shadows and glowing highlights, "
-            "background transformed into grand Renaissance palace interior, "
+            "dramatic chiaroscuro shadows and glowing highlights"
+        ),
+        "prompt_2": (
+            "magnificent classical oil painting on canvas, "
+            "grand Renaissance palace interior background, "
             "rich velvet curtains, ornate gold frames, marble columns, "
             "candlelight flickering, old master museum painting, "
             "baroque masterpiece, gallery quality artwork"
@@ -158,20 +168,21 @@ STYLES = {
             "photograph, digital art, modern, plain background, office, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 35,
+        "controlnet": {"strength": 0.80, "guidance": 10.0, "steps": 40,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     "pixelart": {
         "label": "Pixel Art",
-        "positive": (
+        "prompt": (
+            "same person as pixel art character, identical face shape and features, "
+            "same hairstyle and hair color, "
+            "visible square pixels, limited retro color palette, dithering"
+        ),
+        "prompt_2": (
             "retro 16-bit pixel art video game screenshot, "
-            "same person as pixel art character with identical face shape and features, "
-            "same hairstyle and hair color as real person, "
-            "visible square pixels, limited retro color palette, dithering, "
-            "background as colorful retro RPG game level, "
-            "pixel art trees, 8-bit clouds, tiled ground, "
-            "HUD elements and health bar at top, "
+            "colorful RPG game level background, pixel art trees, 8-bit clouds, "
+            "tiled ground, HUD elements and health bar, "
             "classic SNES Final Fantasy style, nostalgic pixel art, masterpiece"
         ),
         "negative": (
@@ -179,19 +190,21 @@ STYLES = {
             "photorealistic, smooth, high resolution, photograph, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 35,
+        "controlnet": {"strength": 0.83, "guidance": 12.0, "steps": 40,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "comicbook": {
         "label": "Comic Book",
-        "positive": (
-            "bold dynamic comic book illustration, "
+        "prompt": (
             "same person's identical face drawn with ink, no mask, face fully visible, "
-            "preserving their exact eyes nose mouth jaw and expression, "
-            "heavy black ink outlines and halftone dot shading on skin, "
-            "bright saturated primary colors, confident pose, "
-            "background with dramatic speed lines and pop art bursts, "
+            "preserving exact eyes nose mouth jaw and expression, "
+            "heavy black ink outlines, halftone dot shading on skin, "
+            "bright saturated primary colors"
+        ),
+        "prompt_2": (
+            "bold dynamic comic book illustration, "
+            "dramatic speed lines and pop art bursts background, "
             "Ben-Day dots pattern, bold color blocks, "
             "action comic panel layout, "
             "classic comic art style, dynamic composition, masterpiece"
@@ -202,22 +215,24 @@ STYLES = {
             "photorealistic, photograph, real skin, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 40,
                         "controlnet_scale": 0.55},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "steampunk": {
         "label": "Steampunk",
-        "positive": (
-            "incredible steampunk scene, "
-            "same person with their identical face preserved exactly, same eyes nose jaw mouth, "
+        "prompt": (
+            "same person identical face preserved exactly, same eyes nose jaw mouth, "
             "clean-shaven face matching the real person precisely, "
-            "wearing ornate brass goggles pushed up on forehead, "
-            "Victorian leather coat with copper gears and clockwork accessories, "
-            "background transformed into grand Victorian workshop, "
-            "massive spinning brass gears on walls, steam pipes everywhere, "
-            "pressure gauges, leather-bound books, amber gaslight glow, "
-            "copper and bronze color palette, warm dramatic lighting, "
+            "ornate brass goggles pushed up on forehead, "
+            "Victorian leather coat with copper gears and clockwork accessories"
+        ),
+        "prompt_2": (
+            "incredible steampunk scene, "
+            "grand Victorian workshop background, "
+            "massive spinning brass gears, steam pipes, pressure gauges, "
+            "leather-bound books, amber gaslight glow, "
+            "copper and bronze palette, warm dramatic lighting, "
             "industrial revolution aesthetic, masterpiece"
         ),
         "negative": (
@@ -226,7 +241,7 @@ STYLES = {
             "modern, futuristic, neon, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 35,
+        "controlnet": {"strength": 0.78, "guidance": 10.0, "steps": 40,
                         "controlnet_scale": 0.58},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
@@ -396,13 +411,25 @@ def generate_scene(frame, style_key):
 
         mode = _pipe_mode
         params = style.get(mode, style["turbo"])
-        prompt = style["positive"]
+        prompt = style["prompt"]
+        prompt_2 = style.get("prompt_2", prompt)
         neg_prompt = style["negative"]
 
-        # Prepare source image at 1024x1024 for SDXL
+        # Prepare source image — use SDXL-native resolution preserving aspect ratio
+        # SDXL works best at resolutions where total pixels ~ 1024x1024
+        # For 16:9 input: 1280x720 is close to 1024^2 total pixels
         h, w = frame.shape[:2]
+        aspect = w / h
+        if aspect >= 1.5:      # wide (16:9) → 1280x720
+            gen_w, gen_h = 1280, 720
+        elif aspect >= 1.2:    # 4:3 → 1152x896
+            gen_w, gen_h = 1152, 896
+        elif aspect <= 0.75:   # tall portrait → 720x1280
+            gen_w, gen_h = 720, 1280
+        else:                  # ~square → 1024x1024
+            gen_w, gen_h = 1024, 1024
         source_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
+        source_pil = source_pil.resize((gen_w, gen_h), Image.LANCZOS)
 
         with _pipe_lock:
             pipe = _pipe
@@ -423,7 +450,9 @@ def generate_scene(frame, style_key):
 
                 result = pipe(
                     prompt=prompt,
+                    prompt_2=prompt_2,
                     negative_prompt=neg_prompt,
+                    negative_prompt_2=neg_prompt,
                     image=source_pil,
                     control_image=depth_image,
                     strength=params["strength"],
@@ -436,7 +465,9 @@ def generate_scene(frame, style_key):
                 # Turbo fallback
                 result = pipe(
                     prompt=prompt,
+                    prompt_2=prompt_2,
                     negative_prompt=neg_prompt,
+                    negative_prompt_2=neg_prompt,
                     image=source_pil,
                     strength=params["strength"],
                     num_inference_steps=params["steps"],
