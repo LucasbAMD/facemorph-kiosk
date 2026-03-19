@@ -428,17 +428,18 @@ STYLES = {
     "neon": {
         "label": "Neon Glow",
         "prompt": (
-            "person lit by vivid neon lights, "
+            "same person lit by vivid neon lights, "
             "glowing neon light outlines tracing face and body contours, "
             "electric blue and hot pink neon reflections on skin, "
+            "same face same identity same gender, "
             "same hairstyle with neon color highlights, "
             "dark shadows with vibrant neon rim lighting"
         ),
         "prompt_2": (
-            "dramatic neon portrait in dark nightclub environment, "
+            "dramatic neon portrait in dark environment, "
             "vibrant electric blue pink and purple neon tube signs, "
             "neon light painting streaks, colorful lens flares, "
-            "glowing particles floating in air, DJ booth in background, "
+            "glowing particles floating in air, "
             "ultraviolet blacklight atmosphere, stunning, masterpiece"
         ),
         "negative": (
@@ -448,8 +449,8 @@ STYLES = {
         "negative_2": _NEG_QUALITY + ", office, plain background, white wall, washed out",
         "use_ip_adapter": True,
         "ip_adapter_scale": 0.6,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.38},
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
 }
