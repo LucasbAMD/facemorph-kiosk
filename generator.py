@@ -1,19 +1,18 @@
 """
 generator.py — AI Avatar Style Generator
-Uses SDXL + IP-Adapter on ROCm for high-quality stylized avatar generation.
+Uses SDXL + IP-Adapter FaceID on ROCm for identity-preserving stylized avatars.
 
 Pipeline:
-  1. Extracts face from webcam frame
-  2. Uses IP-Adapter to condition on the person's actual face
-  3. Generates a fully stylized avatar (not just a filter)
+  1. insightface extracts a 512-dim face embedding (your actual facial identity)
+  2. IP-Adapter FaceID projects that embedding into the diffusion process
+  3. SDXL generates a fully stylized avatar that genuinely looks like you
   4. Styles: Avatar (blue alien), Claymation, Anime, Ghost
 
-Key improvements over previous version:
-  - 20 inference steps (was 4) for actual quality
-  - guidance_scale 7.5 (was 0.0) for prompt adherence
-  - High denoise (0.80-0.90) to fully restyle, not just tint
-  - IP-Adapter enabled for face identity preservation
-  - Face-centered crop as input instead of full body frame
+Why FaceID matters:
+  Regular IP-Adapter uses generic CLIP image features — it captures "a person"
+  but not YOUR specific face. FaceID uses actual face recognition embeddings
+  from insightface, the same tech used in face unlock. This means the generated
+  avatar preserves your actual facial structure, nose shape, eye spacing, etc.
 """
 
 import cv2
@@ -27,9 +26,15 @@ from PIL import Image
 SDXL_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
              "sd_xl_turbo_1.0_fp16.safetensors")
 
+# FaceID adapter (primary — strong identity preservation)
+FACEID_DIR = Path.home() / "kiosk_models" / "ip_adapter_faceid"
+FACEID_BIN = FACEID_DIR / "ip-adapter-faceid_sdxl.bin"
+FACEID_LORA = FACEID_DIR / "ip-adapter-faceid_sdxl_lora.safetensors"
+
+# Regular IP-Adapter (fallback — weaker identity)
 IP_ADAPTER_DIR = Path.home() / "kiosk_models" / "ip_adapter"
 IP_ADAPTER_BIN = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter_sdxl.bin"
-IMAGE_ENCODER  = IP_ADAPTER_DIR / "models" / "image_encoder"
+IMAGE_ENCODER = IP_ADAPTER_DIR / "models" / "image_encoder"
 
 # ── Style definitions ─────────────────────────────────────────────────────────
 STYLES = {
@@ -51,10 +56,10 @@ STYLES = {
             "blurry, low quality, deformed, ugly, mutation, extra limbs, "
             "text, watermark, signature, multiple people"
         ),
-        "strength": 0.82,
+        "strength": 0.78,
         "guidance": 7.5,
-        "steps": 20,
-        "ip_weight": 0.5,
+        "steps": 25,
+        "ip_scale": 0.7,
     },
     "claymation": {
         "label": "Claymation",
@@ -72,10 +77,10 @@ STYLES = {
             "blurry, low quality, deformed, ugly, "
             "text, watermark, multiple people, anime, cartoon drawing"
         ),
-        "strength": 0.85,
+        "strength": 0.82,
         "guidance": 8.0,
-        "steps": 20,
-        "ip_weight": 0.55,
+        "steps": 25,
+        "ip_scale": 0.7,
     },
     "anime": {
         "label": "Anime",
@@ -95,10 +100,10 @@ STYLES = {
             "western cartoon, chibi, sketch, rough lines, "
             "text, watermark, multiple people, ugly"
         ),
-        "strength": 0.88,
+        "strength": 0.82,
         "guidance": 8.0,
-        "steps": 20,
-        "ip_weight": 0.45,
+        "steps": 25,
+        "ip_scale": 0.65,
     },
     "ghost": {
         "label": "Ghost",
@@ -118,10 +123,10 @@ STYLES = {
             "blurry, low quality, deformed, ugly, "
             "text, watermark, multiple people, costume, mask"
         ),
-        "strength": 0.80,
+        "strength": 0.75,
         "guidance": 7.5,
-        "steps": 20,
-        "ip_weight": 0.5,
+        "steps": 25,
+        "ip_scale": 0.7,
     },
 }
 
@@ -130,20 +135,38 @@ STYLES = {
 _pipe = None
 _pipe_lock = threading.Lock()
 _pipe_ready = False
-_has_ip_adapter = False
+_face_app = None
+_face_app_lock = threading.Lock()
+_identity_mode = "none"  # "faceid", "ip_adapter", or "none"
+
+
+def _init_insightface():
+    """Initialize insightface for face embedding extraction."""
+    global _face_app
+    try:
+        from insightface.app import FaceAnalysis
+        app = FaceAnalysis(
+            name="antelopev2",
+            providers=["CPUExecutionProvider"],
+        )
+        app.prepare(ctx_id=0, det_size=(640, 640))
+        _face_app = app
+        print("[Generator] insightface ready (antelopev2)")
+        return True
+    except Exception as e:
+        print(f"[Generator] insightface not available: {e}")
+        return False
 
 
 def _load_pipeline():
-    """Load SDXL + optional IP-Adapter. Runs in background thread."""
-    global _pipe, _pipe_ready, _has_ip_adapter
+    """Load SDXL + best available identity adapter. Runs in background thread."""
+    global _pipe, _pipe_ready, _identity_mode
 
     try:
         import torch
         from diffusers import StableDiffusionXLImg2ImgPipeline
 
         print("[Generator] Loading SDXL pipeline...")
-        print(f"[Generator] Model: {SDXL_PATH}")
-
         if not SDXL_PATH.exists():
             print(f"[Generator] ERROR: Model not found at {SDXL_PATH}")
             return
@@ -155,37 +178,73 @@ def _load_pipeline():
         )
         pipe = pipe.to("cuda")
 
-        # Try loading IP-Adapter for face identity preservation
-        if IP_ADAPTER_BIN.exists() and IMAGE_ENCODER.exists():
+        # Try enabling memory optimizations
+        try:
+            pipe.enable_vae_slicing()
+        except Exception:
+            pass
+
+        # ── Try IP-Adapter FaceID (best identity preservation) ────────────
+        faceid_loaded = False
+        if FACEID_BIN.exists():
             try:
+                print(f"[Generator] Loading IP-Adapter FaceID from {FACEID_BIN}...")
+                pipe.load_ip_adapter(
+                    str(FACEID_DIR),
+                    subfolder="",
+                    weight_name="ip-adapter-faceid_sdxl.bin",
+                )
+
+                # Load FaceID LoRA for better quality
+                if FACEID_LORA.exists():
+                    try:
+                        pipe.load_lora_weights(
+                            str(FACEID_DIR),
+                            weight_name="ip-adapter-faceid_sdxl_lora.safetensors",
+                        )
+                        pipe.fuse_lora(lora_scale=0.7)
+                        print("[Generator] FaceID LoRA loaded and fused")
+                    except Exception as e:
+                        print(f"[Generator] FaceID LoRA failed (non-critical): {e}")
+
+                # Initialize insightface for face embeddings
+                if _init_insightface():
+                    _identity_mode = "faceid"
+                    faceid_loaded = True
+                    print("[Generator] IP-Adapter FaceID active — strong identity preservation")
+                else:
+                    print("[Generator] insightface failed — FaceID adapter loaded but unusable")
+                    # Unload the adapter since we can't use it without face embeddings
+                    pipe.unload_ip_adapter()
+            except Exception as e:
+                print(f"[Generator] IP-Adapter FaceID failed: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # ── Fallback: regular IP-Adapter (weaker identity) ────────────────
+        if not faceid_loaded and IP_ADAPTER_BIN.exists() and IMAGE_ENCODER.exists():
+            try:
+                print("[Generator] Falling back to regular IP-Adapter...")
                 pipe.load_ip_adapter(
                     str(IP_ADAPTER_DIR),
                     subfolder="sdxl_models",
                     weight_name="ip-adapter_sdxl.bin",
                     image_encoder_folder=str(IMAGE_ENCODER),
                 )
-                _has_ip_adapter = True
-                print("[Generator] IP-Adapter loaded - face identity preservation ON")
+                _identity_mode = "ip_adapter"
+                print("[Generator] Regular IP-Adapter loaded — moderate identity preservation")
             except Exception as e:
-                print(f"[Generator] IP-Adapter failed ({e}) - using img2img only")
-                _has_ip_adapter = False
-        else:
-            print("[Generator] IP-Adapter not found - using img2img only")
-            if not IP_ADAPTER_BIN.exists():
-                print(f"  Missing: {IP_ADAPTER_BIN}")
-            if not IMAGE_ENCODER.exists():
-                print(f"  Missing: {IMAGE_ENCODER}")
+                print(f"[Generator] Regular IP-Adapter also failed: {e}")
 
-        # Enable memory optimizations for AMD
-        try:
-            pipe.enable_vae_slicing()
-        except Exception:
-            pass
+        if _identity_mode == "none":
+            print("[Generator] WARNING: No identity adapter loaded!")
+            print("           Avatars will NOT look like you.")
+            print("           Run: python setup_models.py")
 
         with _pipe_lock:
             _pipe = pipe
         _pipe_ready = True
-        print("[Generator] Pipeline ready!")
+        print(f"[Generator] Pipeline ready! (identity_mode={_identity_mode})")
 
     except Exception as e:
         print(f"[Generator] ERROR loading pipeline: {e}")
@@ -213,30 +272,57 @@ def extract_face_crop(frame, padding_ratio=0.65):
     """
     Extract the largest face from frame with generous padding.
     Returns a square-ish PIL Image centered on the face.
-    This becomes the source image for img2img, so the AI
-    focuses on restyling the face rather than the background.
     """
+    # Try insightface first (more reliable detection)
+    if _face_app is not None:
+        try:
+            with _face_app_lock:
+                faces = _face_app.get(frame)
+            if faces:
+                face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+                x1, y1, x2, y2 = [int(v) for v in face.bbox]
+                w, h = x2 - x1, y2 - y1
+                pad_x = int(w * padding_ratio)
+                pad_y = int(h * padding_ratio)
+                fh, fw = frame.shape[:2]
+                x1 = max(0, x1 - pad_x)
+                y1 = max(0, y1 - pad_y)
+                x2 = min(fw, x2 + pad_x)
+                y2 = min(fh, y2 + pad_y)
+
+                # Make roughly square
+                crop_w, crop_h = x2 - x1, y2 - y1
+                if crop_w > crop_h:
+                    diff = crop_w - crop_h
+                    y1 = max(0, y1 - diff // 2)
+                    y2 = min(fh, y2 + diff // 2)
+                elif crop_h > crop_w:
+                    diff = crop_h - crop_w
+                    x1 = max(0, x1 - diff // 2)
+                    x2 = min(fw, x2 + diff // 2)
+
+                crop = frame[y1:y2, x1:x2]
+                if crop.size > 0:
+                    return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+        except Exception:
+            pass
+
+    # Fallback to Haar cascade
     detector = _get_face_cascade()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
 
     if len(faces) > 0:
-        # Pick largest face
         x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-
-        # Add padding to include hair, ears, neck
         pad_x = int(w * padding_ratio)
         pad_y = int(h * padding_ratio)
         fh, fw = frame.shape[:2]
-
         x1 = max(0, x - pad_x)
         y1 = max(0, y - pad_y)
         x2 = min(fw, x + w + pad_x)
         y2 = min(fh, y + h + pad_y)
 
-        # Make it roughly square for better generation
-        crop_w = x2 - x1
-        crop_h = y2 - y1
+        crop_w, crop_h = x2 - x1, y2 - y1
         if crop_w > crop_h:
             diff = crop_w - crop_h
             y1 = max(0, y1 - diff // 2)
@@ -250,7 +336,7 @@ def extract_face_crop(frame, padding_ratio=0.65):
         if crop.size > 0:
             return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
 
-    # Fallback: center crop of frame
+    # Last resort: center crop
     h, w = frame.shape[:2]
     size = min(h, w)
     y1 = (h - size) // 2
@@ -259,25 +345,57 @@ def extract_face_crop(frame, padding_ratio=0.65):
     return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
 
 
-def extract_face_only(frame):
-    """Extract a tight face crop for IP-Adapter conditioning."""
+def _get_face_embedding(frame):
+    """
+    Extract face embedding using insightface.
+    Returns (embedding_tensor, face_info) or (None, None).
+    """
+    if _face_app is None:
+        return None, None
+
+    try:
+        import torch
+        with _face_app_lock:
+            faces = _face_app.get(frame)
+        if not faces:
+            print("[Generator] No face found by insightface")
+            return None, None
+
+        # Pick largest face
+        face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+        emb = face.normed_embedding  # numpy (512,)
+
+        # Convert to tensor: shape (1, 1, 512) for IP-Adapter FaceID
+        emb_tensor = torch.from_numpy(emb).unsqueeze(0).to(
+            device="cuda", dtype=torch.float16)
+
+        print(f"[Generator] Face embedding extracted (norm={np.linalg.norm(emb):.2f})")
+        return emb_tensor, face
+
+    except Exception as e:
+        print(f"[Generator] Face embedding extraction failed: {e}")
+        return None, None
+
+
+def _get_face_image_for_ip(frame):
+    """Extract a tight face crop as PIL Image for regular IP-Adapter."""
     detector = _get_face_cascade()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = detector.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
 
     if len(faces) > 0:
         x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-        pad = int(max(w, h) * 0.25)
+        pad = int(max(w, h) * 0.3)
         fh, fw = frame.shape[:2]
-        x1 = max(0, x - pad)
-        y1 = max(0, y - pad)
-        x2 = min(fw, x + w + pad)
-        y2 = min(fh, y + h + pad)
+        x1, y1 = max(0, x - pad), max(0, y - pad)
+        x2, y2 = min(fw, x + w + pad), min(fh, y + h + pad)
         crop = frame[y1:y2, x1:x2]
         if crop.size > 0:
-            return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+            pil = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+            return pil.resize((512, 512), Image.LANCZOS)
 
-    return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).resize(
+        (512, 512), Image.LANCZOS)
 
 
 # ── Generation ────────────────────────────────────────────────────────────────
@@ -285,15 +403,15 @@ def generate_avatar(frame, style_key):
     """
     Generate a stylized avatar from a webcam frame.
 
-    Args:
-        frame:     BGR webcam frame
-        style_key: One of 'avatar', 'claymation', 'anime', 'ghost'
+    Uses 3-tier identity preservation:
+      1. FaceID (best) — actual face recognition embeddings
+      2. Regular IP-Adapter (fallback) — CLIP image features
+      3. Plain img2img (minimal) — structure from low denoise only
 
-    Returns:
-        (bgr_image, None) on success, (None, error_string) on failure
+    Returns: (bgr_image, None) on success, (None, error_string) on failure
     """
     if not is_ready():
-        return None, "AI pipeline loading - please wait a moment"
+        return None, "AI pipeline loading — please wait a moment"
 
     style = STYLES.get(style_key)
     if not style:
@@ -304,48 +422,64 @@ def generate_avatar(frame, style_key):
 
         # Extract face-centered crop as source image
         source_pil = extract_face_crop(frame)
-
-        # Resize to 1024x1024 for SDXL
         source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
-
-        # Extract tight face crop for IP-Adapter
-        face_pil = None
-        if _has_ip_adapter:
-            face_pil = extract_face_only(frame)
-            face_pil = face_pil.resize((224, 224), Image.LANCZOS)
 
         with _pipe_lock:
             pipe = _pipe
 
-        print(f"[Generator] Generating {style_key} avatar...")
-        print(f"[Generator] Steps={style['steps']} Strength={style['strength']} "
-              f"Guidance={style['guidance']} IP-Adapter={_has_ip_adapter}")
-        start = time.time()
+        ip_scale = style["ip_scale"]
+        strength = style["strength"]
 
+        print(f"[Generator] Style={style_key} Mode={_identity_mode} "
+              f"Steps={style['steps']} Strength={strength} "
+              f"Guidance={style['guidance']} IP-Scale={ip_scale}")
+
+        start = time.time()
         generator = torch.Generator(device="cuda").manual_seed(
             int(time.time()) % 2**32)
 
-        # Set IP-Adapter scale if available
-        if _has_ip_adapter and face_pil is not None:
-            try:
-                pipe.set_ip_adapter_scale(style["ip_weight"])
-            except Exception:
-                pass
-
-        # Build generation kwargs
         gen_kwargs = {
             "prompt": style["positive"],
             "negative_prompt": style["negative"],
             "image": source_pil,
-            "strength": style["strength"],
+            "strength": strength,
             "num_inference_steps": style["steps"],
             "guidance_scale": style["guidance"],
             "generator": generator,
         }
 
-        # Add IP-Adapter image if available
-        if _has_ip_adapter and face_pil is not None:
+        # ── FaceID mode: use face recognition embeddings ──────────────────
+        if _identity_mode == "faceid":
+            face_emb, face_info = _get_face_embedding(frame)
+            if face_emb is not None:
+                pipe.set_ip_adapter_scale(ip_scale)
+
+                # Project embedding through the FaceID projection layer
+                proj_layers = pipe.unet.encoder_hid_proj.image_projection_layers
+                if proj_layers:
+                    projected = proj_layers[0](face_emb)
+                    # Duplicate for classifier-free guidance (unconditional + conditional)
+                    neg_embed = torch.zeros_like(projected)
+                    gen_kwargs["ip_adapter_image_embeds"] = [
+                        torch.cat([neg_embed, projected])
+                    ]
+                    print(f"[Generator] FaceID embedding projected "
+                          f"(shape={projected.shape})")
+                else:
+                    print("[Generator] WARN: No projection layers found")
+            else:
+                print("[Generator] WARN: No face found — generating without identity")
+
+        # ── Regular IP-Adapter mode: use face image ───────────────────────
+        elif _identity_mode == "ip_adapter":
+            face_pil = _get_face_image_for_ip(frame)
+            pipe.set_ip_adapter_scale(ip_scale)
             gen_kwargs["ip_adapter_image"] = face_pil
+            print(f"[Generator] Using regular IP-Adapter with face crop")
+
+        # ── No identity mode ──────────────────────────────────────────────
+        else:
+            print("[Generator] WARN: No identity adapter — avatar won't look like you")
 
         with torch.inference_mode():
             result = pipe(**gen_kwargs).images[0]
@@ -379,7 +513,7 @@ class ComfyBridge:
         _load_pipeline()
         self.available = is_ready()
         if self.available:
-            print("[Generator] AI engine ready")
+            print(f"[Generator] AI engine ready (identity={_identity_mode})")
         else:
             print("[Generator] AI engine failed to load")
 
