@@ -659,7 +659,6 @@ def _load_pipeline():
                 StableDiffusionXLControlNetImg2ImgPipeline,
                 ControlNetModel,
                 DPMSolverMultistepScheduler,
-                AutoencoderKL,
             )
             from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
@@ -700,19 +699,6 @@ def _load_pipeline():
                 algorithm_type="dpmsolver++",
                 use_karras_sigmas=True,
             )
-
-            # ── Load SDXL VAE fp16 fix (vivid colors, no NaN artifacts) ──
-            print("[Generator]   Loading SDXL VAE fp16 fix...")
-            try:
-                vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix",
-                    torch_dtype=torch.float16,
-                )
-                pipe.vae = vae
-                print("[Generator]   VAE fp16 fix loaded")
-            except Exception as e:
-                print(f"[Generator]   VAE fp16 fix not available: {e}")
-                print("[Generator]   Using default VAE (still works fine)")
 
             pipe = pipe.to("cuda")
 
