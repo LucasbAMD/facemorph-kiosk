@@ -67,22 +67,22 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "prompt": (
-            "same person same gender same ethnicity, identical face shape jaw nose and eyes, "
-            "vivid deep blue Na'vi skin, cyan bioluminescent freckles on face, "
-            "golden cat-slit eyes, tall pointed elf ears, "
-            "full coverage warrior armor, leather chest plate, shoulder pads, woven tunic"
+            "Na'vi alien from Avatar movie, same person's face shape and expression, "
+            "entire body covered in vivid deep blue skin, glowing cyan bioluminescent "
+            "freckles and dots across face and arms, golden cat-slit eyes, "
+            "tall pointed elf ears, full coverage warrior armor with leather chest plate"
         ),
         "prompt_2": (
-            "cinematic still from Avatar on Pandora, James Cameron film style, "
-            "lush alien jungle, massive glowing trees, bioluminescent plants, "
+            "cinematic still from James Cameron Avatar on planet Pandora, "
+            "lush alien bioluminescent jungle, massive glowing trees, "
             "floating jellyfish seeds, blue misty atmosphere, "
-            "ultra detailed, masterpiece"
+            "movie quality, ultra detailed, masterpiece"
         ),
-        "negative": _NEG_IDENTITY + ", human skin, pink skin, normal skin color, office, plain wall",
-        "negative_2": _NEG_QUALITY + ", realistic photo, indoor room",
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.55},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "negative": _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin color, pale",
+        "negative_2": _NEG_QUALITY + ", realistic photo, office, indoor room, plain wall",
+        "controlnet": {"strength": 0.90, "guidance": 14.0, "steps": 35,
+                        "controlnet_scale": 0.38},
+        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
