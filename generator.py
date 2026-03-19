@@ -25,6 +25,12 @@ warnings.filterwarnings("ignore", message=".*enable_vae_slicing.*")
 warnings.filterwarnings("ignore", message=".*local_dir_use_symlinks.*")
 warnings.filterwarnings("ignore", message=".*clean_up_tokenization_spaces.*")
 warnings.filterwarnings("ignore", message=".*The following part of your input was truncated.*")
+# Suppress harmless ROCm/PyTorch warnings on AMD GPUs
+warnings.filterwarnings("ignore", message=".*hipBLASLt.*")
+warnings.filterwarnings("ignore", message=".*Flash attention support on Navi3.*")
+warnings.filterwarnings("ignore", message=".*Memory Efficient attention on Navi3.*")
+# Suppress InsightFace deprecation warning
+warnings.filterwarnings("ignore", message=".*`estimate` is deprecated.*")
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -32,6 +38,7 @@ import logging
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("diffusers").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+logging.getLogger("onnxruntime").setLevel(logging.ERROR)
 
 # ── Model paths ───────────────────────────────────────────────────────────────
 SDXL_TURBO_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
