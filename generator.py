@@ -378,24 +378,25 @@ STYLES = {
     "popart": {
         "label": "Pop Art",
         "prompt": (
-            "person in bold Andy Warhol pop art screen print style, "
+            "same person in bold Andy Warhol pop art screen print style, "
             "flat bright neon color blocks on face and hair, "
             "thick black outlines around all features, "
+            "same face same identity same gender, "
             "high contrast stylized portrait, halftone dot pattern on skin"
         ),
         "prompt_2": (
             "iconic Andy Warhol pop art print, vibrant color offset, "
             "hot pink yellow cyan and orange color palette, "
             "bold graphic shapes and repeating pattern background, "
-            "Warhol Marilyn Monroe series style, "
+            "Warhol screen print series style, "
             "modern art gallery exhibition piece, masterpiece"
         ),
         "negative": _NEG_IDENTITY + ", photorealistic, subtle colors, muted, soft",
         "negative_2": _NEG_QUALITY + ", office, plain background, white wall, photograph",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.4,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.33},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── ICE & FROST ───────────────────────────────────────────────────
