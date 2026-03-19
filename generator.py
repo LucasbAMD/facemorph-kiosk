@@ -39,145 +39,163 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "positive": (
-            "scene from alien planet Pandora, "
-            "person with deep vivid blue skin and glowing cyan bioluminescent dots, "
-            "golden cat-slit eyes, pointed elf ears, tribal bone jewelry, "
-            "lush bioluminescent jungle background with towering alien trees, "
-            "hanging vines, floating glowing seeds, fireflies in misty air, "
-            "cinematic film still, masterpiece"
+            "incredible cinematic still from Avatar movie on planet Pandora, "
+            "person completely transformed into a Na'vi alien with vivid deep blue skin, "
+            "glowing cyan bioluminescent freckles and markings across face and body, "
+            "large golden cat-slit eyes, tall pointed elf ears, flat wide nose, "
+            "tribal bone necklace and woven leaf clothing, "
+            "lush alien jungle background with massive glowing trees, "
+            "bioluminescent plants, floating jellyfish seeds, blue misty atmosphere, "
+            "James Cameron Avatar film style, ultra detailed, masterpiece"
         ),
         "negative": (
-            "human skin, white skin, pink skin, normal skin, office, "
+            "human skin, white skin, pink skin, pale skin, normal skin color, "
+            "office, indoor room, plain wall, realistic photo, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.65, "guidance": 8.5, "steps": 30,
-                        "controlnet_scale": 0.7},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.92, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
         "positive": (
-            "entire scene made of plasticine clay and stop-motion miniatures, "
-            "clay person with round chunky proportions and thumbprint texture, "
-            "miniature clay furniture and props on a tabletop set, "
-            "painted cardboard backdrop, warm studio spotlight, "
-            "Wallace and Gromit style stop-motion frame, masterpiece"
+            "incredible stop-motion claymation scene, "
+            "person sculpted entirely from colorful plasticine clay, "
+            "round chunky body with visible fingerprint textures in the clay, "
+            "oversized head with big clay eyes, smooth clay hair, "
+            "miniature clay furniture and props on a detailed tabletop set, "
+            "painted cardboard sky backdrop with cotton ball clouds, "
+            "warm studio spotlight casting soft shadows, "
+            "Aardman animations style, Wallace and Gromit quality, masterpiece"
         ),
         "negative": (
-            "photorealistic, real human, CGI, 3D render, "
+            "photorealistic, real human, real skin, photograph, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.60, "guidance": 8.0, "steps": 28,
-                        "controlnet_scale": 0.75},
-        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 6},
+        "controlnet": {"strength": 0.90, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "anime": {
         "label": "Anime",
         "positive": (
-            "2D anime illustration of entire scene, "
-            "person drawn with thick black ink outlines and flat cel-shaded colors, "
-            "huge sparkling anime eyes, colorful stylized hair, "
-            "background transformed into anime cityscape at golden hour, "
-            "cherry blossom petals drifting through air, "
-            "manga style, vibrant saturated colors, masterpiece"
+            "stunning 2D anime illustration, NOT a photograph, "
+            "person completely redrawn as anime character with thick black ink outlines, "
+            "flat cel-shaded coloring with no realistic shading, "
+            "huge sparkling anime eyes with light reflections, "
+            "colorful stylized spiky hair, small pointed chin, "
+            "background completely replaced with vibrant anime cityscape at sunset, "
+            "cherry blossom trees, glowing lanterns, dramatic clouds, "
+            "Studio Ghibli quality, manga illustration, vibrant colors, masterpiece"
         ),
         "negative": (
-            "photorealistic, real person, photograph, 3d render, "
-            "realistic skin, blurry, deformed, text, watermark"
+            "photorealistic, real person, photograph, real skin texture, "
+            "3d render, realistic lighting, office, plain background, "
+            "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.65, "guidance": 8.5, "steps": 30,
-                        "controlnet_scale": 0.65},
-        "turbo":      {"strength": 0.87, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.93, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.30},
+        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "cyberpunk": {
         "label": "Cyberpunk",
         "positive": (
-            "cyberpunk scene, person with chrome cybernetic implants and "
-            "glowing circuit-pattern tattoos, neon pink and cyan lighting, "
-            "environment transformed into rain-soaked neon alley, "
-            "holographic advertisements, kanji signs, laser beams, "
-            "wet reflective surfaces with puddles, steam rising, "
-            "cinematic neon noir, masterpiece"
+            "incredible cyberpunk scene at night, "
+            "person with glowing neon circuit tattoos across face and arms, "
+            "chrome cybernetic eye implant, LED strips in hair, "
+            "wearing futuristic jacket with illuminated trim, "
+            "background completely transformed into neon-lit rain-soaked city alley, "
+            "massive holographic billboards, pink and cyan neon signs, "
+            "puddles reflecting neon lights, steam vents, flying vehicles above, "
+            "Blade Runner cinematic style, neon noir, masterpiece"
         ),
         "negative": (
-            "natural lighting, daytime, sunny, medieval, fantasy, "
+            "natural lighting, daytime, sunny, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.60, "guidance": 8.0, "steps": 28,
-                        "controlnet_scale": 0.7},
-        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.90, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "oilpainting": {
         "label": "Oil Painting",
         "positive": (
-            "classical oil painting of entire scene, "
-            "person painted with rich visible brushstrokes and impasto technique, "
-            "warm golden Rembrandt lighting with dramatic chiaroscuro shadows, "
-            "background as ornate Renaissance interior with velvet drapes, "
-            "gilded picture frames on dark walls, candelabra, "
-            "museum masterpiece on canvas, baroque style"
+            "magnificent classical oil painting on canvas, "
+            "person painted with rich thick visible brushstrokes and heavy impasto, "
+            "warm golden Rembrandt lighting with dramatic chiaroscuro, "
+            "deep shadows and glowing highlights on skin, "
+            "background transformed into grand Renaissance palace interior, "
+            "rich velvet curtains, ornate gold frames, marble columns, "
+            "candlelight flickering, old master museum painting, "
+            "baroque masterpiece, gallery quality artwork"
         ),
         "negative": (
-            "photograph, digital art, modern, cartoon, anime, "
+            "photograph, digital art, modern, plain background, office, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.55, "guidance": 7.5, "steps": 28,
-                        "controlnet_scale": 0.7},
-        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 6},
+        "controlnet": {"strength": 0.88, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "pixelart": {
         "label": "Pixel Art",
         "positive": (
-            "retro 16-bit pixel art scene, "
-            "person as pixel art character with blocky square pixels, "
-            "limited color palette, dithering shading, "
-            "background as retro video game level with pixel clouds and tiles, "
-            "8-bit aesthetic, classic SNES RPG style, "
-            "crisp pixel edges, nostalgic retro gaming art"
+            "retro 16-bit pixel art video game screenshot, "
+            "person as chunky pixel art character with visible square pixels, "
+            "limited retro color palette with dithering patterns, "
+            "background as colorful retro RPG game level, "
+            "pixel art trees, 8-bit clouds, tiled ground, "
+            "HUD elements and health bar at top, "
+            "classic SNES Final Fantasy style, nostalgic pixel art, masterpiece"
         ),
         "negative": (
-            "photorealistic, smooth, high resolution, 3d render, "
+            "photorealistic, smooth, high resolution, photograph, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.70, "guidance": 9.0, "steps": 28,
-                        "controlnet_scale": 0.6},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.93, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.30},
+        "turbo":      {"strength": 0.92, "guidance": 0.0, "steps": 7},
     },
     "comicbook": {
         "label": "Comic Book",
         "positive": (
-            "bold comic book illustration of entire scene, "
+            "bold dynamic comic book illustration, "
             "person drawn with heavy black ink outlines and halftone dot shading, "
-            "bright primary colors, dramatic action pose, "
-            "background with comic panel speed lines and pop art bursts, "
-            "Ben-Day dots pattern, speech bubble space, "
-            "Marvel comic style, dynamic composition, masterpiece"
+            "bright saturated primary colors, dramatic heroic pose, "
+            "background with dramatic speed lines, POW burst effects, "
+            "Ben-Day dots pattern everywhere, bold color blocks, "
+            "action comic panel layout, speech bubble in corner, "
+            "Jack Kirby Marvel comic art style, dynamic composition, masterpiece"
         ),
         "negative": (
-            "photorealistic, photograph, 3d render, anime, "
+            "photorealistic, photograph, real skin, plain background, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.65, "guidance": 8.5, "steps": 28,
-                        "controlnet_scale": 0.65},
-        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.92, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.30},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     "steampunk": {
         "label": "Steampunk",
         "positive": (
-            "steampunk scene, person wearing brass goggles and Victorian gear, "
-            "copper mechanical parts and clockwork accessories, "
-            "environment as Victorian workshop with spinning brass gears, "
-            "steam pipes, pressure gauges, leather-bound books, "
-            "warm amber gaslight illumination, copper and bronze tones, "
+            "incredible steampunk scene, "
+            "person wearing ornate brass goggles on forehead, "
+            "Victorian leather coat with copper gears and clockwork accessories, "
+            "mechanical arm with visible brass pistons, "
+            "background transformed into grand Victorian workshop, "
+            "massive spinning brass gears on walls, steam pipes everywhere, "
+            "pressure gauges, leather-bound books, amber gaslight glow, "
+            "copper and bronze color palette, warm dramatic lighting, "
             "industrial revolution aesthetic, masterpiece"
         ),
         "negative": (
-            "modern, futuristic, neon, digital, cartoon, anime, "
+            "modern, futuristic, neon, office, plain room, "
             "blurry, deformed, text, watermark"
         ),
-        "controlnet": {"strength": 0.58, "guidance": 7.5, "steps": 28,
-                        "controlnet_scale": 0.7},
-        "turbo":      {"strength": 0.84, "guidance": 0.0, "steps": 7},
+        "controlnet": {"strength": 0.90, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
 }
 
