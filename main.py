@@ -21,7 +21,7 @@ import uvicorn
 from face_processor import FaceProcessor
 from generator import ComfyBridge
 
-app = FastAPI(title="AI Avatar Kiosk")
+app = FastAPI(title="AMD-Adapt")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 if Path("static").exists():
@@ -240,7 +240,7 @@ async def on_shutdown():
 
 if __name__ == "__main__":
     print("\n" + "="*55)
-    print("  AI AVATAR KIOSK")
+    print("  AMD-ADAPT")
     print("  http://localhost:8000")
     print("="*55 + "\n")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, workers=1)
