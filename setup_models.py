@@ -156,24 +156,36 @@ def main():
     except Exception as e:
         print(f"  [WARN] Could not download InsightFace model: {e}")
 
-    # ── Download SDXL Base (optional, for highest quality) ────────────────
-    print("\n[Bonus] Pre-caching SDXL Base 1.0 pipeline components...")
+    # ── Download Juggernaut XL v9 base model ─────────────────────────────
+    print("\n[Bonus] Pre-caching Juggernaut XL v9 pipeline components...")
+    print("        (Much higher quality than vanilla SDXL Base)")
     print("        This may take a while on first run (~6.5 GB).")
     try:
         from diffusers import StableDiffusionXLControlNetImg2ImgPipeline
-        base_id = "stabilityai/stable-diffusion-xl-base-1.0"
-        print(f"  [..] Downloading {base_id} (fp16 variant)...")
-        StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
-            base_id,
-            torch_dtype=torch.float16,
-            variant="fp16",
-            controlnet=ControlNetModel.from_pretrained(
-                "diffusers/controlnet-depth-sdxl-1.0",
+        base_id = "RunDiffusion/Juggernaut-XL-v9"
+        print(f"  [..] Downloading {base_id}...")
+        try:
+            StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                base_id,
                 torch_dtype=torch.float16,
                 variant="fp16",
-            ),
-        )
-        print("  [OK] SDXL Base + ControlNet pipeline cached")
+                controlnet=ControlNetModel.from_pretrained(
+                    "diffusers/controlnet-depth-sdxl-1.0",
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                ),
+            )
+        except OSError:
+            StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                base_id,
+                torch_dtype=torch.float16,
+                controlnet=ControlNetModel.from_pretrained(
+                    "diffusers/controlnet-depth-sdxl-1.0",
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                ),
+            )
+        print("  [OK] Juggernaut XL v9 + ControlNet pipeline cached")
     except Exception as e:
         print(f"  [WARN] Could not pre-cache full pipeline: {e}")
         print("         It will download on first start instead.")
@@ -183,8 +195,8 @@ def main():
     print("  Setup complete!")
     print()
     print("  Modes available:")
-    print("    - ControlNet + SDXL Base: Best quality (~20-30s)")
-    print("    - SDXL Turbo fallback:    Fast (~5s)")
+    print("    - ControlNet + Juggernaut XL v9: Best quality (~25-40s)")
+    print("    - SDXL Turbo fallback:           Fast (~5s)")
     print()
     print("  Start the kiosk: python start.py")
     print("=" * 55 + "\n")

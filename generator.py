@@ -38,7 +38,8 @@ SDXL_TURBO_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
                    "sd_xl_turbo_1.0_fp16.safetensors")
 
 # HuggingFace model IDs (downloaded to cache by setup_models.py)
-SDXL_BASE_ID = "stabilityai/stable-diffusion-xl-base-1.0"
+# Juggernaut XL v9 — dramatically better quality than vanilla SDXL Base
+SDXL_BASE_ID = "RunDiffusion/Juggernaut-XL-v9"
 CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
 DEPTH_ESTIMATOR_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 
@@ -601,13 +602,21 @@ def _load_pipeline():
                 variant="fp16",
             )
 
-            print("[Generator]   Loading SDXL Base pipeline...")
-            pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
-                SDXL_BASE_ID,
-                controlnet=controlnet,
-                torch_dtype=torch.float16,
-                variant="fp16",
-            )
+            print(f"[Generator]   Loading base model ({SDXL_BASE_ID})...")
+            try:
+                pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                    SDXL_BASE_ID,
+                    controlnet=controlnet,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
+            except OSError:
+                # Model doesn't have fp16 variant, load without it
+                pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                    SDXL_BASE_ID,
+                    controlnet=controlnet,
+                    torch_dtype=torch.float16,
+                )
             pipe = pipe.to("cuda")
 
             try:
