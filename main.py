@@ -1,6 +1,6 @@
 """
-main.py — AI Avatar Kiosk Backend
-Live webcam feed + person selection + AI avatar generation.
+main.py — AI Scene Style Kiosk Backend
+Live webcam feed + AI scene style transfer.
 """
 
 import cv2
@@ -18,7 +18,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from face_processor import FaceProcessor
 from generator import ComfyBridge
 
 app = FastAPI(title="AMD-Adapt")
@@ -27,7 +26,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
 if Path("static").exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-processor = FaceProcessor(faces_dir="faces")
 comfy = ComfyBridge()
 
 cap: Optional[cv2.VideoCapture] = None
@@ -93,14 +91,14 @@ def generate_frames():
         if frame is None:
             processed = _placeholder()
         else:
-            processed = processor.process_frame(frame)
+            processed = frame
         # Downscale for streaming to reduce JPEG encoding cost
         h, w = processed.shape[:2]
         if w > 1280:
             scale = 1280 / w
             processed = cv2.resize(processed, (1280, int(h * scale)),
                                    interpolation=cv2.INTER_AREA)
-        _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 75])
         yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
                + buf.tobytes() + b"\r\n")
         time.sleep(1/30)
@@ -120,37 +118,6 @@ async def video_feed():
         media_type="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.get("/characters")
-async def get_characters():
-    chars = processor.get_characters()
-    for c in chars:
-        c["ai_ready"] = comfy.available
-    return JSONResponse({"characters": chars})
-
-
-# ── Person selection ──────────────────────────────────────────────────────────
-@app.get("/faces")
-async def get_faces():
-    return JSONResponse({"faces": processor.get_detected_faces()})
-
-
-@app.post("/select_person")
-async def select_person(click_x: float = Form(...), click_y: float = Form(...),
-                        frame_w: float = Form(...), frame_h: float = Form(...)):
-    with frame_lock:
-        frame = latest_frame.copy() if latest_frame is not None else None
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(
-        None, processor.toggle_person, click_x, click_y, frame_w, frame_h, frame)
-    return JSONResponse({"faces": processor.get_detected_faces()})
-
-
-@app.post("/clear_selection")
-async def clear_selection():
-    processor.clear_selection()
-    return JSONResponse({"status": "ok"})
-
-
 # ── AI Generation ─────────────────────────────────────────────────────────────
 @app.post("/generate")
 async def generate(character: str = Form(...), gender: str = Form("unknown")):
@@ -161,17 +128,9 @@ async def generate(character: str = Form(...), gender: str = Form("unknown")):
     if not comfy.check_available():
         raise HTTPException(503, "AI engine not ready - loading model...")
 
-    # Use UI gender selection; fallback to stored gender from face recognition
     gender = gender.strip().lower()
     if gender not in ("male", "female"):
         gender = "unknown"
-        detected = processor.get_detected_faces()
-        for f in detected:
-            if f.get("name"):
-                stored = processor.get_gender_for_name(f["name"])
-                if stored in ("male", "female"):
-                    gender = stored
-                    break
 
     started = comfy.generate(frame, character, gender=gender)
     if not started:
@@ -194,44 +153,18 @@ async def generate_status():
 
 @app.get("/comfy_status")
 async def comfy_status():
-    return JSONResponse({"available": comfy.check_available()})
-
-
-# ── Face naming ───────────────────────────────────────────────────────────────
-@app.post("/name_face")
-async def name_face(index: int = Form(...), name: str = Form(...),
-                    gender: str = Form("unknown")):
-    with frame_lock:
-        frame = latest_frame.copy() if latest_frame is not None else None
-    if frame is None:
-        raise HTTPException(400, "No camera frame")
-    name = name.strip()
-    if not name:
-        raise HTTPException(400, "Name cannot be empty")
-    gender = gender.strip().lower()
-    if gender not in ("male", "female", "unknown"):
-        gender = "unknown"
-    success = processor.name_selected_face(index, name, frame, gender)
-    return JSONResponse({"status": "ok" if success else "error",
-                         "name": name, "index": index})
-
-
-@app.get("/known_names")
-async def known_names():
-    return JSONResponse({"names": processor.get_known_names()})
-
-
-@app.post("/forget_face")
-async def forget_face(name: str = Form(...)):
-    processor.forget_face(name)
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({
+        "available": comfy.check_available(),
+        "mode": comfy.get_mode(),
+    })
 
 
 @app.get("/status")
 async def status():
     with frame_lock:
         has_frame = latest_frame is not None
-    return {"camera": has_frame, "ai_ready": comfy.available}
+    return {"camera": has_frame, "ai_ready": comfy.available,
+            "mode": comfy.get_mode()}
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────

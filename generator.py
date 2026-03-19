@@ -1,7 +1,14 @@
 """
 generator.py — AMD-Adapt AI Scene Style Transfer
-Uses SDXL Turbo img2img on ROCm to transform the entire camera scene
-(person + background) into different artistic styles.
+
+Best quality mode: SDXL Base + ControlNet Depth
+  - Extracts depth map from camera frame to preserve structure
+  - Uses SDXL Base (not Turbo) for highest quality output
+  - ~20-30s per generation but dramatically better results
+
+Fallback mode: SDXL Turbo img2img
+  - Fast (~5s) but lower quality
+  - Used when ControlNet models are not available
 """
 
 import cv2
@@ -16,15 +23,17 @@ warnings.filterwarnings("ignore", message=".*upcast_vae.*")
 warnings.filterwarnings("ignore", message=".*enable_vae_slicing.*")
 
 # ── Model paths ───────────────────────────────────────────────────────────────
-SDXL_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
-             "sd_xl_turbo_1.0_fp16.safetensors")
+SDXL_TURBO_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
+                   "sd_xl_turbo_1.0_fp16.safetensors")
 
-# ── Detect model type from filename ───────────────────────────────────────────
-_is_turbo = "turbo" in SDXL_PATH.name.lower()
+# HuggingFace model IDs (downloaded to cache by setup_models.py)
+SDXL_BASE_ID = "stabilityai/stable-diffusion-xl-base-1.0"
+CONTROLNET_DEPTH_ID = "diffusers/controlnet-depth-sdxl-1.0"
+DEPTH_ESTIMATOR_ID = "Intel/dpt-hybrid-midas"
 
 # ── Style definitions ─────────────────────────────────────────────────────────
-# Full-scene prompts: describe how the PERSON and ENVIRONMENT should look.
-# Strength ~0.80 preserves layout, ~0.90+ for dramatic transformation.
+# Each style has prompts and params for both ControlNet and Turbo modes.
+# ControlNet mode uses lower strength since depth map preserves structure.
 
 STYLES = {
     "avatar": {
@@ -41,8 +50,9 @@ STYLES = {
             "human skin, white skin, pink skin, normal skin, office, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.82, "guidance": 7.5, "steps": 20},
+        "controlnet": {"strength": 0.65, "guidance": 8.5, "steps": 30,
+                        "controlnet_scale": 0.7},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "claymation": {
         "label": "Claymation",
@@ -57,8 +67,9 @@ STYLES = {
             "photorealistic, real human, CGI, 3D render, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.85, "guidance": 0.0, "steps": 6},
-        "base":   {"strength": 0.80, "guidance": 8.0, "steps": 20},
+        "controlnet": {"strength": 0.60, "guidance": 8.0, "steps": 28,
+                        "controlnet_scale": 0.75},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 6},
     },
     "anime": {
         "label": "Anime",
@@ -74,8 +85,9 @@ STYLES = {
             "photorealistic, real person, photograph, 3d render, "
             "realistic skin, blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.87, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
+        "controlnet": {"strength": 0.65, "guidance": 8.5, "steps": 30,
+                        "controlnet_scale": 0.65},
+        "turbo":      {"strength": 0.87, "guidance": 0.0, "steps": 7},
     },
     "cyberpunk": {
         "label": "Cyberpunk",
@@ -91,8 +103,9 @@ STYLES = {
             "natural lighting, daytime, sunny, medieval, fantasy, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.85, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.80, "guidance": 7.5, "steps": 20},
+        "controlnet": {"strength": 0.60, "guidance": 8.0, "steps": 28,
+                        "controlnet_scale": 0.7},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
     },
     "oilpainting": {
         "label": "Oil Painting",
@@ -108,8 +121,9 @@ STYLES = {
             "photograph, digital art, modern, cartoon, anime, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.82, "guidance": 0.0, "steps": 6},
-        "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
+        "controlnet": {"strength": 0.55, "guidance": 7.5, "steps": 28,
+                        "controlnet_scale": 0.7},
+        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 6},
     },
     "pixelart": {
         "label": "Pixel Art",
@@ -125,8 +139,9 @@ STYLES = {
             "photorealistic, smooth, high resolution, 3d render, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
+        "controlnet": {"strength": 0.70, "guidance": 9.0, "steps": 28,
+                        "controlnet_scale": 0.6},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     "comicbook": {
         "label": "Comic Book",
@@ -142,8 +157,9 @@ STYLES = {
             "photorealistic, photograph, 3d render, anime, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.86, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.80, "guidance": 8.0, "steps": 20},
+        "controlnet": {"strength": 0.65, "guidance": 8.5, "steps": 28,
+                        "controlnet_scale": 0.65},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     "steampunk": {
         "label": "Steampunk",
@@ -159,8 +175,9 @@ STYLES = {
             "modern, futuristic, neon, digital, cartoon, anime, "
             "blurry, deformed, text, watermark"
         ),
-        "turbo":  {"strength": 0.84, "guidance": 0.0, "steps": 7},
-        "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
+        "controlnet": {"strength": 0.58, "guidance": 7.5, "steps": 28,
+                        "controlnet_scale": 0.7},
+        "turbo":      {"strength": 0.84, "guidance": 0.0, "steps": 7},
     },
 }
 
@@ -172,26 +189,82 @@ STYLE_ORDER = [
 
 # ── Pipeline state ────────────────────────────────────────────────────────────
 _pipe = None
+_depth_estimator = None
+_depth_processor = None
 _pipe_lock = threading.Lock()
 _pipe_ready = False
+_pipe_mode = "none"  # "controlnet" or "turbo"
 
 
 def _load_pipeline():
-    """Load SDXL pipeline. Runs in background thread."""
-    global _pipe, _pipe_ready
+    """Load best available pipeline. Tries ControlNet first, falls back to Turbo."""
+    global _pipe, _pipe_ready, _pipe_mode
+    global _depth_estimator, _depth_processor
 
     try:
         import torch
-        from diffusers import StableDiffusionXLImg2ImgPipeline
 
-        model_type = "Turbo" if _is_turbo else "Base"
-        print(f"[Generator] Loading SDXL {model_type}...")
-        if not SDXL_PATH.exists():
-            print(f"[Generator] ERROR: Model not found at {SDXL_PATH}")
+        # ── Try ControlNet + SDXL Base (best quality) ─────────────────────
+        try:
+            from diffusers import (
+                StableDiffusionXLControlNetImg2ImgPipeline,
+                ControlNetModel,
+            )
+            from transformers import DPTForDepthEstimation, DPTImageProcessor
+
+            print("[Generator] Loading ControlNet Depth + SDXL Base...")
+            print("[Generator]   Loading depth estimator...")
+            depth_proc = DPTImageProcessor.from_pretrained(DEPTH_ESTIMATOR_ID)
+            depth_model = DPTForDepthEstimation.from_pretrained(
+                DEPTH_ESTIMATOR_ID, torch_dtype=torch.float16)
+            depth_model = depth_model.to("cuda")
+            depth_model.eval()
+
+            print("[Generator]   Loading ControlNet...")
+            controlnet = ControlNetModel.from_pretrained(
+                CONTROLNET_DEPTH_ID,
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )
+
+            print("[Generator]   Loading SDXL Base pipeline...")
+            pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                SDXL_BASE_ID,
+                controlnet=controlnet,
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )
+            pipe = pipe.to("cuda")
+
+            try:
+                pipe.enable_vae_slicing()
+            except Exception:
+                pass
+
+            with _pipe_lock:
+                _pipe = pipe
+                _depth_estimator = depth_model
+                _depth_processor = depth_proc
+            _pipe_mode = "controlnet"
+            _pipe_ready = True
+            print("[Generator] Ready! mode=ControlNet+SDXL_Base (best quality)")
             return
 
+        except Exception as e:
+            print(f"[Generator] ControlNet not available: {e}")
+            print("[Generator] Falling back to SDXL Turbo...")
+
+        # ── Fallback: SDXL Turbo ──────────────────────────────────────────
+        if not SDXL_TURBO_PATH.exists():
+            print(f"[Generator] ERROR: No models found!")
+            print(f"[Generator]   Run: python setup_models.py")
+            return
+
+        from diffusers import StableDiffusionXLImg2ImgPipeline
+
+        print(f"[Generator] Loading SDXL Turbo from {SDXL_TURBO_PATH}...")
         pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
-            str(SDXL_PATH),
+            str(SDXL_TURBO_PATH),
             torch_dtype=torch.float16,
             use_safetensors=True,
         )
@@ -204,8 +277,9 @@ def _load_pipeline():
 
         with _pipe_lock:
             _pipe = pipe
+        _pipe_mode = "turbo"
         _pipe_ready = True
-        print(f"[Generator] Ready! model={model_type}")
+        print("[Generator] Ready! mode=SDXL_Turbo (fast)")
 
     except Exception as e:
         print(f"[Generator] ERROR loading pipeline: {e}")
@@ -215,6 +289,41 @@ def _load_pipeline():
 
 def is_ready():
     return _pipe_ready and _pipe is not None
+
+
+def get_mode():
+    return _pipe_mode
+
+
+# ── Depth estimation ──────────────────────────────────────────────────────────
+def _estimate_depth(pil_image):
+    """Extract depth map from image using DPT."""
+    import torch
+
+    with _pipe_lock:
+        proc = _depth_processor
+        model = _depth_estimator
+
+    inputs = proc(images=pil_image, return_tensors="pt")
+    inputs = {k: v.to("cuda", dtype=torch.float16) for k, v in inputs.items()}
+
+    with torch.inference_mode():
+        outputs = model(**inputs)
+        depth = outputs.predicted_depth
+
+    # Normalize and resize to match input
+    depth = depth.squeeze().float()
+    depth = (depth - depth.min()) / (depth.max() - depth.min() + 1e-8)
+    depth_np = depth.cpu().numpy()
+    depth_np = (depth_np * 255).astype(np.uint8)
+
+    # Resize to match input image size
+    w, h = pil_image.size
+    depth_resized = cv2.resize(depth_np, (w, h), interpolation=cv2.INTER_LANCZOS4)
+
+    # Convert to 3-channel RGB PIL image for ControlNet
+    depth_3ch = np.stack([depth_resized] * 3, axis=-1)
+    return Image.fromarray(depth_3ch)
 
 
 # ── Generation ────────────────────────────────────────────────────────────────
@@ -234,6 +343,7 @@ def _build_prompts(style, gender):
 def generate_scene(frame, style_key, gender="unknown"):
     """
     Transform entire camera frame into the given style.
+    Uses ControlNet+depth if available, otherwise Turbo img2img.
     Returns (cv2_image, error_string).
     """
     if not is_ready():
@@ -246,10 +356,11 @@ def generate_scene(frame, style_key, gender="unknown"):
     try:
         import torch
 
-        params = style["turbo"] if _is_turbo else style["base"]
+        mode = _pipe_mode
+        params = style.get(mode, style["turbo"])
         prompt, neg_prompt = _build_prompts(style, gender)
 
-        # Use full frame, resize to 1024x1024 for SDXL
+        # Prepare source image at 1024x1024 for SDXL
         h, w = frame.shape[:2]
         source_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
@@ -257,8 +368,7 @@ def generate_scene(frame, style_key, gender="unknown"):
         with _pipe_lock:
             pipe = _pipe
 
-        model_type = "Turbo" if _is_turbo else "Base"
-        print(f"[Generator] Style={style_key} Model={model_type} "
+        print(f"[Generator] Style={style_key} Mode={mode} "
               f"Steps={params['steps']} Strength={params['strength']} "
               f"Gender={gender} Frame={w}x{h}")
 
@@ -267,22 +377,41 @@ def generate_scene(frame, style_key, gender="unknown"):
             int(time.time()) % 2**32)
 
         with torch.inference_mode():
-            result = pipe(
-                prompt=prompt,
-                negative_prompt=neg_prompt,
-                image=source_pil,
-                strength=params["strength"],
-                num_inference_steps=params["steps"],
-                guidance_scale=params["guidance"],
-                generator=generator,
-            ).images[0]
+            if mode == "controlnet":
+                # Extract depth map for structural preservation
+                print("[Generator]   Estimating depth...")
+                depth_image = _estimate_depth(source_pil)
+
+                result = pipe(
+                    prompt=prompt,
+                    negative_prompt=neg_prompt,
+                    image=source_pil,
+                    control_image=depth_image,
+                    strength=params["strength"],
+                    num_inference_steps=params["steps"],
+                    guidance_scale=params["guidance"],
+                    controlnet_conditioning_scale=params["controlnet_scale"],
+                    generator=generator,
+                ).images[0]
+            else:
+                # Turbo fallback
+                result = pipe(
+                    prompt=prompt,
+                    negative_prompt=neg_prompt,
+                    image=source_pil,
+                    strength=params["strength"],
+                    num_inference_steps=params["steps"],
+                    guidance_scale=params["guidance"],
+                    generator=generator,
+                ).images[0]
 
         elapsed = time.time() - start
         print(f"[Generator] Done in {elapsed:.1f}s")
 
         # Resize back to original aspect ratio
         result_cv = cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR)
-        result_cv = cv2.resize(result_cv, (w, h), interpolation=cv2.INTER_LANCZOS4)
+        result_cv = cv2.resize(result_cv, (w, h),
+                               interpolation=cv2.INTER_LANCZOS4)
         return result_cv, None
 
     except Exception as e:
@@ -307,13 +436,16 @@ class ComfyBridge:
         _load_pipeline()
         self.available = is_ready()
         if self.available:
-            print("[Generator] AI engine ready")
+            print(f"[Generator] AI engine ready (mode={get_mode()})")
         else:
             print("[Generator] AI engine failed to load")
 
     def check_available(self):
         self.available = is_ready()
         return self.available
+
+    def get_mode(self):
+        return get_mode()
 
     def generate(self, frame, style_key, gender="unknown"):
         if self._status == "generating":

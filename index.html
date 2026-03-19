@@ -53,7 +53,7 @@
   /* ── Camera panel ── */
   #cam-panel {
     flex: 1; position: relative; background: #000;
-    overflow: hidden; cursor: default; min-width: 0;
+    overflow: hidden; min-width: 0;
   }
   #feed {
     position: absolute; inset: 0; width: 100%; height: 100%;
@@ -100,36 +100,6 @@
   #save-btn { background: var(--green); color: #000; }
   #close-btn { background: var(--red); color: #fff; }
 
-  /* Selection badges */
-  #sel-badge {
-    position: absolute; top: 12px; left: 12px;
-    background: var(--accent); color: #000;
-    font-weight: 700; font-size: 0.8rem;
-    padding: 5px 12px; border-radius: 20px;
-    display: none; z-index: 5;
-  }
-  #sel-badge.on { display: block; }
-  #clear-btn {
-    position: absolute; top: 12px; left: 12px;
-    background: transparent; color: var(--accent);
-    border: 1px solid var(--accent); font-size: 0.75rem;
-    padding: 5px 12px; border-radius: 20px;
-    cursor: pointer; display: none; z-index: 5;
-  }
-  #clear-btn.on { display: block; }
-
-  /* Known face tags */
-  #known-tags {
-    position: absolute; bottom: 12px; left: 12px;
-    display: flex; flex-wrap: wrap; gap: 5px;
-    max-width: 55%; z-index: 5;
-  }
-  .known-tag {
-    background: rgba(0,0,0,0.75); border: 1px solid var(--gold);
-    color: var(--gold); border-radius: 20px; font-size: 0.7rem;
-    padding: 3px 10px;
-  }
-
   /* ── Sidebar ── */
   #sidebar {
     width: 280px; min-width: 280px; background: var(--card);
@@ -141,46 +111,6 @@
     text-transform: uppercase; padding: 14px 16px 10px;
     border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
-
-  /* Known hosts */
-  #hosts-section {
-    padding: 12px 14px 10px;
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
-  }
-  #hosts-section .sec-title { padding: 0 0 8px; border-bottom: none; }
-  #hosts-list {
-    display: flex; flex-direction: column; gap: 5px;
-    max-height: 120px; overflow-y: auto;
-  }
-  .host-row {
-    display: flex; align-items: center; justify-content: space-between;
-    background: #1a1a1a; border-radius: 6px; padding: 7px 10px;
-    border: 1px solid #252525;
-  }
-  .host-row.here { border-color: var(--gold); background: rgba(255,204,0,0.04); }
-  .host-info { display: flex; align-items: center; gap: 8px; }
-  .host-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #0066aa);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem; font-weight: 700; color: #000; flex-shrink: 0;
-  }
-  .host-name { font-size: 0.8rem; font-weight: 600; }
-  .host-row.here .host-name { color: var(--gold); }
-  .host-status { font-size: 0.6rem; color: #555; }
-  .host-row.here .host-status { color: var(--green); }
-  .host-del {
-    background: transparent; border: none; color: #444;
-    font-size: 0.7rem; cursor: pointer; padding: 3px 5px;
-  }
-  .host-del:hover { color: var(--red); }
-  #add-host-btn {
-    width: 100%; margin-top: 7px; padding: 7px;
-    background: transparent; border: 1px dashed #333;
-    color: #555; border-radius: 6px; font-size: 0.72rem;
-    cursor: pointer; letter-spacing: 1px;
-  }
-  #add-host-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ── Style grid ── */
   .sec-title.styles { border-bottom: none; padding-bottom: 6px; }
@@ -209,19 +139,6 @@
     padding: 14px; border-top: 1px solid var(--border);
     flex-shrink: 0; margin-top: auto;
   }
-  #sel-status {
-    font-size: 0.7rem; color: var(--dim);
-    text-align: center; padding: 0 0 10px; min-height: 18px;
-  }
-  #sel-status.has { color: var(--accent); }
-  #name-btn {
-    width: 100%; padding: 9px; margin-bottom: 8px;
-    background: transparent; color: var(--accent);
-    border: 1px solid var(--accent); border-radius: 8px;
-    font-size: 0.78rem; font-weight: 700; letter-spacing: 1px;
-    cursor: pointer; display: none; text-transform: uppercase;
-  }
-  #name-btn:hover { background: rgba(0,212,255,0.06); }
   /* Gender selector */
   #gender-row {
     display: flex; gap: 6px; margin-bottom: 10px;
@@ -246,37 +163,11 @@
   #transform-btn:hover { opacity: 0.9; }
   #transform-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  /* Name modal */
-  #name-modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
-    display: none; align-items: center; justify-content: center; z-index: 50;
+  #mode-label {
+    font-size: 0.6rem; color: #444; text-align: center;
+    padding: 8px 0 0; letter-spacing: 1px;
   }
-  #name-modal.on { display: flex; }
-  #name-dialog {
-    background: var(--card); border: 1px solid var(--accent);
-    border-radius: 12px; padding: 22px 24px; width: 300px;
-    display: flex; flex-direction: column; gap: 14px;
-    box-shadow: 0 8px 40px rgba(0,212,255,0.2);
-  }
-  #name-dialog h4 { font-size: 0.85rem; color: var(--accent); letter-spacing: 1px; }
-  #name-dialog p { font-size: 0.72rem; color: #888; line-height: 1.5; }
-  #name-input {
-    background: #1a1a1a; border: 1px solid #444; border-radius: 6px;
-    color: #fff; padding: 10px 12px; font-size: 0.95rem; outline: none; width: 100%;
-  }
-  #name-input:focus { border-color: var(--accent); }
-  .gender-row {
-    display: flex; gap: 10px; align-items: center;
-    font-size: 0.75rem; color: #888;
-  }
-  .gender-row label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-  .dialog-btns { display: flex; gap: 8px; }
-  .dialog-btns button {
-    flex: 1; padding: 10px; border: none; border-radius: 6px;
-    cursor: pointer; font-size: 0.82rem; font-weight: 700;
-  }
-  #nd-save { background: var(--accent); color: #000; }
-  #nd-cancel { background: #2a2a2a; color: #ccc; }
+  #mode-label span { color: var(--accent); }
 
   /* Toast */
   #toast {
@@ -310,9 +201,6 @@
   <!-- Camera -->
   <div id="cam-panel">
     <img id="feed" src="/video_feed" alt="Live Feed">
-    <div id="sel-badge"></div>
-    <button id="clear-btn" onclick="clearSel()">Clear</button>
-    <div id="known-tags"></div>
 
     <!-- Generating overlay -->
     <div id="gen-overlay" class="overlay">
@@ -335,49 +223,18 @@
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <!-- Known Hosts -->
-    <div id="hosts-section">
-      <div class="sec-title">Known Hosts</div>
-      <div id="hosts-list">
-        <div style="font-size:0.68rem;color:#444;padding:6px 2px;">
-          No hosts yet. Click your face, then "Register Face".
-        </div>
-      </div>
-      <button id="add-host-btn" onclick="nameSelected()">+ Register Your Face</button>
-    </div>
-
     <!-- Style selector -->
     <div class="sec-title styles">Choose Your Style</div>
     <div id="style-grid"></div>
 
     <!-- Actions -->
     <div id="action-section">
-      <div id="sel-status">Choose a style and transform</div>
-      <button id="name-btn" onclick="nameSelected()">Name Selected Person</button>
       <div id="gender-row">
         <button class="g-btn" onclick="setGender('male',this)">Male</button>
         <button class="g-btn" onclick="setGender('female',this)">Female</button>
       </div>
       <button id="transform-btn" onclick="doTransform()">TRANSFORM SCENE</button>
-    </div>
-  </div>
-</div>
-
-<!-- Name dialog -->
-<div id="name-modal">
-  <div id="name-dialog">
-    <h4>REGISTER YOUR FACE</h4>
-    <p>Enter your name and the kiosk will recognize you automatically.</p>
-    <input id="name-input" type="text" placeholder="Enter your name..." maxlength="30"
-           onkeydown="if(event.key==='Enter') saveName()">
-    <div class="gender-row">
-      <span>I am:</span>
-      <label><input type="radio" name="nd-gender" value="male"> Male</label>
-      <label><input type="radio" name="nd-gender" value="female"> Female</label>
-    </div>
-    <div class="dialog-btns">
-      <button id="nd-save" onclick="saveName()">Save</button>
-      <button id="nd-cancel" onclick="closeName()">Cancel</button>
+      <div id="mode-label"></div>
     </div>
   </div>
 </div>
@@ -399,13 +256,8 @@ const STYLES = [
 
 let selectedStyle = "avatar";
 let selectedGender = "unknown";
-let selCount = 0;
-let faceCount = 0;
-let pendingNameIdx = null;
 let pollTimer = null;
-let lastFaces = [];
 let currentResultDataUrl = null;
-let recognizedNow = new Set();
 
 // ── Build style grid ─────────────────────────────────────────────────────────
 function buildStyleGrid(aiReady) {
@@ -444,204 +296,18 @@ async function checkAI() {
     const b = document.getElementById("ai-badge");
     b.textContent = d.available ? "AI ENGINE READY" : "AI ENGINE LOADING...";
     b.classList.toggle("online", !!d.available);
+    // Show pipeline mode
+    const ml = document.getElementById("mode-label");
+    if (d.mode) ml.innerHTML = "Pipeline: <span>" + d.mode + "</span>";
     return d.available;
   } catch { return false; }
-}
-
-// ── Click to select person ───────────────────────────────────────────────────
-function getImageCoords(e) {
-  const feed = document.getElementById("feed");
-  const rect = feed.getBoundingClientRect();
-  const natW = feed.naturalWidth || 1280;
-  const natH = feed.naturalHeight || 720;
-  const imgAR = natW / natH;
-  const boxAR = rect.width / rect.height;
-  let imgW, imgH, offX, offY;
-  if (imgAR > boxAR) {
-    imgW = rect.width; imgH = rect.width / imgAR;
-    offX = 0; offY = (rect.height - imgH) / 2;
-  } else {
-    imgH = rect.height; imgW = rect.height * imgAR;
-    offX = (rect.width - imgW) / 2; offY = 0;
-  }
-  const cx = e.clientX - rect.left - offX;
-  const cy = e.clientY - rect.top - offY;
-  if (cx < 0 || cy < 0 || cx > imgW || cy > imgH) return null;
-  return { clickX: cx, clickY: cy, frameW: imgW, frameH: imgH };
-}
-
-document.getElementById("cam-panel").addEventListener("click", async function(e) {
-  if (e.target.closest("button")) return;
-  if (e.target.id === "result-img") return;
-  if (document.getElementById("result-overlay").classList.contains("on")) return;
-  if (document.getElementById("gen-overlay").classList.contains("on")) return;
-  if (document.getElementById("name-modal").classList.contains("on")) { closeName(); return; }
-
-  const coords = getImageCoords(e);
-  if (!coords) return;
-
-  const fd = new FormData();
-  fd.append("click_x", coords.clickX);
-  fd.append("click_y", coords.clickY);
-  fd.append("frame_w", coords.frameW);
-  fd.append("frame_h", coords.frameH);
-
-  try {
-    const r = await fetch("/select_person", { method: "POST", body: fd });
-    const data = await r.json();
-    updateSelUI(data.faces);
-  } catch {}
-});
-
-// ── Selection UI ─────────────────────────────────────────────────────────────
-function updateSelUI(faces) {
-  lastFaces = faces || [];
-  faceCount = lastFaces.length;
-  selCount = lastFaces.filter(f => f.selected).length;
-
-  const badge = document.getElementById("sel-badge");
-  const clrBtn = document.getElementById("clear-btn");
-  const status = document.getElementById("sel-status");
-  const nameBtn = document.getElementById("name-btn");
-
-  if (selCount > 0) {
-    badge.textContent = selCount + " selected";
-    badge.classList.add("on");
-    clrBtn.classList.add("on");
-    status.textContent = "Ready to transform scene";
-    status.className = "has";
-    nameBtn.style.display = "block";
-  } else {
-    badge.classList.remove("on");
-    clrBtn.classList.remove("on");
-    status.textContent = "Choose a style and transform";
-    status.className = "";
-    nameBtn.style.display = "none";
-  }
-}
-
-async function clearSel() {
-  await fetch("/clear_selection", { method: "POST" });
-  updateSelUI([]);
-}
-
-// ── Name dialog ──────────────────────────────────────────────────────────────
-function nameSelected() {
-  const face = lastFaces.find(f => f.selected);
-  if (face) {
-    pendingNameIdx = face.index;
-    document.getElementById("name-input").value = face.name || "";
-    document.getElementById("name-modal").classList.add("on");
-    setTimeout(() => document.getElementById("name-input").focus(), 80);
-  } else {
-    toast("Click your face on the camera first");
-  }
-}
-
-function closeName() {
-  document.getElementById("name-modal").classList.remove("on");
-  pendingNameIdx = null;
-}
-
-async function saveName() {
-  const name = document.getElementById("name-input").value.trim();
-  if (!name) { toast("Please enter a name"); return; }
-  if (pendingNameIdx === null) { closeName(); return; }
-
-  const genderEl = document.querySelector('input[name="nd-gender"]:checked');
-  const gender = genderEl ? genderEl.value : "unknown";
-
-  const fd = new FormData();
-  fd.append("index", pendingNameIdx);
-  fd.append("name", name);
-  fd.append("gender", gender);
-
-  try {
-    const r = await fetch("/name_face", { method: "POST", body: fd });
-    const data = await r.json();
-    if (data.status === "ok") {
-      toast("Saved! " + name + " will be recognized automatically", "ok");
-      refreshHosts();
-      closeName();
-    } else {
-      toast("Could not save - click your face first");
-    }
-  } catch (e) {
-    toast("Connection error");
-  }
-}
-
-document.getElementById("name-modal").addEventListener("click", function(e) {
-  if (e.target === this) closeName();
-});
-
-// ── Known Hosts ──────────────────────────────────────────────────────────────
-async function refreshHosts() {
-  try {
-    const r = await fetch("/known_names");
-    const data = await r.json();
-    const names = Object.values(data.names);
-    const list = document.getElementById("hosts-list");
-    const tags = document.getElementById("known-tags");
-
-    if (names.length === 0) {
-      list.innerHTML = '<div style="font-size:0.68rem;color:#444;padding:6px 2px;">No hosts yet.</div>';
-      tags.innerHTML = "";
-      return;
-    }
-
-    list.innerHTML = names.map(n => {
-      const initials = n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-      const here = recognizedNow.has(n);
-      return `
-        <div class="host-row${here ? " here" : ""}">
-          <div class="host-info">
-            <div class="host-avatar">${initials}</div>
-            <div>
-              <div class="host-name">${n}</div>
-              <div class="host-status">${here ? "In frame" : "Not detected"}</div>
-            </div>
-          </div>
-          <button class="host-del" onclick="forgetHost('${n}',event)">x</button>
-        </div>`;
-    }).join("");
-
-    tags.innerHTML = names.filter(n => recognizedNow.has(n)).map(n =>
-      `<div class="known-tag">${n}</div>`
-    ).join("");
-  } catch {}
-}
-
-async function forgetHost(name, e) {
-  e.stopPropagation();
-  if (!confirm("Remove " + name + "?")) return;
-  const fd = new FormData();
-  fd.append("name", name);
-  await fetch("/forget_face", { method: "POST", body: fd });
-  recognizedNow.delete(name);
-  toast("Removed " + name);
-  refreshHosts();
-}
-
-async function pollRecognized() {
-  try {
-    const r = await fetch("/faces");
-    const data = await r.json();
-    const prev = new Set(recognizedNow);
-    recognizedNow.clear();
-    (data.faces || []).forEach(f => { if (f.name) recognizedNow.add(f.name); });
-
-    let changed = recognizedNow.size !== prev.size;
-    if (!changed) for (const n of recognizedNow) if (!prev.has(n)) { changed = true; break; }
-    if (changed) refreshHosts();
-  } catch {}
 }
 
 // ── Save photo ───────────────────────────────────────────────────────────────
 function savePhoto() {
   if (!currentResultDataUrl) return;
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const name = "avatar_" + selectedStyle + "_" + ts + ".jpg";
+  const name = "scene_" + selectedStyle + "_" + ts + ".jpg";
   const a = document.createElement("a");
   a.href = currentResultDataUrl;
   a.download = name;
@@ -659,13 +325,15 @@ let stageIdx = 0;
 
 const STAGES = [
   { pct: 5,  label: "Capturing scene..." },
-  { pct: 20, label: "Transforming scene..." },
+  { pct: 12, label: "Analyzing depth..." },
+  { pct: 25, label: "Transforming scene..." },
   { pct: 45, label: "Applying style..." },
-  { pct: 65, label: "Refining details..." },
-  { pct: 82, label: "Almost there..." },
+  { pct: 60, label: "Rendering details..." },
+  { pct: 75, label: "Refining composition..." },
+  { pct: 88, label: "Almost there..." },
   { pct: 95, label: "Final touches..." },
 ];
-const STAGE_TIMES = [1500, 3000, 4000, 4000, 3000, 3000];
+const STAGE_TIMES = [1500, 2500, 4000, 4000, 4000, 4000, 3000, 3000];
 
 function setProgress(pct, label) {
   document.getElementById("progress-bar").style.width = pct + "%";
@@ -702,7 +370,6 @@ async function doTransform() {
   const btn = document.getElementById("transform-btn");
   btn.disabled = true;
 
-  // Always clear any leaked poll timer from a previous generation
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
   const online = await checkAI();
@@ -722,11 +389,11 @@ async function doTransform() {
   fd.append("gender", selectedGender);
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
-    if (r.status === 400) {
+    if (r.status >= 400) {
       const d = await r.json();
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
-      toast(d.detail || "Select a person first");
+      toast(d.detail || "Error starting generation");
       btn.disabled = false;
       return;
     }
@@ -769,14 +436,12 @@ async function pollStatus() {
       toast("Error: " + (data.message || "unknown"));
       document.getElementById("transform-btn").disabled = false;
     } else if (data.status === "idle") {
-      // No generation in progress — stale poll timer, clean up
       clearInterval(pollTimer); pollTimer = null;
     }
   } catch {}
 }
 
 function closeResult() {
-  // Clear any lingering poll timer
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
@@ -798,8 +463,6 @@ async function init() {
   const online = await checkAI();
   buildStyleGrid(online);
   setInterval(checkAI, 8000);
-  setInterval(pollRecognized, 2000);
-  refreshHosts();
 }
 init();
 </script>
