@@ -53,7 +53,7 @@
   /* ── Camera panel ── */
   #cam-panel {
     flex: 1; position: relative; background: #000;
-    overflow: hidden; cursor: crosshair; min-width: 0;
+    overflow: hidden; cursor: default; min-width: 0;
   }
   #feed {
     position: absolute; inset: 0; width: 100%; height: 100%;
@@ -186,19 +186,20 @@
   .sec-title.styles { border-bottom: none; padding-bottom: 6px; }
   #style-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8px; padding: 0 14px 14px; flex-shrink: 0;
+    gap: 6px; padding: 0 14px 14px; flex: 1; min-height: 0;
+    overflow-y: auto; align-content: start;
   }
   .style-card {
     background: #1a1a1a; border: 2px solid #2a2a2a; border-radius: 10px;
-    padding: 16px 8px; text-align: center; cursor: pointer;
+    padding: 10px 6px; text-align: center; cursor: pointer;
     transition: all 0.15s;
   }
   .style-card:hover { border-color: #444; background: #222; }
   .style-card.active { border-color: var(--accent); background: rgba(0,212,255,0.06); }
   .style-card.active .style-name { color: var(--accent); }
-  .style-emoji { font-size: 2rem; margin-bottom: 6px; }
-  .style-name { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.5px; }
-  .style-sub { font-size: 0.6rem; color: var(--dim); margin-top: 3px; }
+  .style-emoji { font-size: 1.5rem; margin-bottom: 4px; }
+  .style-name { font-size: 0.76rem; font-weight: 700; letter-spacing: 0.5px; }
+  .style-sub { font-size: 0.55rem; color: var(--dim); margin-top: 2px; }
   .style-card.ready .style-name::after {
     content: " \2726"; color: var(--accent); font-size: 0.6rem;
   }
@@ -221,6 +222,19 @@
     cursor: pointer; display: none; text-transform: uppercase;
   }
   #name-btn:hover { background: rgba(0,212,255,0.06); }
+  /* Gender selector */
+  #gender-row {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  #gender-row .g-btn {
+    flex: 1; padding: 8px 4px; border: 1px solid #333; border-radius: 6px;
+    background: #1a1a1a; color: #888; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer; text-align: center;
+    text-transform: uppercase; transition: all 0.15s;
+  }
+  #gender-row .g-btn:hover { border-color: #555; color: #aaa; }
+  #gender-row .g-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+
   #transform-btn {
     width: 100%; padding: 16px;
     background: linear-gradient(135deg, var(--red), #cc1520);
@@ -303,7 +317,7 @@
     <!-- Generating overlay -->
     <div id="gen-overlay" class="overlay">
       <div class="spinner"></div>
-      <div id="gen-msg">Creating your avatar...</div>
+      <div id="gen-msg">Transforming scene...</div>
       <div class="progress-wrap"><div id="progress-bar"></div></div>
       <div id="progress-label">Starting AI engine...</div>
       <div id="elapsed">0s</div>
@@ -338,9 +352,13 @@
 
     <!-- Actions -->
     <div id="action-section">
-      <div id="sel-status">Select a person to transform</div>
+      <div id="sel-status">Choose a style and transform</div>
       <button id="name-btn" onclick="nameSelected()">Name Selected Person</button>
-      <button id="transform-btn" onclick="doTransform()">GENERATE AVATAR</button>
+      <div id="gender-row">
+        <button class="g-btn" onclick="setGender('male',this)">Male</button>
+        <button class="g-btn" onclick="setGender('female',this)">Female</button>
+      </div>
+      <button id="transform-btn" onclick="doTransform()">TRANSFORM SCENE</button>
     </div>
   </div>
 </div>
@@ -369,13 +387,18 @@
 <script>
 // ── Styles ───────────────────────────────────────────────────────────────────
 const STYLES = [
-  { key: "avatar",     emoji: "\uD83D\uDD35", name: "Avatar",     sub: "Blue Alien \u00B7 Pandora" },
-  { key: "claymation", emoji: "\uD83C\uDFA8", name: "Claymation", sub: "Clay \u00B7 Stop Motion" },
-  { key: "anime",      emoji: "\u2728",       name: "Anime",      sub: "Ghibli \u00B7 Cel Shaded" },
-  { key: "ghost",      emoji: "\uD83D\uDC7B", name: "Ghost",      sub: "Spectral \u00B7 Ethereal" },
+  { key: "avatar",      emoji: "\uD83D\uDD35", name: "Avatar",      sub: "Blue Alien \u00B7 Pandora" },
+  { key: "anime",       emoji: "\u2728",       name: "Anime",       sub: "Cel Shaded \u00B7 Manga" },
+  { key: "cyberpunk",   emoji: "\uD83E\uDD16", name: "Cyberpunk",   sub: "Neon \u00B7 Chrome \u00B7 Future" },
+  { key: "claymation",  emoji: "\uD83C\uDFA8", name: "Claymation",  sub: "Clay \u00B7 Stop Motion" },
+  { key: "oilpainting", emoji: "\uD83D\uDDBC\uFE0F", name: "Oil Painting", sub: "Renaissance \u00B7 Brushstrokes" },
+  { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Bold Ink \u00B7 Halftone" },
+  { key: "pixelart",    emoji: "\uD83D\uDC7E", name: "Pixel Art",   sub: "Retro \u00B7 16-Bit" },
+  { key: "steampunk",   emoji: "\u2699\uFE0F", name: "Steampunk",   sub: "Brass \u00B7 Gears \u00B7 Victorian" },
 ];
 
 let selectedStyle = "avatar";
+let selectedGender = "unknown";
 let selCount = 0;
 let faceCount = 0;
 let pendingNameIdx = null;
@@ -400,6 +423,17 @@ function selectStyle(key, el) {
   selectedStyle = key;
   document.querySelectorAll(".style-card").forEach(c => c.classList.remove("active"));
   el.classList.add("active");
+}
+
+function setGender(g, el) {
+  if (selectedGender === g) {
+    selectedGender = "unknown";
+    el.classList.remove("active");
+  } else {
+    selectedGender = g;
+    document.querySelectorAll("#gender-row .g-btn").forEach(b => b.classList.remove("active"));
+    el.classList.add("active");
+  }
 }
 
 // ── AI status ────────────────────────────────────────────────────────────────
@@ -474,13 +508,13 @@ function updateSelUI(faces) {
     badge.textContent = selCount + " selected";
     badge.classList.add("on");
     clrBtn.classList.add("on");
-    status.textContent = "Ready to generate avatar";
+    status.textContent = "Ready to transform scene";
     status.className = "has";
     nameBtn.style.display = "block";
   } else {
     badge.classList.remove("on");
     clrBtn.classList.remove("on");
-    status.textContent = faceCount > 0 ? "Click a person to select" : "No faces detected";
+    status.textContent = "Choose a style and transform";
     status.className = "";
     nameBtn.style.display = "none";
   }
@@ -624,8 +658,8 @@ let elapsedTmr = null;
 let stageIdx = 0;
 
 const STAGES = [
-  { pct: 5,  label: "Analyzing face..." },
-  { pct: 20, label: "Generating avatar..." },
+  { pct: 5,  label: "Capturing scene..." },
+  { pct: 20, label: "Transforming scene..." },
   { pct: 45, label: "Applying style..." },
   { pct: 65, label: "Refining details..." },
   { pct: 82, label: "Almost there..." },
@@ -668,6 +702,9 @@ async function doTransform() {
   const btn = document.getElementById("transform-btn");
   btn.disabled = true;
 
+  // Always clear any leaked poll timer from a previous generation
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
   const online = await checkAI();
   if (!online) {
     toast("AI Engine still loading - please wait");
@@ -677,11 +714,12 @@ async function doTransform() {
 
   document.getElementById("gen-overlay").classList.add("on");
   document.getElementById("gen-msg").textContent =
-    "Creating your " + STYLES.find(s => s.key === selectedStyle).name + " avatar...";
+    "Transforming scene into " + STYLES.find(s => s.key === selectedStyle).name + "...";
   startProgress();
 
   const fd = new FormData();
   fd.append("character", selectedStyle);
+  fd.append("gender", selectedGender);
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
     if (r.status === 400) {
@@ -714,7 +752,7 @@ async function pollStatus() {
     const r = await fetch("/generate_status");
     const data = await r.json();
     if (data.status === "done" && data.image) {
-      clearInterval(pollTimer);
+      clearInterval(pollTimer); pollTimer = null;
       stopProgress();
       setProgress(100, "Done!");
       setTimeout(() => {
@@ -725,16 +763,21 @@ async function pollStatus() {
         document.getElementById("transform-btn").disabled = false;
       }, 300);
     } else if (data.status === "error") {
-      clearInterval(pollTimer);
+      clearInterval(pollTimer); pollTimer = null;
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
       toast("Error: " + (data.message || "unknown"));
       document.getElementById("transform-btn").disabled = false;
+    } else if (data.status === "idle") {
+      // No generation in progress — stale poll timer, clean up
+      clearInterval(pollTimer); pollTimer = null;
     }
   } catch {}
 }
 
 function closeResult() {
+  // Clear any lingering poll timer
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
   currentResultDataUrl = null;

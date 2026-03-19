@@ -55,25 +55,14 @@ def main():
         print(f"[ERR] SDXL model not found at {sdxl}")
         sys.exit(1)
 
-    # Check identity preservation models
-    faceid_bin = Path.home() / "kiosk_models" / "ip_adapter_faceid" / "ip-adapter-faceid_sdxl.bin"
-    if faceid_bin.exists():
-        print("[OK] IP-Adapter FaceID found — strong identity preservation")
+    # Check IP-Adapter
+    ip_bin = Path.home() / "kiosk_models" / "ip_adapter" / "sdxl_models" / "ip-adapter_sdxl.bin"
+    ip_enc = Path.home() / "kiosk_models" / "ip_adapter" / "models" / "image_encoder"
+    if ip_bin.exists() and ip_enc.exists():
+        print("[OK] IP-Adapter found — identity preservation active")
     else:
-        ip_bin = Path.home() / "kiosk_models" / "ip_adapter" / "sdxl_models" / "ip-adapter_sdxl.bin"
-        if ip_bin.exists():
-            print("[OK] Regular IP-Adapter found — moderate identity preservation")
-        else:
-            print("[WARN] No identity adapter found — avatars won't look like you!")
-            print("       Run: python setup_models.py")
-
-    # Check insightface
-    try:
-        import insightface
-        print("[OK] insightface available — face embedding extraction ready")
-    except ImportError:
-        print("[WARN] insightface not installed — FaceID won't work")
-        print("       Run: pip install insightface onnxruntime")
+        print("[WARN] IP-Adapter not found — avatars won't preserve your face")
+        print("       Run: python setup_models.py")
 
     print("\n[OK] Starting kiosk at http://localhost:8000")
     print("     AI pipeline loading in background...\n")
