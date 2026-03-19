@@ -49,7 +49,7 @@ STYLES = {
             "blurry, low quality, deformed, ugly, mutation, extra limbs, "
             "text, watermark, signature, multiple people"
         ),
-        "turbo":  {"strength": 0.60, "guidance": 0.0, "steps": 4},
+        "turbo":  {"strength": 0.92, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.78, "guidance": 7.5, "steps": 20},
         "ip_scale": 0.6,
     },
@@ -69,7 +69,7 @@ STYLES = {
             "blurry, low quality, deformed, ugly, "
             "text, watermark, multiple people, anime, cartoon drawing"
         ),
-        "turbo":  {"strength": 0.65, "guidance": 0.0, "steps": 4},
+        "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
         "ip_scale": 0.6,
     },
@@ -91,7 +91,7 @@ STYLES = {
             "western cartoon, chibi, sketch, rough lines, "
             "text, watermark, multiple people, ugly"
         ),
-        "turbo":  {"strength": 0.65, "guidance": 0.0, "steps": 4},
+        "turbo":  {"strength": 0.90, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.82, "guidance": 8.0, "steps": 20},
         "ip_scale": 0.55,
     },
@@ -113,7 +113,7 @@ STYLES = {
             "blurry, low quality, deformed, ugly, "
             "text, watermark, multiple people, costume, mask"
         ),
-        "turbo":  {"strength": 0.55, "guidance": 0.0, "steps": 4},
+        "turbo":  {"strength": 0.88, "guidance": 0.0, "steps": 6},
         "base":   {"strength": 0.75, "guidance": 7.5, "steps": 20},
         "ip_scale": 0.6,
     },
