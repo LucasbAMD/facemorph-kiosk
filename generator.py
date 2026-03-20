@@ -512,12 +512,12 @@ STYLES = {
     "popart": {
         "label": "Pop Art",
         "prompt": (
-            "same person in bold Andy Warhol pop art style, "
+            "same male person in bold Andy Warhol pop art style, "
             "flat vibrant neon color blocks, "
             "strong black outlines separating color areas, "
             "Ben-Day halftone dot pattern on skin, "
             "high contrast graphic poster look, "
-            "same face same identity same skin tone"
+            "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
             "Andy Warhol silkscreen print background, "
@@ -528,28 +528,29 @@ STYLES = {
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic, photograph, "
-            "soft, muted colors, painterly, watercolor"
+            "soft, muted colors, painterly, watercolor, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, "
             "detailed background, landscape, scenery"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.45},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
     },
     # ── ART DECO / GATSBY ────────────────────────────────────────────
     "artdeco": {
         "label": "Art Deco",
         "prompt": (
-            "same person in 1920s Art Deco illustration style, "
+            "same male person in 1920s Art Deco illustration style, "
             "sharp geometric lines, stylized angular features, "
             "gold and black color palette with metallic sheen, "
             "clean symmetrical composition, "
-            "elegant fashion illustration look, "
-            "same face same identity same skin tone"
+            "masculine dapper gentleman portrait, "
+            "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
             "lavish Art Deco interior background, "
@@ -560,17 +561,18 @@ STYLES = {
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic, photograph, "
-            "cartoon, anime, soft, painterly, messy"
+            "cartoon, anime, soft, painterly, messy, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
             "modern, dark, gritty, natural"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.35},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.45},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
     },
 }
 
