@@ -477,13 +477,108 @@ STYLES = {
                         "controlnet_scale": 0.38},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── DARK SOULS / MEDIEVAL ────────────────────────────────────────
+    "darksouls": {
+        "label": "Dark Souls",
+        "prompt": (
+            "same person as a Dark Souls character portrait, "
+            "dark fantasy medieval knight aesthetic, "
+            "dramatic rim lighting on weathered face, "
+            "intricate engraved armor pauldrons visible at shoulders, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "dark medieval fantasy landscape, "
+            "crumbling gothic cathedral ruins with fog, "
+            "bonfire glowing in the distance, "
+            "FromSoftware Dark Souls concept art style, "
+            "dark moody atmosphere, epic fantasy masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", cartoon, anime, bright colors, "
+            "cheerful, modern, clean"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "bright, colorful, modern city"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.50,
+        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.40},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
+    },
+    # ── POP ART ──────────────────────────────────────────────────────
+    "popart": {
+        "label": "Pop Art",
+        "prompt": (
+            "same person in bold Andy Warhol pop art style, "
+            "flat vibrant neon color blocks, "
+            "strong black outlines separating color areas, "
+            "Ben-Day halftone dot pattern on skin, "
+            "high contrast graphic poster look, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "Andy Warhol silkscreen print background, "
+            "solid bold color field in hot pink or electric blue, "
+            "Roy Lichtenstein comic halftone dots, "
+            "1960s pop art gallery print, "
+            "Museum of Modern Art quality, pop art masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, "
+            "soft, muted colors, painterly, watercolor"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, "
+            "detailed background, landscape, scenery"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.82, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── ART DECO / GATSBY ────────────────────────────────────────────
+    "artdeco": {
+        "label": "Art Deco",
+        "prompt": (
+            "same person in 1920s Art Deco illustration style, "
+            "sharp geometric lines, stylized angular features, "
+            "gold and black color palette with metallic sheen, "
+            "clean symmetrical composition, "
+            "elegant fashion illustration look, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "lavish Art Deco interior background, "
+            "geometric gold sunburst patterns, marble floors, "
+            "ornate Chrysler Building inspired architecture, "
+            "Great Gatsby 1920s glamour, champagne gold tones, "
+            "luxury vintage poster masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, "
+            "cartoon, anime, soft, painterly, messy"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "modern, dark, gritty, natural"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
 }
 
 STYLE_ORDER = [
     "avatar", "anime_op", "anime_db", "pixar", "disney",
     "simpsons", "southpark", "gta", "minecraft",
     "timburton", "cyberpunk", "claymation",
-    "comicbook",
+    "comicbook", "darksouls", "popart", "artdeco",
 ]
 
 
