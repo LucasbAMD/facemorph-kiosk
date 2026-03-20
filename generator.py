@@ -89,11 +89,12 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "prompt": (
-            "Na'vi from James Cameron Avatar movie, "
-            "blue skin with darker blue tiger stripe markings on face and body, "
-            "wide flat nose, large luminous yellow-green eyes with cat-slit pupils, "
-            "small glowing bioluminescent freckles, long braided hair, "
-            "tall pointed elf-like ears, tribal bone and leather necklace"
+            "same person as a Na'vi from Avatar movie, "
+            "blue skin with subtle darker blue tiger stripe markings, "
+            "same facial structure and expression but with Na'vi features, "
+            "luminous yellow-green eyes with cat-slit pupils, "
+            "small glowing bioluminescent freckles on cheeks, "
+            "long braided hair, pointed elf-like ears, same face preserved"
         ),
         "prompt_2": (
             "cinematic still from Avatar 2009 movie, planet Pandora, "
@@ -103,15 +104,16 @@ STYLES = {
             "ultra detailed, masterpiece"
         ),
         "negative": (
-            _NEG_IDENTITY + ", human skin, pink skin, white skin, normal skin, "
-            "pale skin, grey alien, green alien, generic alien, "
-            "smooth skin without stripes, plain blue skin"
+            _NEG_IDENTITY + ", random alien, generic alien, grey alien, green alien, "
+            "monster, creature, non-humanoid, animal face, "
+            "smooth skin without stripes, plain blue skin, "
+            "unrecognizable face, distorted features"
         ),
         "negative_2": _NEG_QUALITY + ", realistic photo, office, indoor room, plain wall",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.88, "guidance": 14.0, "steps": 40,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.6,
+        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 40,
+                        "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     # ── CLAYMATION ────────────────────────────────────────────────────
@@ -139,13 +141,13 @@ STYLES = {
         "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room, white background",
         "use_ip_adapter": True,
         "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.40},
+        "controlnet": {"strength": 0.75, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.48},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
-    # ── ANIME (One Piece) ─────────────────────────────────────────────
-    "anime": {
-        "label": "Anime",
+    # ── ANIME – One Piece ────────────────────────────────────────────
+    "anime_op": {
+        "label": "Anime-OP",
         "prompt": (
             "person redrawn in One Piece anime style by Eiichiro Oda, "
             "bold black ink outlines, large expressive eyes with shiny highlights, "
@@ -162,6 +164,37 @@ STYLES = {
         "negative": (
             _NEG_IDENTITY + ", photorealistic, real person, photograph, "
             "real skin texture, 3d render"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", realistic lighting, office, plain background, "
+            "white wall, indoor room"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.32},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── ANIME – Dragon Ball ──────────────────────────────────────────
+    "anime_db": {
+        "label": "Anime-DB",
+        "prompt": (
+            "same person redrawn in Dragon Ball Z anime style by Akira Toriyama, "
+            "sharp angular face with bold black outlines, intense determined eyes, "
+            "spiky dramatic hair with highlighted streaks, "
+            "muscular heroic proportions, vibrant cel-shaded coloring, "
+            "same face same identity same skin tone, same hair color"
+        ),
+        "prompt_2": (
+            "Dragon Ball Z anime illustration, epic battle arena scene, "
+            "rocky desert landscape with towering cliffs and boulders, "
+            "dramatic energy aura glowing around character, "
+            "power-up lightning and ki energy effects, bright blue sky, "
+            "Toei Animation Dragon Ball style, shonen anime art, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
+            "real skin texture, 3d render, soft rounded features"
         ),
         "negative_2": (
             _NEG_QUALITY + ", realistic lighting, office, plain background, "
@@ -194,8 +227,8 @@ STYLES = {
         "negative_2": _NEG_QUALITY + ", office, plain room, indoor room, white wall",
         "use_ip_adapter": True,
         "ip_adapter_scale": 0.6,
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.45},
+        "controlnet": {"strength": 0.75, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── OIL PAINTING ──────────────────────────────────────────────────
@@ -515,7 +548,7 @@ STYLES = {
 }
 
 STYLE_ORDER = [
-    "avatar", "anime", "cyberpunk", "claymation",
+    "avatar", "anime_op", "anime_db", "cyberpunk", "claymation",
     "oilpainting", "comicbook", "pixelart", "steampunk",
     "watercolor", "zombie", "fantasy", "popart", "ice", "neon",
     "labubu", "wizard",
@@ -822,6 +855,14 @@ def generate_scene(frame, style_key):
         prompt_2 = style.get("prompt_2", prompt)
         neg_prompt = style["negative"]
         neg_prompt_2 = style.get("negative_2", neg_prompt)
+
+        # ── Global identity preservation — appended to ALL styles ──
+        _ID_SUFFIX = ", preserve original skin tone and skin color exactly"
+        _NEG_SUFFIX = ", changed skin color, wrong skin tone, wrong ethnicity"
+        prompt += _ID_SUFFIX
+        prompt_2 += _ID_SUFFIX
+        neg_prompt += _NEG_SUFFIX
+        neg_prompt_2 += _NEG_SUFFIX
 
         # Prepare source image at 1024x1024 for SDXL
         h, w = frame.shape[:2]
