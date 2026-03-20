@@ -308,30 +308,6 @@ STYLES = {
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
-    # ── STEAMPUNK ─────────────────────────────────────────────────────
-    "steampunk": {
-        "label": "Steampunk",
-        "prompt": (
-            "person wearing ornate brass goggles pushed up on forehead, "
-            "Victorian leather greatcoat with copper gear epaulettes, "
-            "clockwork pocket watch chain, brass mechanical arm brace, "
-            "same facial features same skin tone preserved exactly"
-        ),
-        "prompt_2": (
-            "grand Victorian steampunk workshop interior, "
-            "massive spinning brass gears and cogs on walls, "
-            "copper steam pipes with pressure gauges, leather-bound books, "
-            "amber gaslight glow, bronze mechanical inventions, "
-            "warm dramatic lighting, industrial revolution aesthetic, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", added beard, added facial hair, rugged face",
-        "negative_2": _NEG_QUALITY + ", modern, futuristic, neon, office, plain wall",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.38},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
-    },
     # ── WATERCOLOR ────────────────────────────────────────────────────
     "watercolor": {
         "label": "Watercolor",
@@ -383,31 +359,6 @@ STYLES = {
                         "controlnet_scale": 0.45},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
-    # ── FANTASY ELF ───────────────────────────────────────────────────
-    "fantasy": {
-        "label": "Fantasy Elf",
-        "prompt": (
-            "same person as a high fantasy elf warrior, "
-            "elegant long pointed elf ears, ethereal pale luminous skin, "
-            "ornate silver mithril circlet on forehead with blue gem, "
-            "flowing elven robes with leaf filigree embroidery, "
-            "same face same identity same gender same skin tone, same expression preserved"
-        ),
-        "prompt_2": (
-            "epic Lord of the Rings fantasy scene, "
-            "enchanted ancient elven forest of Rivendell, "
-            "magical golden light filtering through towering ancient trees, "
-            "glowing fireflies, mystical elven stone ruins covered in moss, "
-            "fantasy concept art, highly detailed, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", modern clothing, technology, urban, contemporary",
-        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, indoor room",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
     # ── POP ART ───────────────────────────────────────────────────────
     "popart": {
         "label": "Pop Art",
@@ -431,119 +382,6 @@ STYLES = {
         "ip_adapter_scale": 0.55,
         "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
-    # ── ICE & FROST ───────────────────────────────────────────────────
-    "ice": {
-        "label": "Ice & Frost",
-        "prompt": (
-            "same person with magical ice and frost covering skin and hair, "
-            "crystalline ice formations growing on shoulders and clothing, "
-            "frozen eyelashes with tiny icicles, pale blue-white frosty skin, "
-            "same face same identity same gender same skin tone, "
-            "ice crystal crown forming on head, frost patterns on cheeks"
-        ),
-        "prompt_2": (
-            "magical frozen ice kingdom scene, "
-            "massive ice crystal formations and frozen waterfall background, "
-            "shimmering aurora borealis dancing across dark sky, "
-            "gently falling snowflakes, ice palace spires, "
-            "fantasy ice magic cinematic, blue and white lighting, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", warm colors, summer, tropical, green, fire",
-        "negative_2": _NEG_QUALITY + ", office, plain background, indoor room, white wall",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
-    # ── NEON / UV GLOW ────────────────────────────────────────────────
-    "neon": {
-        "label": "Neon Glow",
-        "prompt": (
-            "same person lit by vivid neon lights, "
-            "glowing neon light outlines tracing face and body contours, "
-            "electric blue and green neon reflections on skin, "
-            "same face same identity same gender same skin tone, "
-            "same hairstyle with neon color highlights, "
-            "dark shadows with vibrant neon rim lighting"
-        ),
-        "prompt_2": (
-            "dramatic neon portrait in dark environment, "
-            "vibrant electric blue cyan and green neon tube signs, "
-            "neon light painting streaks, colorful lens flares, "
-            "glowing particles floating in air, "
-            "ultraviolet blacklight atmosphere, stunning, masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", natural lighting, daytime, bright ambient, "
-            "different ethnicity, different race, "
-            "feminine features, lipstick, makeup, woman, female"
-        ),
-        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, washed out",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.65,
-        "controlnet": {"strength": 0.75, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.50},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
-    # ── LABUBU ───────────────────────────────────────────────────────
-    "labubu": {
-        "label": "Labubu",
-        "prompt": (
-            "same person transformed into a cute fuzzy monster plush toy creature, "
-            "round oversized head covered in soft fur, wide mischievous grin "
-            "showing tiny pointed teeth, big round shiny button eyes, "
-            "small pointy elf ears poking out of fur, "
-            "chubby stubby plush body, same face same skin tone"
-        ),
-        "prompt_2": (
-            "adorable fluffy monster plush keychain toy, "
-            "soft fuzzy faux fur texture covering entire body, "
-            "pastel colored plush collectible figure on display shelf, "
-            "soft studio product photography lighting, "
-            "cute kawaii monster stuffed animal, highly detailed, masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", realistic human, photorealistic skin, "
-            "schoolgirl, school uniform, anime girl, human body, human skin, "
-            "scary, horror, dark, smooth vinyl, plastic, hard surface"
-        ),
-        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, nature, human photo",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.4,
-        "controlnet": {"strength": 0.88, "guidance": 14.0, "steps": 40,
-                        "controlnet_scale": 0.30},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
-    },
-    # ── WIZARD ───────────────────────────────────────────────────────
-    "wizard": {
-        "label": "Wizard",
-        "prompt": (
-            "same person wearing wizard costume, "
-            "rich purple and gold wizard robes with star and moon embroidery, "
-            "tall pointed wizard hat, holding a glowing magic wand, "
-            "bright magical sparks flying from wand tip, "
-            "same face same identity same gender same skin tone same skin color"
-        ),
-        "prompt_2": (
-            "fantasy wizard castle interior, "
-            "grand stone hall with floating glowing candles overhead, "
-            "tall arched windows with moonlight streaming in, "
-            "magical books and potions on shelves, enchanted starry ceiling, "
-            "warm bright candlelight, fantasy movie cinematic quality, masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", modern clothing, casual wear, "
-            "evil, dark lord, skull, death eater mask, "
-            "different person, changed ethnicity, changed race"
-        ),
-        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, daylight, white wall, dark shadows",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.6,
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── STUDIO GHIBLI ───────────────────────────────────────────────
@@ -801,9 +639,8 @@ STYLE_ORDER = [
     "avatar", "anime_op", "anime_db", "ghibli", "pixar",
     "simpsons", "gta", "minecraft", "timburton", "ukiyoe", "lego",
     "cyberpunk", "claymation",
-    "oilpainting", "comicbook", "pixelart", "steampunk",
-    "watercolor", "zombie", "fantasy", "popart", "ice", "neon",
-    "labubu", "wizard",
+    "oilpainting", "comicbook", "pixelart",
+    "watercolor", "zombie", "popart",
 ]
 
 

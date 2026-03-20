@@ -69,12 +69,16 @@
     box-shadow: 0 0 12px rgba(34,221,68,0.15);
   }
   #about-btn {
-    font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
-    background: rgba(255,255,255,0.03); border: 1px solid #333;
-    color: #555; letter-spacing: 1.5px; font-weight: 600;
+    font-size: 0.65rem; padding: 6px 16px; border-radius: 20px;
+    background: rgba(0,212,255,0.08); border: 1px solid var(--accent);
+    color: var(--accent); letter-spacing: 1.5px; font-weight: 700;
     cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 0 10px rgba(0,212,255,0.15);
   }
-  #about-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #about-btn:hover {
+    background: rgba(0,212,255,0.15); color: #fff;
+    box-shadow: 0 0 18px rgba(0,212,255,0.3);
+  }
 
   /* ── About modal ── */
   #about-overlay {
@@ -500,6 +504,14 @@
       The entire pipeline runs in ~25-40 seconds per image.
     </p>
 
+    <h3>Credits</h3>
+    <p>
+      This photo booth was created from scratch by <strong style="color:var(--text)">Lucas Bergman</strong>
+      with help from <strong style="color:var(--text)">Nathan Pisik</strong> and
+      <strong style="color:var(--text)">Kelly Jackson</strong> for the
+      <strong style="color:var(--accent)">CEC in Austin, TX</strong>.
+    </p>
+
     <div class="about-footer">
       Built with Stable Diffusion XL &middot; ControlNet &middot; IP-Adapter &middot; Real-ESRGAN &middot; AMD ROCm
     </div>
@@ -526,15 +538,9 @@ const STYLES = [
   { key: "oilpainting", emoji: "\uD83D\uDDBC\uFE0F", name: "Oil Painting", sub: "Renaissance \u00B7 Canvas" },
   { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Ink \u00B7 Halftone" },
   { key: "pixelart",    emoji: "\uD83D\uDC7E", name: "Pixel Art",   sub: "Retro \u00B7 16-Bit" },
-  { key: "steampunk",   emoji: "\u2699\uFE0F", name: "Steampunk",   sub: "Brass \u00B7 Victorian" },
   { key: "watercolor",  emoji: "\uD83C\uDF3A", name: "Watercolor",  sub: "Soft \u00B7 Delicate" },
   { key: "zombie",      emoji: "\uD83E\uDDDF", name: "Zombie",      sub: "Horror \u00B7 Undead" },
-  { key: "fantasy",     emoji: "\uD83E\uDDD9", name: "Fantasy Elf", sub: "Magic \u00B7 Enchanted" },
   { key: "popart",      emoji: "\uD83C\uDFA8", name: "Pop Art",     sub: "Bold \u00B7 Graphic" },
-  { key: "ice",         emoji: "\u2744\uFE0F", name: "Ice & Frost", sub: "Frozen \u00B7 Crystal" },
-  { key: "neon",        emoji: "\uD83D\uDD2E", name: "Neon Glow",   sub: "Electric \u00B7 UV" },
-  { key: "labubu",     emoji: "\uD83E\uDDF8", name: "Labubu",      sub: "Plush \u00B7 Monster" },
-  { key: "wizard",     emoji: "\uD83E\uDE84", name: "Wizard",      sub: "Magic \u00B7 Fantasy" },
 ];
 
 let selectedStyle = "avatar";
