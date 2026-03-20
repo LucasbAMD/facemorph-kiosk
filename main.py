@@ -11,6 +11,7 @@ import base64
 import numpy as np
 from pathlib import Path
 from typing import Optional
+from PIL import Image, ImageDraw, ImageFont
 
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
@@ -54,29 +55,40 @@ _cobrand_name: Optional[str] = None
 _cobrand_lock = threading.Lock()
 
 
+_FONT_PATH = str(Path(__file__).parent / "assets" / "fonts" / "Nunito.ttf")
+
+
+def _get_font(size: int) -> ImageFont.FreeTypeFont:
+    """Load Nunito at the requested pixel size, fall back to default."""
+    try:
+        return ImageFont.truetype(_FONT_PATH, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
 def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
-    """Render 'AMD X <name>' text on the top-left of the result image (no box)."""
+    """Render 'AMD X <name>' on the top-left using Nunito (rounded sans-serif)."""
     label = f"AMD X {name}"
     h, w = img.shape[:2]
 
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = w / 900          # ~2.3 at 2048px, ~1.1 at 1024px
-    thickness = max(2, int(w / 500))  # ~4 at 2048px
+    font_size = max(16, int(w / 28))  # ~73px at 2048, ~37px at 1024
+    font = _get_font(font_size)
+
+    # Convert BGR -> RGBA for compositing
+    pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGBA))
+    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
 
     margin = int(w * 0.02)
-    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
-    text_x = margin
-    text_y = margin + th
+    x, y = margin, margin
 
-    # Thin dark outline for readability on any background
-    outline = max(1, thickness + 2)
-    cv2.putText(img, label, (text_x, text_y), font, font_scale,
-                (0, 0, 0), outline, cv2.LINE_AA)
-    # White text on top
-    cv2.putText(img, label, (text_x, text_y), font, font_scale,
-                (255, 255, 255), thickness, cv2.LINE_AA)
+    # Soft dark shadow for readability (semi-transparent, offset 2px)
+    draw.text((x + 2, y + 2), label, font=font, fill=(0, 0, 0, 120))
+    # White text on top, slightly transparent so it's not harsh
+    draw.text((x, y), label, font=font, fill=(255, 255, 255, 210))
 
-    return img
+    result = Image.alpha_composite(pil_img, overlay)
+    return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
 
 
 def _apply_watermark(img: np.ndarray) -> np.ndarray:
@@ -84,25 +96,24 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
     label = "AMD Austin CEC"
     h, w = img.shape[:2]
 
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    # Smaller than the co-brand — roughly 1.5-2% of image height
-    font_scale = w / 1800         # ~1.1 at 2048px, ~0.57 at 1024px
-    thickness = max(1, int(w / 900))
+    font_size = max(12, int(w / 50))  # ~41px at 2048, ~20px at 1024
+    font = _get_font(font_size)
 
-    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+    pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGBA))
+    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
 
     margin = int(w * 0.02)
-    text_x = margin
-    text_y = h - margin
+    bbox = draw.textbbox((0, 0), label, font=font)
+    th = bbox[3] - bbox[1]
+    x = margin
+    y = h - margin - th
 
-    # Semi-transparent white text (draw on overlay, blend at low opacity)
-    overlay = img.copy()
-    cv2.putText(overlay, label, (text_x, text_y), font, font_scale,
-                (255, 255, 255), thickness, cv2.LINE_AA)
-    # ~35% opacity — visible but doesn't overpower the image
-    cv2.addWeighted(overlay, 0.35, img, 0.65, 0, img)
+    # ~35% opacity white text
+    draw.text((x, y), label, font=font, fill=(255, 255, 255, 90))
 
-    return img
+    result = Image.alpha_composite(pil_img, overlay)
+    return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
 
 
 # ── Camera ────────────────────────────────────────────────────────────────────
