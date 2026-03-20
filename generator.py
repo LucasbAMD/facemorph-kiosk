@@ -546,10 +546,73 @@ STYLES = {
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── STUDIO GHIBLI ───────────────────────────────────────────────
+    "ghibli": {
+        "label": "Ghibli",
+        "prompt": (
+            "same person drawn in Studio Ghibli anime style by Hayao Miyazaki, "
+            "soft rounded features with gentle expression, large warm eyes, "
+            "simple clean line art with soft colored shading, "
+            "wind gently blowing hair, same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "Studio Ghibli anime movie scene, "
+            "lush green rolling hills with wildflowers and tall grass swaying, "
+            "huge fluffy white cumulus clouds in bright blue sky, "
+            "distant countryside village with red rooftops, "
+            "Spirited Away and Howl's Moving Castle art style, "
+            "beautiful hand-painted watercolor background, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
+            "3d render, CGI, sharp edges, dark, gritty"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "urban, city, indoor room, dark atmosphere"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.38},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── PIXAR 3D ────────────────────────────────────────────────────
+    "pixar": {
+        "label": "Pixar 3D",
+        "prompt": (
+            "same person as a Pixar 3D animated character, "
+            "smooth stylized 3D render with slightly oversized head, "
+            "big expressive glossy eyes, soft rounded features, "
+            "subtle subsurface skin scattering, perfectly smooth skin, "
+            "same face same identity same skin tone same hair color"
+        ),
+        "prompt_2": (
+            "Pixar Disney 3D animated movie scene, "
+            "colorful vibrant stylized room with warm lighting, "
+            "soft depth of field background blur, global illumination, "
+            "Pixar RenderMan quality, The Incredibles and Coco art style, "
+            "high quality 3D animation still frame, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", real person, photograph, 2d, flat, "
+            "anime, cartoon, hand drawn, sketch"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "uncanny valley, creepy, horror, dark"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.42},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
 }
 
 STYLE_ORDER = [
-    "avatar", "anime_op", "anime_db", "cyberpunk", "claymation",
+    "avatar", "anime_op", "anime_db", "ghibli", "pixar",
+    "cyberpunk", "claymation",
     "oilpainting", "comicbook", "pixelart", "steampunk",
     "watercolor", "zombie", "fantasy", "popart", "ice", "neon",
     "labubu", "wizard",
