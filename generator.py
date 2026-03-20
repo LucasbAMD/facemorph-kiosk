@@ -89,32 +89,43 @@ STYLES = {
     "avatar": {
         "label": "Avatar",
         "prompt": (
-            "same person as a Na'vi from Avatar movie, "
-            "blue skin with subtle darker blue tiger stripe markings, "
-            "same facial structure and expression but with Na'vi features, "
-            "luminous yellow-green eyes with cat-slit pupils, "
-            "small glowing bioluminescent freckles on cheeks, "
-            "long braided hair, pointed elf-like ears, same face preserved"
+            "same person transformed into a Na'vi alien from James Cameron Avatar movie, "
+            "saturated cerulean blue skin with thin darker indigo tiger stripe patterns "
+            "across forehead nose and cheeks, "
+            "wide flat nose with flared nostrils, large bright amber golden yellow eyes "
+            "with vertical cat-slit pupils, "
+            "bioluminescent pale blue-white freckle dots scattered across nose bridge "
+            "and cheekbones and forehead, "
+            "long pointed ears angled outward, strong prominent brow ridge, "
+            "angular jawline with high cheekbones, "
+            "long dark hair in thick tribal braid with beads and feathers, "
+            "same face same identity same gender same expression"
         ),
         "prompt_2": (
-            "cinematic still from Avatar 2009 movie, planet Pandora, "
-            "lush bioluminescent rainforest, giant glowing willow trees, "
-            "floating mountains in background, blue-green misty atmosphere, "
-            "Weta Digital CGI quality, James Cameron cinematography, "
-            "ultra detailed, masterpiece"
+            "cinematic film still from Avatar 2009, Pandora jungle at night, "
+            "glowing bioluminescent plants and floating seeds of the sacred tree, "
+            "blue-purple ambient light, Weta Digital photorealistic CGI rendering, "
+            "subsurface skin scattering, volumetric fog, "
+            "James Cameron cinematography, IMAX quality, 8k detail"
         ),
         "negative": (
-            _NEG_IDENTITY + ", random alien, generic alien, grey alien, green alien, "
-            "monster, creature, non-humanoid, animal face, "
-            "smooth skin without stripes, plain blue skin, "
-            "unrecognizable face, distorted features"
+            _NEG_IDENTITY + ", human skin, pink skin, pale skin, normal skin color, "
+            "generic alien, grey alien, green alien, green skin, "
+            "monster, creature, non-humanoid, animal face, furry, "
+            "smooth skin without stripes, plain flat blue, body paint, cosplay, "
+            "face paint, halloween costume, makeup, "
+            "small ears, round human ears, normal human eyes, "
+            "woman, female, changed gender, changed race"
         ),
-        "negative_2": _NEG_QUALITY + ", realistic photo, office, indoor room, plain wall",
+        "negative_2": (
+            _NEG_QUALITY + ", realistic photo of human, office, indoor room, "
+            "plain wall, earth setting, modern city"
+        ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.6,
-        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 40,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 40,
+                        "controlnet_scale": 0.42},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── CLAYMATION ────────────────────────────────────────────────────
     "claymation": {
