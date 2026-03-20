@@ -742,24 +742,23 @@ async function pollMotion() {
     const r = await fetch("/motion_status");
     const d = await r.json();
     const stableS = d.stable_seconds || 0;
-    const hasFace = d.face || false;
 
     const barWrap = document.getElementById("stability-bar-wrap");
     const bar = document.getElementById("stability-bar");
     const hint = document.getElementById("stability-hint");
 
-    if (hasFace && stableS > 0.5 && stableS < STABLE_TRIGGER) {
+    if (stableS > 0.5 && stableS < STABLE_TRIGGER) {
       // Show progress toward trigger
       if (countdownActive) cancelCountdown();
       barWrap.classList.add("on");
       hint.classList.add("on");
       bar.style.width = Math.min(100, (stableS / STABLE_TRIGGER) * 100) + "%";
-    } else if (hasFace && stableS >= STABLE_TRIGGER && !countdownActive) {
+    } else if (stableS >= STABLE_TRIGGER && !countdownActive) {
       barWrap.classList.remove("on");
       hint.classList.remove("on");
       bar.style.width = "0%";
       beginCountdown();
-    } else if (!hasFace || stableS < 0.5) {
+    } else if (stableS < 0.5) {
       if (countdownActive) cancelCountdown();
       barWrap.classList.remove("on");
       hint.classList.remove("on");
