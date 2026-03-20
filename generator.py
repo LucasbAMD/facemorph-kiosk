@@ -232,31 +232,6 @@ STYLES = {
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
-    # ── OIL PAINTING ──────────────────────────────────────────────────
-    "oilpainting": {
-        "label": "Oil Painting",
-        "prompt": (
-            "person painted with thick visible oil paint brushstrokes, "
-            "rich impasto technique with raised paint texture, "
-            "warm golden Rembrandt lighting on face, "
-            "dramatic chiaroscuro with deep shadows and glowing highlights, "
-            "oil paint blending visible on cheeks and forehead"
-        ),
-        "prompt_2": (
-            "classical oil painting on stretched canvas, "
-            "grand Renaissance palace interior background, "
-            "rich velvet curtains, ornate gilded frames on walls, marble columns, "
-            "candlelight glow, old master museum painting, "
-            "baroque masterpiece, gallery quality fine art"
-        ),
-        "negative": _NEG_IDENTITY + ", photograph, digital art, modern, flat colors",
-        "negative_2": _NEG_QUALITY + ", plain background, office, white wall, indoor room",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.80, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.35},
-        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
-    },
     # ── COMIC BOOK ────────────────────────────────────────────────────
     "comicbook": {
         "label": "Comic Book",
@@ -601,7 +576,7 @@ STYLE_ORDER = [
     "avatar", "anime_op", "anime_db", "pixar", "disney",
     "simpsons", "southpark", "gta", "minecraft", "borderlands",
     "timburton", "cyberpunk", "claymation",
-    "oilpainting", "monet", "comicbook", "stainedglass",
+    "monet", "comicbook", "stainedglass",
 ]
 
 
