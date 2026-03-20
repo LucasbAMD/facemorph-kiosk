@@ -125,60 +125,62 @@ STYLES = {
     "baroque": {
         "label": "Baroque",
         "prompt": (
-            "same male person portrait painted in Baroque oil painting style, "
-            "dramatic Rembrandt side lighting with warm highlights, "
-            "preserving original face and skin color exactly, "
-            "thick visible oil paint brushstrokes, classical portrait composition, "
-            "rich golden and amber warm tones, "
-            "same face same identity same skin tone same gender same ethnicity"
+            "same male person, oil painting portrait, "
+            "bright warm light on face showing clear skin detail, "
+            "visible oil paint brushstrokes, classical portrait, "
+            "same face same identity same skin tone same gender same ethnicity, "
+            "light skin caucasian man, keep original appearance exactly"
         ),
         "prompt_2": (
-            "Old Masters oil painting background, "
-            "warm amber and burgundy tones, rich golden highlights, "
-            "ornate gilded frame museum quality, "
-            "Vermeer color palette, warm candlelit atmosphere, "
-            "Renaissance-era rich velvet and silk attire, "
-            "classical masterpiece museum painting"
+            "classical oil painting, warm golden background, "
+            "ornate gilded frame, museum quality painting, "
+            "Vermeer soft light, warm cream and gold tones, "
+            "Renaissance velvet attire, bright well-lit composition, "
+            "masterpiece fine art portrait"
         ),
         "negative": (
             _NEG_IDENTITY + ", cartoon, anime, flat colors, digital art, "
             "bright neon, modern clothing, "
-            "dark skin, black skin, dark face, shadow face, silhouette, "
-            "woman, female, feminine, changed gender, changed race, changed skin"
+            "dark skin, black skin, brown skin, dark face, dark complexion, "
+            "shadow face, silhouette, dark shadow on face, underexposed, "
+            "african, black person, dark-skinned, "
+            "woman, female, feminine, long hair, breasts, "
+            "changed gender, changed race, changed skin, chiaroscuro"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
-            "modern, screenshot, flat lighting, dark umber, pitch black"
+            "modern, screenshot, flat lighting, dark umber, pitch black, "
+            "dark background, black background, heavy shadows"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.65,
-        "controlnet": {"strength": 0.72, "guidance": 9.5, "steps": 35,
-                        "controlnet_scale": 0.52},
-        "turbo":      {"strength": 0.80, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.75,
+        "controlnet": {"strength": 0.68, "guidance": 8.5, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.78, "guidance": 0.0, "steps": 7},
     },
     # ── SYNTHWAVE / RETROWAVE ─────────────────────────────────────────
     "synthwave": {
         "label": "Synthwave",
         "prompt": (
-            "same male person portrait in 1980s synthwave retrowave art style, "
-            "neon pink and cyan colored lighting illuminating face, "
-            "stylized digital airbrush illustration, "
-            "preserving original face and skin color exactly, "
-            "detailed face with natural skin, masculine features, "
-            "same face same identity same skin tone same gender same ethnicity"
+            "same male person, 1980s retrowave poster illustration, "
+            "man with original face and original skin color, "
+            "stylized digital airbrush art, masculine features, "
+            "same face same identity same skin tone same gender same ethnicity, "
+            "light skin caucasian man, keep original appearance exactly"
         ),
         "prompt_2": (
-            "synthwave retrowave background, "
+            "synthwave retrowave background behind person, "
             "neon grid floor stretching to horizon, "
             "glowing pink and purple sunset with chrome sun, "
             "palm tree silhouettes, retro 80s sports car, "
-            "VHS aesthetic, vaporwave neon glow, "
-            "outrun art style masterpiece"
+            "vaporwave neon glow, outrun art style masterpiece"
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic photograph, cartoon, anime, "
             "dull colors, desaturated, muted, "
-            "dark skin, black skin, dark face, shadow face, silhouette, "
+            "dark skin, black skin, brown skin, dark face, dark complexion, "
+            "shadow face, silhouette, dark shadow on face, "
+            "african, black person, dark-skinned, "
             "woman, female, feminine, long hair, breasts, lipstick, makeup, "
             "changed gender, changed race, changed skin"
         ),
@@ -187,10 +189,10 @@ STYLES = {
             "daytime, natural lighting, realistic"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.65,
-        "controlnet": {"strength": 0.74, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.50},
-        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.75,
+        "controlnet": {"strength": 0.68, "guidance": 9.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.78, "guidance": 0.0, "steps": 7},
     },
     # ── CLAYMATION ────────────────────────────────────────────────────
     "claymation": {
