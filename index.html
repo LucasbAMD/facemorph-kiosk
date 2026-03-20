@@ -561,7 +561,7 @@
 
 <script>
 const STYLES = [
-  { key: "avatar",      emoji: "\uD83D\uDD35", name: "Avatar",      sub: "Na'vi \u00B7 Pandora" },
+  { key: "ghibli",      emoji: "\uD83C\uDF3F", name: "Ghibli",      sub: "Miyazaki \u00B7 Watercolor" },
   { key: "anime_op",    emoji: "\u2728",       name: "Anime-OP",    sub: "One Piece \u00B7 Oda" },
   { key: "anime_db",    emoji: "\uD83D\uDD25", name: "Anime-DB",    sub: "Dragon Ball \u00B7 Toriyama" },
   { key: "pixar",       emoji: "\uD83C\uDFAC", name: "Pixar 3D",    sub: "Animated \u00B7 Disney" },
@@ -577,9 +577,11 @@ const STYLES = [
   { key: "darksouls",  emoji: "\u2694\uFE0F", name: "Dark Souls",  sub: "Medieval \u00B7 Dark Fantasy" },
   { key: "popart",     emoji: "\uD83C\uDF08", name: "Pop Art",     sub: "Warhol \u00B7 Halftone" },
   { key: "artdeco",    emoji: "\uD83C\uDFDB\uFE0F", name: "Art Deco",    sub: "Gatsby \u00B7 1920s Gold" },
+  { key: "baroque",    emoji: "\uD83D\uDDBC\uFE0F", name: "Baroque",     sub: "Oil \u00B7 Old Masters" },
+  { key: "synthwave",  emoji: "\uD83C\uDF05", name: "Synthwave",   sub: "Neon \u00B7 Retrowave" },
 ];
 
-let selectedStyle = "avatar";
+let selectedStyle = "ghibli";
 let pollTimer = null;
 let currentResultDataUrl = null;
 
@@ -678,6 +680,8 @@ function stopProgress() {
 }
 
 async function doTransform() {
+  // Block if result overlay is still showing
+  if (document.getElementById("result-overlay").classList.contains("on")) return;
   cancelCountdown();
   fetch("/motion_reset", { method: "POST" }).catch(() => {});
   const btn = document.getElementById("transform-btn");
@@ -730,7 +734,7 @@ async function pollStatus() {
         currentResultDataUrl = data.image;
         document.getElementById("result-img").src = data.image;
         document.getElementById("result-overlay").classList.add("on");
-        document.getElementById("transform-btn").disabled = false;
+        // Keep transform button disabled while result is showing
       }, 300);
     } else if (data.status === "error") {
       clearInterval(pollTimer); pollTimer = null; stopProgress();
@@ -751,6 +755,7 @@ function closeResult() {
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
   currentResultDataUrl = null;
+  document.getElementById("transform-btn").disabled = false;
 }
 
 function toast(msg, type) {

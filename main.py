@@ -89,6 +89,32 @@ def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
     return img
 
 
+def _apply_watermark(img: np.ndarray) -> np.ndarray:
+    """Render a subtle 'AMD Customer Engagement Center' watermark in the bottom-left."""
+    label = "AMD Customer Engagement Center"
+    h, w = img.shape[:2]
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    # Smaller than the co-brand — roughly 1.5-2% of image height
+    font_scale = w / 1800         # ~1.1 at 2048px, ~0.57 at 1024px
+    thickness = max(1, int(w / 900))
+
+    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+
+    margin = int(w * 0.02)
+    text_x = margin
+    text_y = h - margin
+
+    # Semi-transparent white text (draw on overlay, blend at low opacity)
+    overlay = img.copy()
+    cv2.putText(overlay, label, (text_x, text_y), font, font_scale,
+                (255, 255, 255), thickness, cv2.LINE_AA)
+    # ~35% opacity — visible but doesn't overpower the image
+    cv2.addWeighted(overlay, 0.35, img, 0.65, 0, img)
+
+    return img
+
+
 # ── Camera ────────────────────────────────────────────────────────────────────
 def start_capture(camera_index: int = 0):
     global cap, latest_frame, capture_running
@@ -222,6 +248,8 @@ async def generate_status():
                     cobrand = _cobrand_name
                 if cobrand:
                     result = _apply_cobrand_overlay(result, cobrand)
+                # Always apply the AMD CEC watermark (bottom-left, subtle)
+                result = _apply_watermark(result)
                 _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 95])
                 b64 = base64.b64encode(buf.tobytes()).decode()
                 print(f"[Status] Result ready: {result.shape}, JPEG size: {len(buf)}bytes")

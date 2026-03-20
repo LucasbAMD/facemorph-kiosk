@@ -85,47 +85,104 @@ _NEG_QUALITY = (
 # strength ~0.78-0.85 controls how much the image deviates from original.
 
 STYLES = {
-    # ── AVATAR ────────────────────────────────────────────────────────
-    "avatar": {
-        "label": "Avatar",
+    # ── STUDIO GHIBLI ─────────────────────────────────────────────────
+    "ghibli": {
+        "label": "Studio Ghibli",
         "prompt": (
-            "same person transformed into a Na'vi alien from James Cameron Avatar movie, "
-            "saturated cerulean blue skin with thin darker indigo tiger stripe patterns "
-            "across forehead nose and cheeks, "
-            "wide flat nose with flared nostrils, large bright amber golden yellow eyes "
-            "with vertical cat-slit pupils, "
-            "bioluminescent pale blue-white freckle dots scattered across nose bridge "
-            "and cheekbones and forehead, "
-            "long pointed ears angled outward, strong prominent brow ridge, "
-            "angular jawline with high cheekbones, "
-            "long dark hair in thick tribal braid with beads and feathers, "
-            "same face same identity same gender same expression"
+            "same person as a Studio Ghibli anime character, "
+            "soft rounded face with gentle features, large expressive eyes, "
+            "Hayao Miyazaki character design, warm natural skin tones, "
+            "hand-painted watercolor cel animation style, "
+            "delicate linework, same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
-            "cinematic film still from Avatar 2009, Pandora jungle at night, "
-            "glowing bioluminescent plants and floating seeds of the sacred tree, "
-            "blue-purple ambient light, Weta Digital photorealistic CGI rendering, "
-            "subsurface skin scattering, volumetric fog, "
-            "James Cameron cinematography, IMAX quality, 8k detail"
+            "Studio Ghibli animated film background, "
+            "lush green rolling hills with wildflowers, "
+            "towering cumulus clouds in bright blue sky, "
+            "Spirited Away and Howl's Moving Castle art style, "
+            "soft watercolor textures, warm golden hour sunlight, "
+            "hand-painted anime masterpiece"
         ),
         "negative": (
-            _NEG_IDENTITY + ", human skin, pink skin, pale skin, normal skin color, "
-            "generic alien, grey alien, green alien, green skin, "
-            "monster, creature, non-humanoid, animal face, furry, "
-            "smooth skin without stripes, plain flat blue, body paint, cosplay, "
-            "face paint, halloween costume, makeup, "
-            "small ears, round human ears, normal human eyes, "
-            "woman, female, changed gender, changed race"
+            _NEG_IDENTITY + ", photorealistic, photograph, 3D render, "
+            "dark, gritty, horror, harsh lighting, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
-            _NEG_QUALITY + ", realistic photo of human, office, indoor room, "
-            "plain wall, earth setting, modern city"
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "modern city, dark, photorealistic"
         ),
         "use_ip_adapter": True,
         "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 40,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.45},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
+    },
+    # ── BAROQUE OIL PAINTING ──────────────────────────────────────────
+    "baroque": {
+        "label": "Baroque",
+        "prompt": (
+            "same person portrait in Baroque oil painting style, "
+            "dramatic Rembrandt lighting with strong chiaroscuro, "
+            "rich warm skin tones with realistic detailed face, "
+            "thick visible oil paint brushstrokes, classical portrait composition, "
+            "same face same identity same skin tone same gender same ethnicity"
+        ),
+        "prompt_2": (
+            "Old Masters oil painting background, "
+            "deep dark umber and burgundy tones, "
+            "ornate gilded frame museum quality, "
+            "Caravaggio dramatic spotlight, Vermeer color palette, "
+            "Renaissance-era rich velvet and silk attire, "
+            "classical masterpiece museum painting"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", cartoon, anime, flat colors, digital art, "
+            "bright neon, modern clothing, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "modern, screenshot, flat lighting"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.60,
+        "controlnet": {"strength": 0.75, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.48},
+        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 7},
+    },
+    # ── SYNTHWAVE / RETROWAVE ─────────────────────────────────────────
+    "synthwave": {
+        "label": "Synthwave",
+        "prompt": (
+            "same person portrait in 1980s synthwave retrowave art style, "
+            "neon pink and cyan lighting on face, chrome reflections, "
+            "stylized digital airbrush illustration, "
+            "cool sunglasses optional, detailed face with natural skin color, "
+            "same face same identity same skin tone same gender same ethnicity"
+        ),
+        "prompt_2": (
+            "synthwave retrowave background, "
+            "neon grid floor stretching to horizon, "
+            "glowing pink and purple sunset with chrome sun, "
+            "palm tree silhouettes, retro 80s sports car, "
+            "VHS aesthetic, vaporwave neon glow, "
+            "outrun art style masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic photograph, cartoon, anime, "
+            "dull colors, desaturated, muted, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "daytime, natural lighting, realistic"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
                         "controlnet_scale": 0.42},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
     },
     # ── CLAYMATION ────────────────────────────────────────────────────
     "claymation": {
@@ -592,10 +649,11 @@ STYLES = {
 }
 
 STYLE_ORDER = [
-    "avatar", "anime_op", "anime_db", "pixar", "disney",
+    "ghibli", "anime_op", "anime_db", "pixar", "disney",
     "simpsons", "southpark", "gta", "minecraft",
     "timburton", "cyberpunk", "claymation",
     "comicbook", "darksouls", "popart", "artdeco",
+    "baroque", "synthwave",
 ]
 
 
