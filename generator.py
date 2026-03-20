@@ -557,11 +557,12 @@ STYLES = {
     "artdeco": {
         "label": "Art Deco",
         "prompt": (
-            "same male person in 1920s Art Deco illustration style, "
+            "same male person portrait in 1920s Art Deco poster illustration style, "
             "sharp geometric lines, stylized angular features, "
-            "gold and black color palette with metallic sheen, "
+            "warm gold and cream color palette with metallic gold accents, "
             "clean symmetrical composition, "
-            "masculine dapper gentleman portrait, "
+            "realistic detailed face with natural skin color preserved, "
+            "dapper gentleman in art deco fashion, "
             "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
@@ -574,6 +575,8 @@ STYLES = {
         "negative": (
             _NEG_IDENTITY + ", photorealistic, photograph, "
             "cartoon, anime, soft, painterly, messy, "
+            "mannequin, featureless face, blank face, smooth face, no features, "
+            "dark skin overlay, black face, silhouette, shadow face, "
             "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
@@ -581,10 +584,10 @@ STYLES = {
             "modern, dark, gritty, natural"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.65,
+        "controlnet": {"strength": 0.75, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.50},
+        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 7},
     },
 }
 
