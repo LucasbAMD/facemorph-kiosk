@@ -608,10 +608,198 @@ STYLES = {
                         "controlnet_scale": 0.42},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
+    # ── SIMPSONS ─────────────────────────────────────────────────────
+    "simpsons": {
+        "label": "Simpsons",
+        "prompt": (
+            "same person drawn as a character from The Simpsons TV show, "
+            "bright yellow skin, large round white eyes with black pupils, "
+            "overbite mouth, four fingers on each hand, "
+            "same hairstyle and hair color, same face same identity, "
+            "Matt Groening cartoon art style"
+        ),
+        "prompt_2": (
+            "The Simpsons animated TV show scene, "
+            "colorful Springfield living room with worn couch, "
+            "simple flat colored background, bright cheerful lighting, "
+            "classic Simpsons animation cel style, "
+            "clean bold outlines, flat cartoon coloring, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
+            "3d render, realistic skin, normal skin color"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "dark, gritty, realistic"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.35},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── GTA LOADING SCREEN ───────────────────────────────────────────
+    "gta": {
+        "label": "GTA",
+        "prompt": (
+            "same person drawn in Grand Theft Auto game loading screen art style, "
+            "bold stylized illustration with heavy ink outlines, "
+            "saturated colors, slightly exaggerated features, "
+            "confident attitude pose, same face same identity same skin tone, "
+            "same hairstyle, GTA V character portrait"
+        ),
+        "prompt_2": (
+            "Grand Theft Auto V loading screen illustration, "
+            "Los Santos city skyline with palm trees and sunset, "
+            "warm orange and pink gradient sky, "
+            "bold graphic novel illustration style, "
+            "Rockstar Games official art style, vibrant, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, "
+            "anime, cartoon, 3d render, soft"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "dark, muted colors, desaturated"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.40},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── MINECRAFT ────────────────────────────────────────────────────
+    "minecraft": {
+        "label": "Minecraft",
+        "prompt": (
+            "same person as a Minecraft character with blocky voxel body, "
+            "square head with pixelated face texture, "
+            "blocky rectangular arms and legs, cubic proportions, "
+            "pixel art skin texture on all surfaces, "
+            "same face same identity same skin tone, Minecraft Steve style"
+        ),
+        "prompt_2": (
+            "Minecraft video game screenshot, "
+            "blocky voxel landscape with grass blocks and oak trees, "
+            "bright blue sky with square white clouds, "
+            "pixelated sunlight, crafting table and torches nearby, "
+            "Minecraft Java Edition graphics, iconic voxel world, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, smooth skin, round features, "
+            "high resolution, realistic proportions, curved surfaces"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, realistic, "
+            "smooth textures, anti-aliased"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.32},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+    },
+    # ── TIM BURTON ───────────────────────────────────────────────────
+    "timburton": {
+        "label": "Tim Burton",
+        "prompt": (
+            "same person in Tim Burton gothic art style, "
+            "pale white skin with dark sunken eye circles, "
+            "exaggerated thin spindly proportions, wild messy hair, "
+            "large haunted expressive eyes, slightly elongated face, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "Tim Burton movie scene, dark gothic whimsical world, "
+            "twisted bare trees with spiral branches, "
+            "crooked Victorian houses on a misty hill, "
+            "purple and grey moonlit sky, Corpse Bride and "
+            "Nightmare Before Christmas art style, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, "
+            "bright colors, cheerful, realistic proportions, "
+            "normal eyes, tanned skin"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "sunny, daylight, tropical"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.40},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── UKIYO-E ──────────────────────────────────────────────────────
+    "ukiyoe": {
+        "label": "Ukiyo-e",
+        "prompt": (
+            "same person as a Japanese ukiyo-e woodblock print portrait, "
+            "flat bold ink outlines, subtle woodgrain texture visible, "
+            "traditional Japanese facial features stylization, "
+            "elegant flowing robes with decorative patterns, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "traditional Japanese ukiyo-e woodblock print, "
+            "Mount Fuji and cherry blossom trees in background, "
+            "great wave ocean scene, muted indigo blue and red ink palette, "
+            "visible wood block printing texture, "
+            "Hokusai and Hiroshige style, Edo period art, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, digital art, "
+            "3d render, modern, bright neon colors"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "western, modern architecture"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.38},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── LEGO ─────────────────────────────────────────────────────────
+    "lego": {
+        "label": "Lego",
+        "prompt": (
+            "same person as a Lego minifigure with yellow plastic skin, "
+            "classic Lego head with printed face, C-shaped claw hands, "
+            "plastic snap-on hair piece matching hairstyle, "
+            "short stubby Lego legs, same face same identity, "
+            "shiny ABS plastic surface with molding lines"
+        ),
+        "prompt_2": (
+            "Lego toy photography scene, "
+            "colorful Lego brick cityscape built from plastic bricks, "
+            "bright studio lighting with soft shadows on baseplate, "
+            "Lego instruction manual style, toy product photography, "
+            "sharp focus on minifigure, vibrant primary colors, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, real person, human skin, "
+            "realistic proportions, soft texture, cloth, fabric"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, nature, "
+            "realistic, dark, muted"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.32},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+    },
 }
 
 STYLE_ORDER = [
     "avatar", "anime_op", "anime_db", "ghibli", "pixar",
+    "simpsons", "gta", "minecraft", "timburton", "ukiyoe", "lego",
     "cyberpunk", "claymation",
     "oilpainting", "comicbook", "pixelart", "steampunk",
     "watercolor", "zombie", "fantasy", "popart", "ice", "neon",

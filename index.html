@@ -57,6 +57,7 @@
     font-size: 0.62rem; font-weight: 300;
     letter-spacing: 1.5px; color: #555;
   }
+  .header-right { display: flex; align-items: center; gap: 12px; }
   #ai-badge {
     font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
     background: rgba(255,255,255,0.03); border: 1px solid #333;
@@ -67,6 +68,61 @@
     border-color: var(--green); color: var(--green);
     box-shadow: 0 0 12px rgba(34,221,68,0.15);
   }
+  #about-btn {
+    font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid #333;
+    color: #555; letter-spacing: 1.5px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  #about-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── About modal ── */
+  #about-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(5,5,8,0.92); backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center;
+  }
+  #about-overlay.on { display: flex; }
+  #about-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 680px; width: 90%;
+    max-height: 85vh; overflow-y: auto; padding: 36px 40px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  #about-box h2 {
+    font-size: 0.7rem; letter-spacing: 4px; color: var(--accent);
+    text-transform: uppercase; font-weight: 700; margin-bottom: 20px;
+  }
+  #about-box h3 {
+    font-size: 0.8rem; font-weight: 700; color: var(--text);
+    margin: 20px 0 8px; letter-spacing: 0.5px;
+  }
+  #about-box p, #about-box li {
+    font-size: 0.75rem; color: #999; line-height: 1.7;
+    font-weight: 300;
+  }
+  #about-box ol { padding-left: 20px; }
+  #about-box li { margin-bottom: 8px; }
+  #about-box .step-num {
+    color: var(--accent); font-weight: 700;
+  }
+  #about-box .tech {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    background: rgba(0,212,255,0.08); color: var(--accent);
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.5px;
+  }
+  #about-box .about-footer {
+    margin-top: 24px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 0.65rem; color: #444; letter-spacing: 0.5px;
+  }
+  #about-close {
+    float: right; background: rgba(255,255,255,0.06); border: none;
+    color: #888; padding: 8px 20px; border-radius: 8px;
+    font-size: 0.75rem; cursor: pointer; font-weight: 600;
+    letter-spacing: 1px;
+  }
+  #about-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
   /* ── Layout ── */
   #main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
@@ -343,7 +399,10 @@
     <span class="logo-sep"></span>
     <span class="logo-tagline">ROCm-Accelerated AI Photo Booth</span>
   </div>
-  <div id="ai-badge">AI ENGINE</div>
+  <div class="header-right">
+    <button id="about-btn" onclick="toggleAbout()">HOW IT WORKS</button>
+    <div id="ai-badge">AI ENGINE</div>
+  </div>
 </header>
 
 <!-- Main -->
@@ -394,6 +453,59 @@
   </div>
 </div>
 
+<!-- About modal -->
+<div id="about-overlay">
+  <div id="about-box">
+    <button id="about-close" onclick="toggleAbout()">CLOSE</button>
+    <h2>How This Photo Booth Works</h2>
+
+    <h3>The Pipeline — Step by Step</h3>
+    <ol>
+      <li>
+        <span class="step-num">Camera Capture</span> — A live webcam feed streams to your browser.
+        When you hold still for 3 seconds, a 5-second countdown begins and the current frame is captured.
+      </li>
+      <li>
+        <span class="step-num">Depth Estimation</span> — The captured frame is sent through
+        <span class="tech">Depth-Anything-V2</span>, a neural network that creates a depth map of the scene.
+        This preserves your pose, body position, and spatial layout.
+      </li>
+      <li>
+        <span class="step-num">Face Embedding</span> — <span class="tech">InsightFace</span> detects your face
+        and extracts a 512-dimensional embedding that encodes your unique facial features. This is fed to
+        <span class="tech">IP-Adapter FaceID</span> so the AI knows what you look like.
+      </li>
+      <li>
+        <span class="step-num">Style Transfer (Diffusion)</span> — Your photo, depth map, and face embedding
+        are combined with the style prompt and sent to <span class="tech">Juggernaut XL v9</span>,
+        a Stable Diffusion XL model. A <span class="tech">ControlNet</span> module uses the depth map to
+        preserve your structure while the diffusion process transforms the image into the chosen art style
+        over 35-40 denoising steps.
+      </li>
+      <li>
+        <span class="step-num">Upscaling</span> — The 1024x1024 result is upscaled to 2048x2048 using
+        <span class="tech">Real-ESRGAN</span>, a neural upscaler that adds sharp detail without artifacts.
+      </li>
+      <li>
+        <span class="step-num">Display &amp; Save</span> — The final image is displayed on screen.
+        You can save it as a JPEG to take home.
+      </li>
+    </ol>
+
+    <h3>Key Technologies</h3>
+    <p>
+      <span class="tech">AMD Radeon GPU</span> accelerated via <span class="tech">ROCm</span> &mdash;
+      all AI inference runs locally on the GPU, no cloud APIs needed. The scheduler uses
+      <span class="tech">DPM++ 2M Karras</span> for sharper, more coherent outputs.
+      The entire pipeline runs in ~25-40 seconds per image.
+    </p>
+
+    <div class="about-footer">
+      Built with Stable Diffusion XL &middot; ControlNet &middot; IP-Adapter &middot; Real-ESRGAN &middot; AMD ROCm
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -403,6 +515,12 @@ const STYLES = [
   { key: "anime_db",    emoji: "\uD83D\uDD25", name: "Anime-DB",    sub: "Dragon Ball \u00B7 Toriyama" },
   { key: "ghibli",      emoji: "\uD83C\uDF3F", name: "Ghibli",      sub: "Miyazaki \u00B7 Whimsical" },
   { key: "pixar",       emoji: "\uD83C\uDFAC", name: "Pixar 3D",    sub: "Animated \u00B7 Disney" },
+  { key: "simpsons",    emoji: "\uD83D\uDFE1", name: "Simpsons",    sub: "Springfield \u00B7 Yellow" },
+  { key: "gta",         emoji: "\uD83D\uDD2B", name: "GTA",         sub: "Loading Screen \u00B7 Vice" },
+  { key: "minecraft",   emoji: "\u26CF\uFE0F", name: "Minecraft",   sub: "Voxel \u00B7 Blocky" },
+  { key: "timburton",   emoji: "\uD83D\uDD78\uFE0F", name: "Tim Burton",  sub: "Gothic \u00B7 Whimsical" },
+  { key: "ukiyoe",      emoji: "\uD83C\uDF38", name: "Ukiyo-e",     sub: "Woodblock \u00B7 Edo" },
+  { key: "lego",        emoji: "\uD83E\uDDF1", name: "Lego",        sub: "Minifigure \u00B7 Bricks" },
   { key: "cyberpunk",   emoji: "\uD83E\uDD16", name: "Cyberpunk",   sub: "Neon Noir \u00B7 Chrome" },
   { key: "claymation",  emoji: "\uD83C\uDFA8", name: "Claymation",  sub: "Clay \u00B7 Stop Motion" },
   { key: "oilpainting", emoji: "\uD83D\uDDBC\uFE0F", name: "Oil Painting", sub: "Renaissance \u00B7 Canvas" },
@@ -673,6 +791,10 @@ function cancelCountdown() {
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
   countdownActive = false;
   document.getElementById("countdown-overlay").classList.remove("on");
+}
+
+function toggleAbout() {
+  document.getElementById("about-overlay").classList.toggle("on");
 }
 
 async function init() {
