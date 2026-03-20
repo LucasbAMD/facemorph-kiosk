@@ -42,7 +42,13 @@ prev_gray = None
 motion_lock = threading.Lock()
 stable_since: float = 0.0        # timestamp when scene became stable
 motion_score: float = 999.0      # current frame-diff score (lower = more stable)
+face_present: bool = False        # is a face detected in frame?
 MOTION_THRESHOLD = 3.0           # below this = "holding still"
+
+# Face detector for presence check (lightweight Haar cascade, ships with OpenCV)
+_face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
 
 
 # ── Camera ────────────────────────────────────────────────────────────────────
@@ -66,8 +72,11 @@ def start_capture(camera_index: int = 0):
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
             cap.set(cv2.CAP_PROP_FPS, 30)
 
+    face_check_counter = 0
+
     def loop():
-        global latest_frame, prev_gray, stable_since, motion_score
+        nonlocal face_check_counter
+        global latest_frame, prev_gray, stable_since, motion_score, face_present
         while capture_running:
             with cap_lock:
                 ok = cap and cap.isOpened()
@@ -82,10 +91,20 @@ def start_capture(camera_index: int = 0):
                 # Motion detection: compare grayscale frames
                 small = cv2.resize(frame, (320, 180))
                 gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-                gray = cv2.GaussianBlur(gray, (21, 21), 0)
+                blurred = cv2.GaussianBlur(gray, (21, 21), 0)
+
+                # Face presence check (every 5th frame to stay cheap)
+                face_check_counter += 1
+                if face_check_counter % 5 == 0:
+                    faces = _face_cascade.detectMultiScale(
+                        gray, scaleFactor=1.3, minNeighbors=3, minSize=(40, 40)
+                    )
+                    with motion_lock:
+                        face_present = len(faces) > 0
+
                 with motion_lock:
                     if prev_gray is not None:
-                        diff = cv2.absdiff(prev_gray, gray)
+                        diff = cv2.absdiff(prev_gray, blurred)
                         score = float(np.mean(diff))
                         motion_score = score
                         if score < MOTION_THRESHOLD:
@@ -95,7 +114,7 @@ def start_capture(camera_index: int = 0):
                             stable_since = 0.0
                     else:
                         stable_since = 0.0
-                    prev_gray = gray
+                    prev_gray = blurred
             else:
                 time.sleep(0.033)
 
@@ -196,7 +215,8 @@ async def motion_status_endpoint():
     with motion_lock:
         dur = (time.time() - stable_since) if stable_since > 0 else 0.0
         score = motion_score
-    return JSONResponse({"stable_seconds": round(dur, 2), "motion_score": round(score, 2)})
+        has_face = face_present
+    return JSONResponse({"stable_seconds": round(dur, 2), "motion_score": round(score, 2), "face": has_face})
 
 
 @app.post("/motion_reset")
