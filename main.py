@@ -45,6 +45,50 @@ motion_score: float = 999.0      # current frame-diff score (lower = more stable
 MOTION_THRESHOLD = 3.0           # below this = "holding still"
 
 
+# ── Co-brand overlay state ────────────────────────────────────────────────────
+_cobrand_name: Optional[str] = None
+_cobrand_lock = threading.Lock()
+
+
+def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
+    """Render 'AMD X <name>' badge on the top-left of the result image."""
+    label = f"AMD X {name}"
+    h, w = img.shape[:2]
+
+    # Scale font relative to image width so it's visible on stickers (~3-4% of width)
+    # At 2048px wide this gives roughly 60-80px tall text
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = w / 900          # ~2.3 at 2048px, ~1.1 at 1024px
+    thickness = max(2, int(w / 500))  # ~4 at 2048px
+
+    # Measure text
+    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+
+    # Padding around text
+    pad_x = int(w * 0.015)
+    pad_y = int(h * 0.010)
+    margin = int(w * 0.02)
+
+    # Box coordinates
+    x1 = margin
+    y1 = margin
+    x2 = x1 + tw + 2 * pad_x
+    y2 = y1 + th + baseline + 2 * pad_y
+
+    # Semi-transparent dark background
+    overlay = img.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), cv2.FILLED)
+    cv2.addWeighted(overlay, 0.55, img, 0.45, 0, img)
+
+    # White text
+    text_x = x1 + pad_x
+    text_y = y1 + pad_y + th
+    cv2.putText(img, label, (text_x, text_y), font, font_scale,
+                (255, 255, 255), thickness, cv2.LINE_AA)
+
+    return img
+
+
 # ── Camera ────────────────────────────────────────────────────────────────────
 def start_capture(camera_index: int = 0):
     global cap, latest_frame, capture_running
@@ -147,13 +191,18 @@ async def video_feed():
 
 # ── AI Generation ─────────────────────────────────────────────────────────────
 @app.post("/generate")
-async def generate(character: str = Form(...)):
+async def generate(character: str = Form(...),
+                   cobrand: Optional[str] = Form(None)):
+    global _cobrand_name
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
         raise HTTPException(400, "No camera frame available")
     if not comfy.check_available():
         raise HTTPException(503, "AI engine not ready - loading model...")
+
+    with _cobrand_lock:
+        _cobrand_name = cobrand.strip() if cobrand else None
 
     started = comfy.generate(frame, character)
     if not started:
@@ -168,6 +217,11 @@ async def generate_status():
         result = comfy.get_result()
         if result is not None:
             try:
+                # Apply co-brand overlay if a name was provided
+                with _cobrand_lock:
+                    cobrand = _cobrand_name
+                if cobrand:
+                    result = _apply_cobrand_overlay(result, cobrand)
                 _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 95])
                 b64 = base64.b64encode(buf.tobytes()).decode()
                 print(f"[Status] Result ready: {result.shape}, JPEG size: {len(buf)}bytes")
