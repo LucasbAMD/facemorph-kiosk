@@ -93,7 +93,7 @@ def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
 
 def _apply_watermark(img: np.ndarray) -> np.ndarray:
     """Render a subtle 'AMD Austin CEC' watermark in the bottom-left."""
-    label = "AMD Austin CEC"
+    label = "AMD Austin Customer Engagement Center"
     h, w = img.shape[:2]
 
     font_size = max(12, int(w / 50))  # ~41px at 2048, ~20px at 1024
