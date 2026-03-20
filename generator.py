@@ -89,11 +89,12 @@ STYLES = {
     "ghibli": {
         "label": "Studio Ghibli",
         "prompt": (
-            "same person as a Studio Ghibli anime character, "
-            "soft rounded face with gentle features, large expressive eyes, "
-            "Hayao Miyazaki character design, warm natural skin tones, "
-            "hand-painted watercolor cel animation style, "
-            "delicate linework, same face same identity same skin tone same gender same ethnicity"
+            "same male person portrait in Studio Ghibli anime style, "
+            "stylized anime face with large expressive eyes, "
+            "bold clean anime linework, cel shaded coloring, "
+            "preserving original face shape and skin color exactly, "
+            "Hayao Miyazaki anime character design, "
+            "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
             "Studio Ghibli animated film background, "
@@ -106,6 +107,8 @@ STYLES = {
         "negative": (
             _NEG_IDENTITY + ", photorealistic, photograph, 3D render, "
             "dark, gritty, horror, harsh lighting, "
+            "asian features, epicanthic fold, changed ethnicity, "
+            "child, boy, young boy, kid, baby face, "
             "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
@@ -113,52 +116,55 @@ STYLES = {
             "modern city, dark, photorealistic"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.65,
+        "controlnet": {"strength": 0.75, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.50},
+        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 7},
     },
     # ── BAROQUE OIL PAINTING ──────────────────────────────────────────
     "baroque": {
         "label": "Baroque",
         "prompt": (
-            "same person portrait in Baroque oil painting style, "
-            "dramatic Rembrandt lighting with strong chiaroscuro, "
-            "rich warm skin tones with realistic detailed face, "
+            "same male person portrait painted in Baroque oil painting style, "
+            "dramatic Rembrandt side lighting with warm highlights, "
+            "preserving original face and skin color exactly, "
             "thick visible oil paint brushstrokes, classical portrait composition, "
+            "rich golden and amber warm tones, "
             "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
             "Old Masters oil painting background, "
-            "deep dark umber and burgundy tones, "
+            "warm amber and burgundy tones, rich golden highlights, "
             "ornate gilded frame museum quality, "
-            "Caravaggio dramatic spotlight, Vermeer color palette, "
+            "Vermeer color palette, warm candlelit atmosphere, "
             "Renaissance-era rich velvet and silk attire, "
             "classical masterpiece museum painting"
         ),
         "negative": (
             _NEG_IDENTITY + ", cartoon, anime, flat colors, digital art, "
             "bright neon, modern clothing, "
+            "dark skin, black skin, dark face, shadow face, silhouette, "
             "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
-            "modern, screenshot, flat lighting"
+            "modern, screenshot, flat lighting, dark umber, pitch black"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.60,
-        "controlnet": {"strength": 0.75, "guidance": 10.0, "steps": 35,
-                        "controlnet_scale": 0.48},
-        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.65,
+        "controlnet": {"strength": 0.72, "guidance": 9.5, "steps": 35,
+                        "controlnet_scale": 0.52},
+        "turbo":      {"strength": 0.80, "guidance": 0.0, "steps": 7},
     },
     # ── SYNTHWAVE / RETROWAVE ─────────────────────────────────────────
     "synthwave": {
         "label": "Synthwave",
         "prompt": (
-            "same person portrait in 1980s synthwave retrowave art style, "
-            "neon pink and cyan lighting on face, chrome reflections, "
+            "same male person portrait in 1980s synthwave retrowave art style, "
+            "neon pink and cyan colored lighting illuminating face, "
             "stylized digital airbrush illustration, "
-            "cool sunglasses optional, detailed face with natural skin color, "
+            "preserving original face and skin color exactly, "
+            "detailed face with natural skin, masculine features, "
             "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
@@ -172,17 +178,19 @@ STYLES = {
         "negative": (
             _NEG_IDENTITY + ", photorealistic photograph, cartoon, anime, "
             "dull colors, desaturated, muted, "
-            "woman, female, feminine, changed gender, changed race, changed skin"
+            "dark skin, black skin, dark face, shadow face, silhouette, "
+            "woman, female, feminine, long hair, breasts, lipstick, makeup, "
+            "changed gender, changed race, changed skin"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
             "daytime, natural lighting, realistic"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.42},
-        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.65,
+        "controlnet": {"strength": 0.74, "guidance": 10.0, "steps": 35,
+                        "controlnet_scale": 0.50},
+        "turbo":      {"strength": 0.82, "guidance": 0.0, "steps": 7},
     },
     # ── CLAYMATION ────────────────────────────────────────────────────
     "claymation": {
