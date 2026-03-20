@@ -450,11 +450,11 @@ STYLES = {
     "disney": {
         "label": "Disney 2D",
         "prompt": (
-            "same person drawn as a classic Disney animated character, "
+            "same male person drawn as a classic Disney animated character, "
             "smooth clean ink outlines, large expressive Disney eyes, "
-            "soft rounded features, warm skin tones, "
+            "soft rounded features, "
             "flowing animated hair with highlights, "
-            "same face same identity same skin tone same hair color"
+            "same face same identity same skin tone same gender same ethnicity"
         ),
         "prompt_2": (
             "classic Disney Renaissance 2D animated movie scene, "
@@ -465,17 +465,18 @@ STYLES = {
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic, real person, photograph, "
-            "3d render, CGI, Pixar, modern 3D animation"
+            "3d render, CGI, Pixar, modern 3D animation, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
             "dark, gritty, realistic"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.38},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.45},
+        "turbo":      {"strength": 0.85, "guidance": 0.0, "steps": 7},
     },
     # ── DARK SOULS / MEDIEVAL ────────────────────────────────────────
     "darksouls": {
