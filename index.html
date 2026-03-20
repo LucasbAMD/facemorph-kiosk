@@ -68,6 +68,13 @@
     border-color: var(--green); color: var(--green);
     box-shadow: 0 0 12px rgba(34,221,68,0.15);
   }
+  #run-counter {
+    font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid #333;
+    color: #888; letter-spacing: 1.5px; font-weight: 600;
+    white-space: nowrap;
+  }
+  #run-counter span { color: var(--accent); font-weight: 700; }
   #about-btn {
     font-size: 0.65rem; padding: 6px 16px; border-radius: 20px;
     background: rgba(0,212,255,0.08); border: 1px solid var(--accent);
@@ -288,10 +295,24 @@
     flex-shrink: 0; margin-top: auto;
     background: rgba(0,0,0,0.2);
   }
-  #cobrand-section label {
-    font-size: 0.55rem; letter-spacing: 2px; color: var(--dim);
-    text-transform: uppercase; font-weight: 600; display: block;
+  .cobrand-header {
+    display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 6px;
+  }
+  .cobrand-header label {
+    font-size: 0.55rem; letter-spacing: 2px; color: var(--dim);
+    text-transform: uppercase; font-weight: 600;
+  }
+  .cobrand-toggle {
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
+  }
+  .cobrand-toggle input[type="checkbox"] {
+    accent-color: var(--accent); width: 13px; height: 13px;
+    cursor: pointer;
+  }
+  .cobrand-toggle span {
+    font-size: 0.5rem; color: #555; letter-spacing: 0.5px;
+    text-transform: uppercase; font-weight: 500;
   }
   #cobrand-input {
     width: 100%; padding: 10px 12px;
@@ -301,13 +322,14 @@
     font-family: 'Inter', sans-serif;
     font-size: 0.8rem; font-weight: 500;
     letter-spacing: 0.5px; outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, opacity 0.2s;
   }
   #cobrand-input::placeholder { color: #444; font-weight: 300; }
   #cobrand-input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 8px rgba(0,212,255,0.1);
   }
+  #cobrand-input:disabled { opacity: 0.3; cursor: not-allowed; }
   #cobrand-preview {
     font-size: 0.55rem; color: #555; margin-top: 5px;
     letter-spacing: 0.5px; min-height: 1.2em;
@@ -436,6 +458,7 @@
     <span class="logo-tagline">ROCm-Accelerated AI Photo Booth</span>
   </div>
   <div class="header-right">
+    <div id="run-counter">RUNS: <span id="run-count">0</span></div>
     <button id="about-btn" onclick="toggleAbout()">HOW IT WORKS</button>
     <div id="ai-badge">AI ENGINE</div>
   </div>
@@ -483,7 +506,13 @@
     </div>
     <div id="style-grid"></div>
     <div id="cobrand-section">
-      <label for="cobrand-input">Personalize Label</label>
+      <div class="cobrand-header">
+        <label for="cobrand-input">Personalize Label</label>
+        <label class="cobrand-toggle">
+          <input type="checkbox" id="cobrand-toggle" checked onchange="toggleCobrand()">
+          <span>Show</span>
+        </label>
+      </div>
       <input id="cobrand-input" type="text" placeholder="Company or name"
              maxlength="30" autocomplete="off" spellcheck="false"
              oninput="updateCobrandPreview()">
@@ -588,11 +617,24 @@ let currentResultDataUrl = null;
 function updateCobrandPreview() {
   const val = document.getElementById("cobrand-input").value.trim();
   const preview = document.getElementById("cobrand-preview");
-  if (val) {
+  const on = document.getElementById("cobrand-toggle").checked;
+  if (val && on) {
     preview.innerHTML = "Label: <span>AMD X " + val.replace(/</g, "&lt;") + "</span>";
   } else {
     preview.textContent = "";
   }
+}
+
+function toggleCobrand() {
+  const on = document.getElementById("cobrand-toggle").checked;
+  document.getElementById("cobrand-input").disabled = !on;
+  updateCobrandPreview();
+}
+
+function updateRunCounter() {
+  fetch("/run_count").then(r => r.json()).then(d => {
+    document.getElementById("run-count").textContent = d.count;
+  }).catch(() => {});
 }
 
 function buildStyleGrid(aiReady) {
@@ -697,8 +739,9 @@ async function doTransform() {
 
   const fd = new FormData();
   fd.append("character", selectedStyle);
+  const cobrandOn = document.getElementById("cobrand-toggle").checked;
   const cobrandVal = document.getElementById("cobrand-input").value.trim();
-  if (cobrandVal) fd.append("cobrand", cobrandVal);
+  if (cobrandOn && cobrandVal) fd.append("cobrand", cobrandVal);
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
     if (r.status >= 400) {
@@ -735,6 +778,7 @@ async function pollStatus() {
         document.getElementById("result-img").src = data.image;
         document.getElementById("result-overlay").classList.add("on");
         // Keep transform button disabled while result is showing
+        updateRunCounter();
       }, 300);
     } else if (data.status === "error") {
       clearInterval(pollTimer); pollTimer = null; stopProgress();
@@ -862,6 +906,7 @@ async function init() {
   buildStyleGrid(online);
   setInterval(checkAI, 8000);
   startMotionPolling();
+  updateRunCounter();
 }
 init();
 </script>

@@ -45,44 +45,34 @@ motion_score: float = 999.0      # current frame-diff score (lower = more stable
 MOTION_THRESHOLD = 3.0           # below this = "holding still"
 
 
+# ── Run counter ───────────────────────────────────────────────────────────────
+_run_count: int = 0
+_run_lock = threading.Lock()
+
 # ── Co-brand overlay state ────────────────────────────────────────────────────
 _cobrand_name: Optional[str] = None
 _cobrand_lock = threading.Lock()
 
 
 def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
-    """Render 'AMD X <name>' badge on the top-left of the result image."""
+    """Render 'AMD X <name>' text on the top-left of the result image (no box)."""
     label = f"AMD X {name}"
     h, w = img.shape[:2]
 
-    # Scale font relative to image width so it's visible on stickers (~3-4% of width)
-    # At 2048px wide this gives roughly 60-80px tall text
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = w / 900          # ~2.3 at 2048px, ~1.1 at 1024px
     thickness = max(2, int(w / 500))  # ~4 at 2048px
 
-    # Measure text
-    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
-
-    # Padding around text
-    pad_x = int(w * 0.015)
-    pad_y = int(h * 0.010)
     margin = int(w * 0.02)
+    (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+    text_x = margin
+    text_y = margin + th
 
-    # Box coordinates
-    x1 = margin
-    y1 = margin
-    x2 = x1 + tw + 2 * pad_x
-    y2 = y1 + th + baseline + 2 * pad_y
-
-    # Semi-transparent dark background
-    overlay = img.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), cv2.FILLED)
-    cv2.addWeighted(overlay, 0.55, img, 0.45, 0, img)
-
-    # White text
-    text_x = x1 + pad_x
-    text_y = y1 + pad_y + th
+    # Thin dark outline for readability on any background
+    outline = max(1, thickness + 2)
+    cv2.putText(img, label, (text_x, text_y), font, font_scale,
+                (0, 0, 0), outline, cv2.LINE_AA)
+    # White text on top
     cv2.putText(img, label, (text_x, text_y), font, font_scale,
                 (255, 255, 255), thickness, cv2.LINE_AA)
 
@@ -90,8 +80,8 @@ def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
 
 
 def _apply_watermark(img: np.ndarray) -> np.ndarray:
-    """Render a subtle 'AMD Customer Engagement Center' watermark in the bottom-left."""
-    label = "AMD Customer Engagement Center"
+    """Render a subtle 'AMD Austin CEC' watermark in the bottom-left."""
+    label = "AMD Austin CEC"
     h, w = img.shape[:2]
 
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -243,6 +233,10 @@ async def generate_status():
         result = comfy.get_result()
         if result is not None:
             try:
+                # Bump run counter
+                global _run_count
+                with _run_lock:
+                    _run_count += 1
                 # Apply co-brand overlay if a name was provided
                 with _cobrand_lock:
                     cobrand = _cobrand_name
@@ -288,6 +282,13 @@ async def motion_reset():
     with motion_lock:
         stable_since = 0.0
     return JSONResponse({"ok": True})
+
+
+@app.get("/run_count")
+async def run_count():
+    with _run_lock:
+        count = _run_count
+    return JSONResponse({"count": count})
 
 
 @app.get("/status")
