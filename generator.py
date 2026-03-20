@@ -458,56 +458,58 @@ STYLES = {
     "labubu": {
         "label": "Labubu",
         "prompt": (
-            "same person transformed into an adorable Labubu vinyl art toy, "
-            "oversized round head with mischievous wide grin showing tiny pointy teeth, "
-            "large round glossy eyes, small pointy elf ears, "
-            "chubby stubby body with short arms and legs, "
-            "smooth shiny vinyl toy surface, same face same identity same skin tone"
+            "same person transformed into a cute fuzzy monster plush toy creature, "
+            "round oversized head covered in soft fur, wide mischievous grin "
+            "showing tiny pointed teeth, big round shiny button eyes, "
+            "small pointy elf ears poking out of fur, "
+            "chubby stubby plush body, same face same skin tone"
         ),
         "prompt_2": (
-            "cute designer vinyl art toy figure by Kasing Lung, "
-            "colorful candy-pastel toy shelf display background, "
-            "soft studio lighting with gentle shadows, "
-            "Pop Mart blind box collectible toy photography, "
-            "kawaii aesthetic, highly detailed figurine, masterpiece"
+            "adorable fluffy monster plush keychain toy, "
+            "soft fuzzy faux fur texture covering entire body, "
+            "pastel colored plush collectible figure on display shelf, "
+            "soft studio product photography lighting, "
+            "cute kawaii monster stuffed animal, highly detailed, masterpiece"
         ),
         "negative": (
             _NEG_IDENTITY + ", realistic human, photorealistic skin, "
-            "scary, horror, dark, matte finish, rough texture"
+            "schoolgirl, school uniform, anime girl, human body, human skin, "
+            "scary, horror, dark, smooth vinyl, plastic, hard surface"
         ),
-        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, nature",
+        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, nature, human photo",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
-                        "controlnet_scale": 0.35},
+        "ip_adapter_scale": 0.4,
+        "controlnet": {"strength": 0.88, "guidance": 14.0, "steps": 40,
+                        "controlnet_scale": 0.30},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
     # ── WIZARD ───────────────────────────────────────────────────────
     "wizard": {
         "label": "Wizard",
         "prompt": (
-            "same person as a powerful wizard from Harry Potter, "
-            "wearing dark flowing wizard robes with house crest embroidery, "
-            "pointed wizard hat slightly tilted, round spectacles, "
-            "holding a glowing magic wand casting bright sparkling spell, "
-            "same face same identity same gender same skin tone, same expression"
+            "same person wearing wizard costume, "
+            "rich purple and gold wizard robes with star and moon embroidery, "
+            "tall pointed wizard hat, holding a glowing magic wand, "
+            "bright magical sparks flying from wand tip, "
+            "same face same identity same gender same skin tone same skin color"
         ),
         "prompt_2": (
-            "Hogwarts School of Witchcraft and Wizardry interior, "
-            "grand stone hall with floating candles overhead, "
-            "moving portraits on walls, enchanted starry ceiling, "
-            "magical spell light trails and sparkles in air, "
-            "Harry Potter movie cinematic quality, warm candlelight, masterpiece"
+            "fantasy wizard castle interior, "
+            "grand stone hall with floating glowing candles overhead, "
+            "tall arched windows with moonlight streaming in, "
+            "magical books and potions on shelves, enchanted starry ceiling, "
+            "warm bright candlelight, fantasy movie cinematic quality, masterpiece"
         ),
         "negative": (
             _NEG_IDENTITY + ", modern clothing, casual wear, "
-            "evil, dark lord, skull, death eater mask"
+            "evil, dark lord, skull, death eater mask, "
+            "different person, changed ethnicity, changed race"
         ),
-        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, daylight, white wall",
+        "negative_2": _NEG_QUALITY + ", office, plain background, outdoor, daylight, white wall, dark shadows",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.42},
+        "ip_adapter_scale": 0.6,
+        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
 }
