@@ -120,29 +120,30 @@ STYLES = {
     "claymation": {
         "label": "Claymation",
         "prompt": (
-            "same person sculpted as clay figure with visible sculpting tool marks, "
+            "same person sculpted as a clay figure, "
             "chunky exaggerated clay features, fingerprint impressions in clay, "
-            "natural skin-colored clay with warm beige and peach tones, "
+            "light colored clay matching original skin tone exactly, "
             "big round clay eyes, clay hair shaped in thick textured strands, "
-            "oversized hands and stubby proportions"
+            "same face same identity same skin tone"
         ),
         "prompt_2": (
-            "stop-motion animation movie scene, detailed miniature set, "
+            "stop-motion animation movie scene, detailed miniature clay set, "
             "tiny clay props and furniture on tabletop, "
             "painted paper backdrop of rolling hills and blue sky, "
             "cotton ball clouds, warm studio spotlight with soft shadows, "
-            "Aardman Animations Shaun the Sheep quality, masterpiece"
+            "Wallace and Gromit claymation quality, masterpiece"
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic, real human, real skin, photograph, "
             "smooth skin, smooth plastic, airbrushed, "
-            "purple skin, blue skin, green skin, grey skin, unnatural skin color"
+            "dark skin, dark clay, brown clay, black clay, "
+            "animal, sheep, lamb, wool, fur"
         ),
         "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room, white background",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.75, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.48},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.72, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     # ── ANIME – One Piece ────────────────────────────────────────────
@@ -256,31 +257,6 @@ STYLES = {
                         "controlnet_scale": 0.35},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
-    # ── PIXEL ART ─────────────────────────────────────────────────────
-    "pixelart": {
-        "label": "Pixel Art",
-        "prompt": (
-            "same person as pixel art RPG character sprite, "
-            "visible square pixels, limited 16-bit retro color palette, "
-            "dithering shading technique, blocky pixel features, "
-            "same face same identity same gender same skin tone, "
-            "same hairstyle and hair color rendered in pixel blocks"
-        ),
-        "prompt_2": (
-            "retro 16-bit SNES video game screenshot, "
-            "pixel art fantasy village background with tiled stone path, "
-            "pixel art trees and bushes, 8-bit clouds and blue sky, "
-            "RPG game HUD with health bar at top, "
-            "Final Fantasy VI style, nostalgic pixel art, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", photorealistic, smooth, high resolution, photograph",
-        "negative_2": _NEG_QUALITY + ", office, plain wall, indoor room",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.82, "guidance": 13.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
-    },
     # ── COMIC BOOK ────────────────────────────────────────────────────
     "comicbook": {
         "label": "Comic Book",
@@ -307,113 +283,6 @@ STYLES = {
         "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
                         "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
-    },
-    # ── WATERCOLOR ────────────────────────────────────────────────────
-    "watercolor": {
-        "label": "Watercolor",
-        "prompt": (
-            "same person painted in translucent watercolor washes, "
-            "visible cold-pressed paper texture underneath, "
-            "delicate wet-on-wet paint bleeds on edges of face and hair, "
-            "soft color gradients, artistic paint drips, "
-            "same face same identity same gender same skin tone, same hairstyle and expression"
-        ),
-        "prompt_2": (
-            "beautiful watercolor painting on textured cotton paper, "
-            "soft impressionist garden background with bleeding flower colors, "
-            "wisteria and roses in loose watercolor washes, "
-            "splashes of diluted pigment, gentle pastel sky, "
-            "fine art watercolor exhibition quality, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", photograph, digital art, oil painting, sharp edges",
-        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, harsh colors",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.42},
-        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
-    },
-    # ── ZOMBIE ────────────────────────────────────────────────────────
-    "zombie": {
-        "label": "Zombie",
-        "prompt": (
-            "same person transformed into a terrifying zombie, "
-            "pale green-grey decaying skin with exposed veins, "
-            "dark hollow sunken eye sockets with milky white eyes, "
-            "cracked bleeding lips, torn and bloodied clothing, "
-            "same face same identity same gender, "
-            "same hairstyle but matted dirty and disheveled"
-        ),
-        "prompt_2": (
-            "cinematic horror movie scene, dark foggy graveyard at night, "
-            "creepy dead twisted trees, cracked mossy tombstones, "
-            "huge full moon through clouds, eerie green fog rolling, "
-            "dramatic horror film lighting, The Walking Dead quality, "
-            "highly detailed, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", cute, happy colors, bright, cheerful, clean skin",
-        "negative_2": _NEG_QUALITY + ", office, plain background, daytime, white wall",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.80, "guidance": 13.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
-    # ── POP ART ───────────────────────────────────────────────────────
-    "popart": {
-        "label": "Pop Art",
-        "prompt": (
-            "same person in bold Andy Warhol pop art screen print style, "
-            "flat bright neon color blocks on face and hair, "
-            "thick black outlines around all features, "
-            "same face same identity same gender same skin tone, "
-            "high contrast stylized portrait, halftone dot pattern on skin"
-        ),
-        "prompt_2": (
-            "iconic Andy Warhol pop art print, vibrant color offset, "
-            "hot pink yellow cyan and orange color palette, "
-            "bold graphic shapes and repeating pattern background, "
-            "Warhol screen print series style, "
-            "modern art gallery exhibition piece, masterpiece"
-        ),
-        "negative": _NEG_IDENTITY + ", photorealistic, subtle colors, muted, soft",
-        "negative_2": _NEG_QUALITY + ", office, plain background, white wall, photograph",
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.55,
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.45},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
-    # ── STUDIO GHIBLI ───────────────────────────────────────────────
-    "ghibli": {
-        "label": "Ghibli",
-        "prompt": (
-            "same person drawn in Studio Ghibli anime style by Hayao Miyazaki, "
-            "soft rounded features with gentle expression, large warm eyes, "
-            "simple clean line art with soft colored shading, "
-            "wind gently blowing hair, same face same identity same skin tone"
-        ),
-        "prompt_2": (
-            "Studio Ghibli anime movie scene, "
-            "lush green rolling hills with wildflowers and tall grass swaying, "
-            "huge fluffy white cumulus clouds in bright blue sky, "
-            "distant countryside village with red rooftops, "
-            "Spirited Away and Howl's Moving Castle art style, "
-            "beautiful hand-painted watercolor background, masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
-            "3d render, CGI, sharp edges, dark, gritty"
-        ),
-        "negative_2": (
-            _NEG_QUALITY + ", office, plain background, white wall, "
-            "urban, city, indoor room, dark atmosphere"
-        ),
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.38},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── PIXAR 3D ────────────────────────────────────────────────────
     "pixar": {
@@ -571,30 +440,123 @@ STYLES = {
                         "controlnet_scale": 0.40},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
-    # ── UKIYO-E ──────────────────────────────────────────────────────
-    "ukiyoe": {
-        "label": "Ukiyo-e",
+    # ── SOUTH PARK ────────────────────────────────────────────────────
+    "southpark": {
+        "label": "South Park",
         "prompt": (
-            "same person as a Japanese ukiyo-e woodblock print portrait, "
-            "flat bold ink outlines, subtle woodgrain texture visible, "
-            "traditional Japanese facial features stylization, "
-            "elegant flowing robes with decorative patterns, "
-            "same face same identity same skin tone"
+            "same person as a South Park cartoon character, "
+            "simple construction paper cutout style, round head, "
+            "dot eyes, simple oval mouth, stubby body with no neck, "
+            "flat colored shapes with wobbly paper-cut edges, "
+            "same face same identity same skin tone same hair color"
         ),
         "prompt_2": (
-            "traditional Japanese ukiyo-e woodblock print, "
-            "Mount Fuji and cherry blossom trees in background, "
-            "great wave ocean scene, muted indigo blue and red ink palette, "
-            "visible wood block printing texture, "
-            "Hokusai and Hiroshige style, Edo period art, masterpiece"
+            "South Park animated TV show scene, "
+            "snowy small mountain town with simple buildings, "
+            "flat construction paper cutout art style, "
+            "bright simple colors, Comedy Central South Park quality, "
+            "Trey Parker and Matt Stone animation style, masterpiece"
         ),
         "negative": (
-            _NEG_IDENTITY + ", photorealistic, photograph, digital art, "
-            "3d render, modern, bright neon colors"
+            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
+            "3d render, detailed features, realistic proportions"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
-            "western, modern architecture"
+            "dark, realistic, detailed background"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.35,
+        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
+                        "controlnet_scale": 0.30},
+        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+    },
+    # ── MONET / IMPRESSIONIST ────────────────────────────────────────
+    "monet": {
+        "label": "Monet",
+        "prompt": (
+            "same person painted in Claude Monet impressionist style, "
+            "visible loose dappled brushstrokes, soft blended colors, "
+            "warm natural light on face, slightly dreamy soft focus, "
+            "oil paint on canvas texture, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "Claude Monet impressionist oil painting, "
+            "beautiful garden with water lilies and Japanese bridge, "
+            "dappled sunlight through willow trees, flower fields, "
+            "soft pastel sky with gentle clouds, "
+            "Musee d'Orsay gallery quality, impressionist masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, digital art, "
+            "sharp edges, flat colors, cartoon"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "modern, urban, dark"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.40},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
+    },
+    # ── BORDERLANDS ──────────────────────────────────────────────────
+    "borderlands": {
+        "label": "Borderlands",
+        "prompt": (
+            "same person drawn in Borderlands video game cel-shaded style, "
+            "heavy black ink outlines on all edges, cross-hatching shading, "
+            "gritty comic book ink texture, bold saturated colors, "
+            "slightly rugged exaggerated features, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "Borderlands video game screenshot, "
+            "post-apocalyptic desert wasteland with rusty metal structures, "
+            "cel-shaded 3D rendering with heavy ink outlines on everything, "
+            "Pandora planet landscape, Gearbox Software art style, "
+            "vibrant comic book coloring, masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, smooth shading, "
+            "soft, realistic lighting, no outlines"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "clean, polished, modern city"
+        ),
+        "use_ip_adapter": True,
+        "ip_adapter_scale": 0.5,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.40},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+    },
+    # ── STAINED GLASS ────────────────────────────────────────────────
+    "stainedglass": {
+        "label": "Stained Glass",
+        "prompt": (
+            "same person depicted as a stained glass window portrait, "
+            "bold black lead lines separating colorful glass segments, "
+            "jewel-toned translucent glass pieces in rich reds blues and golds, "
+            "light shining through colored glass, "
+            "same face same identity same skin tone"
+        ),
+        "prompt_2": (
+            "medieval cathedral stained glass window, "
+            "ornate Gothic stone arch frame around the window, "
+            "brilliant sunlight streaming through colored glass, "
+            "intricate geometric and floral border patterns, "
+            "Notre-Dame cathedral quality, sacred art masterpiece"
+        ),
+        "negative": (
+            _NEG_IDENTITY + ", photorealistic, photograph, "
+            "3d render, painting, soft edges, no lead lines"
+        ),
+        "negative_2": (
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "modern, dark, muted colors"
         ),
         "use_ip_adapter": True,
         "ip_adapter_scale": 0.45,
@@ -602,45 +564,44 @@ STYLES = {
                         "controlnet_scale": 0.38},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
-    # ── LEGO ─────────────────────────────────────────────────────────
-    "lego": {
-        "label": "Lego",
+    # ── DISNEY RENAISSANCE (2D) ──────────────────────────────────────
+    "disney": {
+        "label": "Disney 2D",
         "prompt": (
-            "same person as a Lego minifigure with yellow plastic skin, "
-            "classic Lego head with printed face, C-shaped claw hands, "
-            "plastic snap-on hair piece matching hairstyle, "
-            "short stubby Lego legs, same face same identity, "
-            "shiny ABS plastic surface with molding lines"
+            "same person drawn as a classic Disney animated character, "
+            "smooth clean ink outlines, large expressive Disney eyes, "
+            "soft rounded features, warm skin tones, "
+            "flowing animated hair with highlights, "
+            "same face same identity same skin tone same hair color"
         ),
         "prompt_2": (
-            "Lego toy photography scene, "
-            "colorful Lego brick cityscape built from plastic bricks, "
-            "bright studio lighting with soft shadows on baseplate, "
-            "Lego instruction manual style, toy product photography, "
-            "sharp focus on minifigure, vibrant primary colors, masterpiece"
+            "classic Disney Renaissance 2D animated movie scene, "
+            "magical kingdom castle in golden sunset background, "
+            "warm glowing light, enchanted sparkles in the air, "
+            "The Lion King and Aladdin hand-drawn animation quality, "
+            "beautiful 2D cel animation, Disney masterpiece"
         ),
         "negative": (
-            _NEG_IDENTITY + ", photorealistic, real person, human skin, "
-            "realistic proportions, soft texture, cloth, fabric"
+            _NEG_IDENTITY + ", photorealistic, real person, photograph, "
+            "3d render, CGI, Pixar, modern 3D animation"
         ),
         "negative_2": (
-            _NEG_QUALITY + ", office, plain background, nature, "
-            "realistic, dark, muted"
+            _NEG_QUALITY + ", office, plain background, white wall, "
+            "dark, gritty, realistic"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.4,
-        "controlnet": {"strength": 0.85, "guidance": 13.0, "steps": 35,
-                        "controlnet_scale": 0.32},
-        "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.45,
+        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.38},
+        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
 }
 
 STYLE_ORDER = [
-    "avatar", "anime_op", "anime_db", "ghibli", "pixar",
-    "simpsons", "gta", "minecraft", "timburton", "ukiyoe", "lego",
-    "cyberpunk", "claymation",
-    "oilpainting", "comicbook", "pixelart",
-    "watercolor", "zombie", "popart",
+    "avatar", "anime_op", "anime_db", "pixar", "disney",
+    "simpsons", "southpark", "gta", "minecraft", "borderlands",
+    "timburton", "cyberpunk", "claymation",
+    "oilpainting", "monet", "comicbook", "stainedglass",
 ]
 
 
