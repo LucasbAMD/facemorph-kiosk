@@ -464,27 +464,28 @@ STYLES = {
         "prompt": (
             "same person lit by vivid neon lights, "
             "glowing neon light outlines tracing face and body contours, "
-            "electric blue and hot pink neon reflections on skin, "
+            "electric blue and green neon reflections on skin, "
             "same face same identity same gender same skin tone, "
             "same hairstyle with neon color highlights, "
             "dark shadows with vibrant neon rim lighting"
         ),
         "prompt_2": (
             "dramatic neon portrait in dark environment, "
-            "vibrant electric blue pink and purple neon tube signs, "
+            "vibrant electric blue cyan and green neon tube signs, "
             "neon light painting streaks, colorful lens flares, "
             "glowing particles floating in air, "
             "ultraviolet blacklight atmosphere, stunning, masterpiece"
         ),
         "negative": (
             _NEG_IDENTITY + ", natural lighting, daytime, bright ambient, "
-            "different ethnicity, different race"
+            "different ethnicity, different race, "
+            "feminine features, lipstick, makeup, woman, female"
         ),
         "negative_2": _NEG_QUALITY + ", office, plain background, white wall, washed out",
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.6,
-        "controlnet": {"strength": 0.78, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.45},
+        "ip_adapter_scale": 0.65,
+        "controlnet": {"strength": 0.75, "guidance": 12.0, "steps": 35,
+                        "controlnet_scale": 0.50},
         "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
     },
     # ── LABUBU ───────────────────────────────────────────────────────
