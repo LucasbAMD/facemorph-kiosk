@@ -446,99 +446,6 @@ STYLES = {
                         "controlnet_scale": 0.30},
         "turbo":      {"strength": 0.90, "guidance": 0.0, "steps": 7},
     },
-    # ── MONET / IMPRESSIONIST ────────────────────────────────────────
-    "monet": {
-        "label": "Monet",
-        "prompt": (
-            "same person painted in Claude Monet impressionist style, "
-            "visible loose dappled brushstrokes, soft blended colors, "
-            "warm natural light on face, slightly dreamy soft focus, "
-            "oil paint on canvas texture, "
-            "same face same identity same skin tone"
-        ),
-        "prompt_2": (
-            "Claude Monet impressionist oil painting, "
-            "beautiful garden with water lilies and Japanese bridge, "
-            "dappled sunlight through willow trees, flower fields, "
-            "soft pastel sky with gentle clouds, "
-            "Musee d'Orsay gallery quality, impressionist masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", photorealistic, photograph, digital art, "
-            "sharp edges, flat colors, cartoon"
-        ),
-        "negative_2": (
-            _NEG_QUALITY + ", office, plain background, white wall, "
-            "modern, urban, dark"
-        ),
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
-    },
-    # ── BORDERLANDS ──────────────────────────────────────────────────
-    "borderlands": {
-        "label": "Borderlands",
-        "prompt": (
-            "same person drawn in Borderlands video game cel-shaded style, "
-            "heavy black ink outlines on all edges, cross-hatching shading, "
-            "gritty comic book ink texture, bold saturated colors, "
-            "slightly rugged exaggerated features, "
-            "same face same identity same skin tone"
-        ),
-        "prompt_2": (
-            "Borderlands video game screenshot, "
-            "post-apocalyptic desert wasteland with rusty metal structures, "
-            "cel-shaded 3D rendering with heavy ink outlines on everything, "
-            "Pandora planet landscape, Gearbox Software art style, "
-            "vibrant comic book coloring, masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", photorealistic, photograph, smooth shading, "
-            "soft, realistic lighting, no outlines"
-        ),
-        "negative_2": (
-            _NEG_QUALITY + ", office, plain background, white wall, "
-            "clean, polished, modern city"
-        ),
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
-    # ── STAINED GLASS ────────────────────────────────────────────────
-    "stainedglass": {
-        "label": "Stained Glass",
-        "prompt": (
-            "same person depicted as a stained glass window portrait, "
-            "bold black lead lines separating colorful glass segments, "
-            "jewel-toned translucent glass pieces in rich reds blues and golds, "
-            "light shining through colored glass, "
-            "same face same identity same skin tone"
-        ),
-        "prompt_2": (
-            "medieval cathedral stained glass window, "
-            "ornate Gothic stone arch frame around the window, "
-            "brilliant sunlight streaming through colored glass, "
-            "intricate geometric and floral border patterns, "
-            "Notre-Dame cathedral quality, sacred art masterpiece"
-        ),
-        "negative": (
-            _NEG_IDENTITY + ", photorealistic, photograph, "
-            "3d render, painting, soft edges, no lead lines"
-        ),
-        "negative_2": (
-            _NEG_QUALITY + ", office, plain background, white wall, "
-            "modern, dark, muted colors"
-        ),
-        "use_ip_adapter": True,
-        "ip_adapter_scale": 0.45,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.38},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
-    },
     # ── DISNEY RENAISSANCE (2D) ──────────────────────────────────────
     "disney": {
         "label": "Disney 2D",
@@ -574,9 +481,9 @@ STYLES = {
 
 STYLE_ORDER = [
     "avatar", "anime_op", "anime_db", "pixar", "disney",
-    "simpsons", "southpark", "gta", "minecraft", "borderlands",
+    "simpsons", "southpark", "gta", "minecraft",
     "timburton", "cyberpunk", "claymation",
-    "monet", "comicbook", "stainedglass",
+    "comicbook",
 ]
 
 
