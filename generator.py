@@ -403,11 +403,12 @@ STYLES = {
     "gta": {
         "label": "GTA",
         "prompt": (
-            "same person drawn in Grand Theft Auto game loading screen art style, "
+            "same male person drawn in Grand Theft Auto game loading screen art style, "
             "bold stylized illustration with heavy ink outlines, "
             "saturated colors, slightly exaggerated features, "
-            "confident attitude pose, same face same identity same skin tone, "
-            "same hairstyle, GTA V character portrait"
+            "same face same identity same skin tone same gender same ethnicity, "
+            "same hairstyle, light skin caucasian man, keep original appearance exactly, "
+            "GTA V character portrait"
         ),
         "prompt_2": (
             "Grand Theft Auto V loading screen illustration, "
@@ -418,17 +419,20 @@ STYLES = {
         ),
         "negative": (
             _NEG_IDENTITY + ", photorealistic, photograph, "
-            "anime, cartoon, 3d render, soft"
+            "anime, cartoon, 3d render, soft, "
+            "dark skin, black skin, brown skin, dark face, dark complexion, "
+            "african, black person, dark-skinned, "
+            "woman, female, feminine, changed gender, changed race, changed skin"
         ),
         "negative_2": (
             _NEG_QUALITY + ", office, plain background, white wall, "
             "dark, muted colors, desaturated"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.5,
-        "controlnet": {"strength": 0.80, "guidance": 12.0, "steps": 35,
-                        "controlnet_scale": 0.40},
-        "turbo":      {"strength": 0.88, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.75,
+        "controlnet": {"strength": 0.68, "guidance": 9.0, "steps": 35,
+                        "controlnet_scale": 0.55},
+        "turbo":      {"strength": 0.78, "guidance": 0.0, "steps": 7},
     },
     # ── MINECRAFT ────────────────────────────────────────────────────
     "minecraft": {
