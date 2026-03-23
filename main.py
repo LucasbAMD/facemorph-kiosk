@@ -96,7 +96,7 @@ def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
 
 def _apply_watermark(img: np.ndarray) -> np.ndarray:
     """Render a polaroid-style bottom banner with centered label."""
-    label = "Customer Engagement Program"
+    label = "AMD Customer Engagement Program"
     h, w = img.shape[:2]
 
     font_size = max(12, int(w / 45))
