@@ -109,8 +109,8 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
     x = margin
     y = h - margin - th
 
-    # ~35% opacity white text
-    draw.text((x, y), label, font=font, fill=(255, 255, 255, 90))
+    # 80% opacity black text
+    draw.text((x, y), label, font=font, fill=(0, 0, 0, 204))
 
     result = Image.alpha_composite(pil_img, overlay)
     return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
