@@ -1,166 +1,243 @@
 #!/usr/bin/env python3
 """
-setup_models.py — Download all model weights for the AI Avatar Kiosk.
+setup_models.py — Download all model weights for the AI Scene Style Kiosk.
 Run this once before starting the kiosk for the first time.
 
 Downloads:
-  1. IP-Adapter FaceID SDXL — face identity preservation (uses face recognition embeddings)
-  2. IP-Adapter FaceID LoRA — improves generation quality with FaceID
-  3. insightface antelopev2 — face detection + embedding extraction (auto-downloaded)
+  1. SDXL Base 1.0 — high-quality diffusion model
+  2. ControlNet Depth SDXL — preserves scene structure during style transfer
+  3. DPT depth estimator — extracts depth maps from camera frames
 
 Usage:
     python setup_models.py
 """
 import os
 import sys
-import urllib.request
 from pathlib import Path
 
 MODELS_DIR = Path.home() / "kiosk_models"
 
-# ── IP-Adapter FaceID SDXL ────────────────────────────────────────────────────
-# From https://huggingface.co/h94/IP-Adapter-FaceID
-# These use actual face recognition embeddings (512-dim from insightface)
-# instead of generic CLIP features, giving much stronger identity preservation.
-FACEID_DIR = MODELS_DIR / "ip_adapter_faceid"
-FACEID_FILES = {
-    "ip-adapter-faceid_sdxl.bin": (
-        "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/"
-        "ip-adapter-faceid_sdxl.bin"
-    ),
-    "ip-adapter-faceid_sdxl_lora.safetensors": (
-        "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/"
-        "ip-adapter-faceid_sdxl_lora.safetensors"
-    ),
-}
 
-# ── Regular IP-Adapter SDXL (fallback) ────────────────────────────────────────
-# From https://huggingface.co/h94/IP-Adapter
-IP_ADAPTER_DIR = MODELS_DIR / "ip_adapter"
-IP_ADAPTER_FILES = {
-    "sdxl_models/ip-adapter_sdxl.bin": (
-        "https://huggingface.co/h94/IP-Adapter/resolve/main/"
-        "sdxl_models/ip-adapter_sdxl.safetensors"
-    ),
-    "models/image_encoder/config.json": (
-        "https://huggingface.co/h94/IP-Adapter/resolve/main/"
-        "models/image_encoder/config.json"
-    ),
-    "models/image_encoder/model.safetensors": (
-        "https://huggingface.co/h94/IP-Adapter/resolve/main/"
-        "models/image_encoder/model.safetensors"
-    ),
-}
-
-
-def download(url, dest):
-    dest = Path(dest)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        size_mb = dest.stat().st_size // (1024 * 1024)
-        print(f"  [OK] Already exists: {dest.name} ({size_mb}MB)")
-        return True
-    print(f"  [..] Downloading {dest.name}...")
+def check_package(name):
     try:
-        def progress(block, block_size, total):
-            if total > 0:
-                done = min(block * block_size, total)
-                pct = int(done * 100 / total)
-                mb = done // (1024 * 1024)
-                total_mb = total // (1024 * 1024)
-                print(f"\r       {pct}%  ({mb}/{total_mb} MB)", end="", flush=True)
-        urllib.request.urlretrieve(url, dest, reporthook=progress)
-        print()
-        size_mb = dest.stat().st_size // (1024 * 1024)
-        print(f"  [OK] {dest.name} ({size_mb}MB)")
+        __import__(name)
         return True
-    except Exception as e:
-        print(f"\n  [ERR] Failed: {e}")
-        if dest.exists():
-            dest.unlink()
+    except ImportError:
         return False
 
 
 def main():
     print("\n" + "=" * 55)
-    print("  AI Avatar Kiosk — Model Setup")
+    print("  AI Scene Style Kiosk — Model Setup")
     print("=" * 55)
 
-    # ── Check SDXL model ──────────────────────────────────────────────────
-    print("\n[1/4] Checking SDXL model...")
-    sdxl_path = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
-                 "sd_xl_turbo_1.0_fp16.safetensors")
-    if sdxl_path.exists():
-        print(f"  [OK] SDXL found at {sdxl_path}")
-    else:
-        print(f"  [ERR] SDXL not found at {sdxl_path}")
-        print("        Download it first, then re-run this script.")
-        sys.exit(1)
-
-    # ── Download IP-Adapter FaceID (primary) ──────────────────────────────
-    print("\n[2/4] Downloading IP-Adapter FaceID SDXL...")
-    print("       (This gives strong face identity preservation)")
-    faceid_ok = True
-    for filename, url in FACEID_FILES.items():
-        if not download(url, FACEID_DIR / filename):
-            faceid_ok = False
-
-    # ── Download regular IP-Adapter (fallback) ────────────────────────────
-    print("\n[3/4] Downloading regular IP-Adapter SDXL (fallback)...")
-    for filename, url in IP_ADAPTER_FILES.items():
-        download(url, IP_ADAPTER_DIR / filename)
-
-    # ── Initialize insightface (downloads antelopev2 model) ───────────────
-    print("\n[4/4] Setting up insightface face analysis...")
-    try:
-        from insightface.app import FaceAnalysis
-        print("  [..] Downloading antelopev2 model (first time only)...")
-        app = FaceAnalysis(
-            name="antelopev2",
-            providers=["CPUExecutionProvider"],
-        )
-        app.prepare(ctx_id=0, det_size=(640, 640))
-        print("  [OK] insightface ready")
-    except ImportError:
-        print("  [ERR] insightface not installed!")
-        print("        Run: pip install insightface onnxruntime")
-    except Exception as e:
-        print(f"  [WARN] insightface setup issue: {e}")
-        print("         Face detection will fall back to OpenCV Haar cascades")
-
-    # ── Check Python packages ─────────────────────────────────────────────
-    print("\n[..] Checking Python packages...")
-    pkgs = {
-        "torch": "torch",
-        "diffusers": "diffusers",
-        "transformers": "transformers",
-        "accelerate": "accelerate",
+    # ── Check required packages ────────────────────────────────────────────
+    print("\n[1/8] Checking Python packages...")
+    required = {
+        "torch": "torch (with ROCm)",
+        "diffusers": "diffusers>=0.27.0",
+        "transformers": "transformers>=4.36.0",
+        "accelerate": "accelerate>=0.25.0",
         "cv2": "opencv-python",
-        "insightface": "insightface",
     }
     missing = []
-    for mod, pip_name in pkgs.items():
-        try:
-            __import__(mod)
-            print(f"  [OK] {mod}")
-        except ImportError:
-            print(f"  [--] {mod} (not installed)")
-            missing.append(pip_name)
+    for mod, desc in required.items():
+        if check_package(mod):
+            print(f"  [OK] {desc}")
+        else:
+            print(f"  [--] {desc} NOT INSTALLED")
+            missing.append(mod)
 
-    if missing:
-        print(f"\n  Missing packages: {', '.join(missing)}")
-        print(f"  Run: pip install {' '.join(missing)}")
+    if "torch" in missing or "diffusers" in missing:
+        print("\n  [ERR] Core packages missing. Install them first:")
+        print("        pip install -r requirements.txt")
+        sys.exit(1)
+
+    import torch
+    print(f"\n  PyTorch: {torch.__version__}")
+    print(f"  CUDA/ROCm available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"  GPU: {torch.cuda.get_device_name(0)}")
+        vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        print(f"  VRAM: {vram:.1f} GB")
+
+    # ── Check/download SDXL Turbo (existing) ──────────────────────────────
+    print("\n[2/8] Checking SDXL Turbo model...")
+    sdxl_turbo = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
+                  "sd_xl_turbo_1.0_fp16.safetensors")
+    if sdxl_turbo.exists():
+        size_mb = sdxl_turbo.stat().st_size // (1024 * 1024)
+        print(f"  [OK] SDXL Turbo found ({size_mb} MB)")
+    else:
+        print(f"  [WARN] SDXL Turbo not found at {sdxl_turbo}")
+        print("         Turbo fallback mode will not be available.")
+
+    # ── Download ControlNet Depth SDXL ────────────────────────────────────
+    print("\n[3/8] Downloading ControlNet Depth for SDXL...")
+    print("       (This preserves your pose and scene structure)")
+    print("       Model: diffusers/controlnet-depth-sdxl-1.0")
+    try:
+        from diffusers import ControlNetModel
+        controlnet_id = "diffusers/controlnet-depth-sdxl-1.0"
+        print(f"  [..] Downloading {controlnet_id}...")
+        ControlNetModel.from_pretrained(
+            controlnet_id,
+            torch_dtype=torch.float16,
+            variant="fp16",
+        )
+        print(f"  [OK] ControlNet Depth SDXL cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download ControlNet: {e}")
+        print("         Will fall back to Turbo-only mode.")
+
+    # ── Download Depth-Anything-V2 depth estimator ─────────────────────────
+    print("\n[4/8] Downloading depth estimator (Depth-Anything-V2)...")
+    print("       Model: depth-anything/Depth-Anything-V2-Small-hf")
+    try:
+        from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+        depth_id = "depth-anything/Depth-Anything-V2-Small-hf"
+        print(f"  [..] Downloading {depth_id}...")
+        AutoImageProcessor.from_pretrained(depth_id)
+        AutoModelForDepthEstimation.from_pretrained(depth_id)
+        print(f"  [OK] Depth-Anything-V2 cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download depth estimator: {e}")
+        print("         Will fall back to Turbo-only mode.")
+
+    # ── Download IP-Adapter FaceID for SDXL ─────────────────────────────
+    # ── Download Real-ESRGAN 2x upscaler ─────────────────────────────
+    print("\n[5/8] Downloading Real-ESRGAN 2x upscaler...")
+    print("       (Upscales output from 1024 to 2048 for sharper results)")
+    models_dir = Path.home() / "kiosk_models"
+    models_dir.mkdir(exist_ok=True)
+    esrgan_path = models_dir / "RealESRGAN_x2plus.pth"
+    if esrgan_path.exists():
+        size_mb = esrgan_path.stat().st_size // (1024 * 1024)
+        print(f"  [OK] RealESRGAN_x2plus.pth already exists ({size_mb} MB)")
+    else:
+        try:
+            import urllib.request
+            url = ("https://github.com/xinntao/Real-ESRGAN/releases/download/"
+                   "v0.2.1/RealESRGAN_x2plus.pth")
+            print(f"  [..] Downloading from GitHub releases...")
+            urllib.request.urlretrieve(url, str(esrgan_path))
+            size_mb = esrgan_path.stat().st_size // (1024 * 1024)
+            print(f"  [OK] RealESRGAN_x2plus.pth downloaded ({size_mb} MB)")
+        except Exception as e:
+            print(f"  [WARN] Could not download Real-ESRGAN: {e}")
+            print("         Output will not be upscaled (still works, just lower res).")
+
+    print("\n[6/10] Downloading IP-Adapter FaceID for SDXL...")
+    print("       (Preserves face identity + visual appearance during styles)")
+    print("       Model: h94/IP-Adapter-FaceID")
+    try:
+        from huggingface_hub import hf_hub_download
+        # Plus v2 (best quality — uses face + CLIP visual features)
+        print("  [..] Downloading ip-adapter-faceid-plusv2_sdxl.bin...")
+        hf_hub_download(
+            repo_id="h94/IP-Adapter-FaceID",
+            filename="ip-adapter-faceid-plusv2_sdxl.bin",
+        )
+        print("  [OK] IP-Adapter FaceID Plus v2 SDXL cached")
+        # Also download basic FaceID as fallback
+        print("  [..] Downloading ip-adapter-faceid_sdxl.bin (fallback)...")
+        hf_hub_download(
+            repo_id="h94/IP-Adapter-FaceID",
+            filename="ip-adapter-faceid_sdxl.bin",
+        )
+        print("  [OK] IP-Adapter FaceID basic SDXL cached (fallback)")
+    except Exception as e:
+        print(f"  [WARN] Could not download IP-Adapter FaceID: {e}")
+        print("         Avatar style will work without face ID preservation.")
+
+    # ── Download CLIP Vision encoder for FaceID Plus v2 ────────────────
+    print("\n[7/10] Downloading CLIP Vision encoder for FaceID Plus v2...")
+    print("       (Provides visual appearance features for better identity)")
+    print("       Model: laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
+    try:
+        from transformers import CLIPVisionModelWithProjection, CLIPImageProcessor
+        clip_id = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+        print(f"  [..] Downloading {clip_id}...")
+        CLIPImageProcessor.from_pretrained(clip_id)
+        CLIPVisionModelWithProjection.from_pretrained(clip_id, torch_dtype=torch.float16)
+        print("  [OK] CLIP Vision encoder cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download CLIP Vision encoder: {e}")
+        print("         FaceID will fall back to basic mode.")
+
+    # ── Download SDXL VAE fp16 fix ─────────────────────────────────────
+    print("\n[8/10] Downloading SDXL VAE fp16 fix...")
+    print("       (More vivid colors, prevents fp16 NaN artifacts)")
+    print("       Model: madebyollin/sdxl-vae-fp16-fix")
+    try:
+        from diffusers import AutoencoderKL
+        print("  [..] Downloading madebyollin/sdxl-vae-fp16-fix...")
+        AutoencoderKL.from_pretrained(
+            "madebyollin/sdxl-vae-fp16-fix",
+            torch_dtype=torch.float16,
+        )
+        print("  [OK] SDXL VAE fp16 fix cached")
+    except Exception as e:
+        print(f"  [WARN] Could not download VAE fp16 fix: {e}")
+        print("         Will use default VAE (still works fine).")
+
+    # ── Download InsightFace buffalo_l model ───────────────────────────
+    print("\n[9/10] Checking InsightFace face analysis model...")
+    try:
+        from insightface.app import FaceAnalysis
+        print("  [..] Downloading buffalo_l model (if needed)...")
+        app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+        app.prepare(ctx_id=-1, det_size=(160, 160))
+        print("  [OK] InsightFace buffalo_l cached")
+    except ImportError:
+        print("  [WARN] InsightFace not installed.")
+        print("         Install with: pip install insightface onnxruntime-gpu")
+    except Exception as e:
+        print(f"  [WARN] Could not download InsightFace model: {e}")
+
+    # ── Download Juggernaut XL v9 base model ─────────────────────────────
+    print("\n[10/10] Pre-caching Juggernaut XL v9 pipeline components...")
+    print("        (Much higher quality than vanilla SDXL Base)")
+    print("        This may take a while on first run (~6.5 GB).")
+    try:
+        from diffusers import StableDiffusionXLControlNetImg2ImgPipeline
+        base_id = "RunDiffusion/Juggernaut-XL-v9"
+        print(f"  [..] Downloading {base_id}...")
+        try:
+            StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                base_id,
+                torch_dtype=torch.float16,
+                variant="fp16",
+                controlnet=ControlNetModel.from_pretrained(
+                    "diffusers/controlnet-depth-sdxl-1.0",
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                ),
+            )
+        except OSError:
+            StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+                base_id,
+                torch_dtype=torch.float16,
+                controlnet=ControlNetModel.from_pretrained(
+                    "diffusers/controlnet-depth-sdxl-1.0",
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                ),
+            )
+        print("  [OK] Juggernaut XL v9 + ControlNet pipeline cached")
+    except Exception as e:
+        print(f"  [WARN] Could not pre-cache full pipeline: {e}")
+        print("         It will download on first start instead.")
 
     # ── Summary ───────────────────────────────────────────────────────────
     print("\n" + "=" * 55)
-    if faceid_ok:
-        print("  Setup complete!")
-        print("  FaceID mode: ENABLED (avatars will look like you)")
-    else:
-        print("  Setup partially complete.")
-        print("  FaceID: FAILED (avatars may not preserve identity)")
-        print("  Regular IP-Adapter may still work as fallback.")
-    print("\n  Start the kiosk: python start.py")
+    print("  Setup complete!")
+    print()
+    print("  Modes available:")
+    print("    - ControlNet + Juggernaut XL v9: Best quality (~25-40s)")
+    print("    - SDXL Turbo fallback:           Fast (~5s)")
+    print()
+    print("  Start the kiosk: python start.py")
     print("=" * 55 + "\n")
 
 

@@ -3,49 +3,137 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AMD-Adapt</title>
+<title>AMD Adapt - ROCm AI Photo Booth</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap');
+
   :root {
-    --bg:     #0a0a0a;
-    --card:   #141414;
-    --border: #222;
-    --text:   #f0f0f0;
-    --dim:    #666;
-    --accent: #00d4ff;
-    --red:    #ED1C24;
-    --green:  #22dd44;
-    --gold:   #ffcc00;
+    --bg:      #050508;
+    --card:    #0d0d12;
+    --card-hi: #14141c;
+    --border:  #1a1a25;
+    --text:    #eaeaef;
+    --dim:     #555568;
+    --accent:  #00d4ff;
+    --red:     #ED1C24;
+    --green:   #22dd44;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%; background: var(--bg); color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
     overflow: hidden; user-select: none;
   }
   body { display: flex; flex-direction: column; }
 
   /* ── Header ── */
   header {
-    height: 52px; min-height: 52px; display: flex;
+    height: 60px; min-height: 60px; display: flex;
     align-items: center; justify-content: space-between;
-    padding: 0 24px; background: #111;
-    border-bottom: 2px solid var(--red); flex-shrink: 0;
+    padding: 0 28px;
+    background: linear-gradient(180deg, #0f0f14 0%, #0a0a0f 100%);
+    border-bottom: 1px solid #1a1a25;
+    flex-shrink: 0; position: relative; z-index: 5;
   }
-  .logo { display: flex; align-items: center; gap: 12px; }
+  header::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--red) 0%, var(--red) 30%, transparent 100%);
+  }
+  .logo { display: flex; align-items: center; gap: 16px; }
   .logo-badge {
     background: var(--red); color: #fff; font-weight: 900;
-    font-size: 1rem; padding: 3px 10px; letter-spacing: 2px;
+    font-size: 1.1rem; padding: 5px 14px; letter-spacing: 2px;
+    clip-path: polygon(0 0, 100% 0, 95% 100%, 0 100%);
   }
   .logo-text {
-    font-size: 1rem; font-weight: 300;
-    letter-spacing: 4px; color: #bbb;
+    font-size: 1.0rem; font-weight: 400;
+    letter-spacing: 6px; color: #ccc; text-transform: uppercase;
   }
+  .logo-sep {
+    width: 1px; height: 24px; background: #444; margin: 0 4px;
+  }
+  .logo-tagline {
+    font-size: 0.75rem; font-weight: 400;
+    letter-spacing: 2px; color: #999;
+  }
+  .header-right { display: flex; align-items: center; gap: 12px; }
   #ai-badge {
-    font-size: 0.72rem; padding: 4px 12px; border-radius: 20px;
-    background: #1a1a1a; border: 1px solid #444; color: #555;
-    transition: all 0.3s;
+    font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid #333;
+    color: #444; letter-spacing: 1.5px; font-weight: 600;
+    transition: all 0.5s ease;
   }
-  #ai-badge.online { border-color: var(--green); color: var(--green); }
+  #ai-badge.online {
+    border-color: var(--green); color: var(--green);
+    box-shadow: 0 0 12px rgba(34,221,68,0.15);
+  }
+  #run-counter {
+    font-size: 0.65rem; padding: 5px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.03); border: 1px solid #333;
+    color: #888; letter-spacing: 1.5px; font-weight: 600;
+    white-space: nowrap;
+  }
+  #run-counter span { color: var(--accent); font-weight: 700; }
+  #about-btn {
+    font-size: 0.65rem; padding: 6px 16px; border-radius: 20px;
+    background: rgba(0,212,255,0.08); border: 1px solid var(--accent);
+    color: var(--accent); letter-spacing: 1.5px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 0 10px rgba(0,212,255,0.15);
+  }
+  #about-btn:hover {
+    background: rgba(0,212,255,0.15); color: #fff;
+    box-shadow: 0 0 18px rgba(0,212,255,0.3);
+  }
+
+  /* ── About modal ── */
+  #about-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(5,5,8,0.92); backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center;
+  }
+  #about-overlay.on { display: flex; }
+  #about-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 680px; width: 90%;
+    max-height: 85vh; overflow-y: auto; padding: 36px 40px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  #about-box h2 {
+    font-size: 0.7rem; letter-spacing: 4px; color: var(--accent);
+    text-transform: uppercase; font-weight: 700; margin-bottom: 20px;
+  }
+  #about-box h3 {
+    font-size: 0.8rem; font-weight: 700; color: var(--text);
+    margin: 20px 0 8px; letter-spacing: 0.5px;
+  }
+  #about-box p, #about-box li {
+    font-size: 0.75rem; color: #999; line-height: 1.7;
+    font-weight: 300;
+  }
+  #about-box ol { padding-left: 20px; }
+  #about-box li { margin-bottom: 8px; }
+  #about-box .step-num {
+    color: var(--accent); font-weight: 700;
+  }
+  #about-box .tech {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    background: rgba(0,212,255,0.08); color: var(--accent);
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.5px;
+  }
+  #about-box .about-footer {
+    margin-top: 24px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 0.65rem; color: #444; letter-spacing: 0.5px;
+  }
+  #about-close {
+    float: right; background: rgba(255,255,255,0.06); border: none;
+    color: #888; padding: 8px 20px; border-radius: 8px;
+    font-size: 0.75rem; cursor: pointer; font-weight: 600;
+    letter-spacing: 1px;
+  }
+  #about-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
   /* ── Layout ── */
   #main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
@@ -53,244 +141,310 @@
   /* ── Camera panel ── */
   #cam-panel {
     flex: 1; position: relative; background: #000;
-    overflow: hidden; cursor: default; min-width: 0;
+    overflow: hidden; min-width: 0;
+  }
+  #cam-panel::before {
+    content: ''; position: absolute; inset: 0; z-index: 1;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.03);
   }
   #feed {
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: contain; display: block;
   }
 
-  /* Overlays */
+  /* ── Overlays ── */
   .overlay {
     position: absolute; inset: 0; display: none;
     flex-direction: column; align-items: center;
-    justify-content: center; gap: 16px; z-index: 10;
+    justify-content: center; gap: 18px; z-index: 10;
   }
   .overlay.on { display: flex; }
-  #gen-overlay { background: rgba(0,0,0,0.82); }
-  #result-overlay { background: rgba(0,0,0,0.94); }
+  #gen-overlay {
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.92) 100%);
+    backdrop-filter: blur(8px);
+  }
+  #result-overlay {
+    background: rgba(5,5,8,0.96);
+    backdrop-filter: blur(4px);
+  }
 
   .spinner {
-    width: 48px; height: 48px;
-    border: 4px solid #333; border-top-color: var(--accent);
-    border-radius: 50%; animation: spin 0.8s linear infinite;
+    width: 52px; height: 52px;
+    border: 3px solid rgba(255,255,255,0.06);
+    border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  #gen-msg { color: var(--accent); font-size: 0.95rem; letter-spacing: 1px; }
+  #gen-msg {
+    color: var(--accent); font-size: 1rem;
+    letter-spacing: 1.5px; font-weight: 600;
+  }
   .progress-wrap {
-    width: 300px; max-width: 80%; background: #222;
-    border-radius: 8px; height: 6px; overflow: hidden;
+    width: 320px; max-width: 80%; background: rgba(255,255,255,0.05);
+    border-radius: 10px; height: 5px; overflow: hidden;
   }
   #progress-bar {
-    height: 100%; width: 0%; background: var(--accent);
-    border-radius: 8px; transition: width 0.4s ease;
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), #0088ff);
+    border-radius: 10px; transition: width 0.5s ease;
   }
-  #progress-label { font-size: 0.68rem; color: #555; letter-spacing: 1px; }
-  #elapsed { font-size: 0.6rem; color: #333; }
+  #progress-label {
+    font-size: 0.65rem; color: var(--dim);
+    letter-spacing: 1.5px; font-weight: 400;
+  }
+  #elapsed { font-size: 0.6rem; color: #333; font-weight: 300; }
 
-  /* Result */
-  #result-img { max-height: 76vh; max-width: 92%; border-radius: 8px; }
-  .result-btns { display: flex; gap: 10px; }
+  /* ── Result ── */
+  #result-img {
+    max-height: 74vh; max-width: 90%;
+    border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .result-btns { display: flex; gap: 12px; margin-top: 4px; }
   .result-btns button {
-    padding: 12px 28px; border: none; border-radius: 6px;
-    font-size: 0.9rem; font-weight: 700; letter-spacing: 1px;
-    cursor: pointer;
+    padding: 14px 32px; border: none; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.15s; text-transform: uppercase;
   }
-  #save-btn { background: var(--green); color: #000; }
-  #close-btn { background: var(--red); color: #fff; }
-
-  /* Selection badges */
-  #sel-badge {
-    position: absolute; top: 12px; left: 12px;
-    background: var(--accent); color: #000;
-    font-weight: 700; font-size: 0.8rem;
-    padding: 5px 12px; border-radius: 20px;
-    display: none; z-index: 5;
+  #save-btn {
+    background: var(--green); color: #000;
+    box-shadow: 0 4px 20px rgba(34,221,68,0.25);
   }
-  #sel-badge.on { display: block; }
-  #clear-btn {
-    position: absolute; top: 12px; left: 12px;
-    background: transparent; color: var(--accent);
-    border: 1px solid var(--accent); font-size: 0.75rem;
-    padding: 5px 12px; border-radius: 20px;
-    cursor: pointer; display: none; z-index: 5;
-  }
-  #clear-btn.on { display: block; }
-
-  /* Known face tags */
-  #known-tags {
-    position: absolute; bottom: 12px; left: 12px;
-    display: flex; flex-wrap: wrap; gap: 5px;
-    max-width: 55%; z-index: 5;
-  }
-  .known-tag {
-    background: rgba(0,0,0,0.75); border: 1px solid var(--gold);
-    color: var(--gold); border-radius: 20px; font-size: 0.7rem;
-    padding: 3px 10px;
-  }
+  #save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(34,221,68,0.35); }
+  #close-btn { background: rgba(255,255,255,0.08); color: #aaa; }
+  #close-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
   /* ── Sidebar ── */
   #sidebar {
-    width: 280px; min-width: 280px; background: var(--card);
+    width: 300px; min-width: 300px;
+    background: linear-gradient(180deg, var(--card) 0%, #080810 100%);
     border-left: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden;
   }
-  .sec-title {
-    font-size: 0.6rem; letter-spacing: 3px; color: var(--dim);
-    text-transform: uppercase; padding: 14px 16px 10px;
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
-  }
 
-  /* Known hosts */
-  #hosts-section {
-    padding: 12px 14px 10px;
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  /* ── Sidebar header ── */
+  .sidebar-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
   }
-  #hosts-section .sec-title { padding: 0 0 8px; border-bottom: none; }
-  #hosts-list {
-    display: flex; flex-direction: column; gap: 5px;
-    max-height: 120px; overflow-y: auto;
+  .sidebar-header h2 {
+    font-size: 0.65rem; letter-spacing: 4px; color: var(--dim);
+    text-transform: uppercase; font-weight: 600; margin-bottom: 4px;
   }
-  .host-row {
-    display: flex; align-items: center; justify-content: space-between;
-    background: #1a1a1a; border-radius: 6px; padding: 7px 10px;
-    border: 1px solid #252525;
+  .sidebar-header p {
+    font-size: 0.7rem; color: #444; font-weight: 300;
   }
-  .host-row.here { border-color: var(--gold); background: rgba(255,204,0,0.04); }
-  .host-info { display: flex; align-items: center; gap: 8px; }
-  .host-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #0066aa);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem; font-weight: 700; color: #000; flex-shrink: 0;
-  }
-  .host-name { font-size: 0.8rem; font-weight: 600; }
-  .host-row.here .host-name { color: var(--gold); }
-  .host-status { font-size: 0.6rem; color: #555; }
-  .host-row.here .host-status { color: var(--green); }
-  .host-del {
-    background: transparent; border: none; color: #444;
-    font-size: 0.7rem; cursor: pointer; padding: 3px 5px;
-  }
-  .host-del:hover { color: var(--red); }
-  #add-host-btn {
-    width: 100%; margin-top: 7px; padding: 7px;
-    background: transparent; border: 1px dashed #333;
-    color: #555; border-radius: 6px; font-size: 0.72rem;
-    cursor: pointer; letter-spacing: 1px;
-  }
-  #add-host-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ── Style grid ── */
-  .sec-title.styles { border-bottom: none; padding-bottom: 6px; }
   #style-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 6px; padding: 0 14px 14px; flex: 1; min-height: 0;
+    gap: 6px; padding: 12px 12px; flex: 1; min-height: 0;
     overflow-y: auto; align-content: start;
   }
   .style-card {
-    background: #1a1a1a; border: 2px solid #2a2a2a; border-radius: 10px;
-    padding: 10px 6px; text-align: center; cursor: pointer;
-    transition: all 0.15s;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 10px 6px 8px; text-align: center; cursor: pointer;
+    transition: all 0.2s ease; position: relative; overflow: hidden;
   }
-  .style-card:hover { border-color: #444; background: #222; }
-  .style-card.active { border-color: var(--accent); background: rgba(0,212,255,0.06); }
+  .style-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top, rgba(255,255,255,0.03) 0%, transparent 70%);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .style-card:hover {
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    transform: translateY(-1px);
+  }
+  .style-card:hover::before { opacity: 1; }
+  .style-card.active {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.05);
+    box-shadow: 0 0 20px rgba(0,212,255,0.08), inset 0 1px 0 rgba(0,212,255,0.1);
+  }
+  .style-card.active::before { opacity: 1; }
   .style-card.active .style-name { color: var(--accent); }
-  .style-emoji { font-size: 1.5rem; margin-bottom: 4px; }
-  .style-name { font-size: 0.76rem; font-weight: 700; letter-spacing: 0.5px; }
-  .style-sub { font-size: 0.55rem; color: var(--dim); margin-top: 2px; }
+
+  .style-emoji { font-size: 1.3rem; margin-bottom: 4px; position: relative; z-index: 1; }
+  .style-name {
+    font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.5px; position: relative; z-index: 1;
+    transition: color 0.2s;
+  }
+  .style-sub {
+    font-size: 0.48rem; color: var(--dim);
+    margin-top: 2px; position: relative; z-index: 1;
+    letter-spacing: 0.5px;
+  }
   .style-card.ready .style-name::after {
-    content: " \2726"; color: var(--accent); font-size: 0.6rem;
+    content: ""; display: inline-block;
+    width: 5px; height: 5px; background: var(--accent);
+    border-radius: 50%; margin-left: 6px; vertical-align: middle;
+    box-shadow: 0 0 6px var(--accent);
   }
 
-  /* ── Transform button area ── */
-  #action-section {
-    padding: 14px; border-top: 1px solid var(--border);
+  /* ── Co-brand input ── */
+  #cobrand-section {
+    padding: 12px 16px 0;
+    border-top: 1px solid var(--border);
     flex-shrink: 0; margin-top: auto;
+    background: rgba(0,0,0,0.2);
   }
-  #sel-status {
-    font-size: 0.7rem; color: var(--dim);
-    text-align: center; padding: 0 0 10px; min-height: 18px;
+  .cobrand-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
   }
-  #sel-status.has { color: var(--accent); }
-  #name-btn {
-    width: 100%; padding: 9px; margin-bottom: 8px;
-    background: transparent; color: var(--accent);
-    border: 1px solid var(--accent); border-radius: 8px;
-    font-size: 0.78rem; font-weight: 700; letter-spacing: 1px;
-    cursor: pointer; display: none; text-transform: uppercase;
+  .cobrand-header label {
+    font-size: 0.55rem; letter-spacing: 2px; color: var(--dim);
+    text-transform: uppercase; font-weight: 600;
   }
-  #name-btn:hover { background: rgba(0,212,255,0.06); }
-  /* Gender selector */
-  #gender-row {
-    display: flex; gap: 6px; margin-bottom: 10px;
+  .cobrand-toggle {
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
   }
-  #gender-row .g-btn {
-    flex: 1; padding: 8px 4px; border: 1px solid #333; border-radius: 6px;
-    background: #1a1a1a; color: #888; font-size: 0.72rem; font-weight: 700;
-    letter-spacing: 1px; cursor: pointer; text-align: center;
-    text-transform: uppercase; transition: all 0.15s;
+  .cobrand-toggle input[type="checkbox"] {
+    accent-color: var(--accent); width: 13px; height: 13px;
+    cursor: pointer;
   }
-  #gender-row .g-btn:hover { border-color: #555; color: #aaa; }
-  #gender-row .g-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+  .cobrand-toggle span {
+    font-size: 0.5rem; color: #555; letter-spacing: 0.5px;
+    text-transform: uppercase; font-weight: 500;
+  }
+  #cobrand-input {
+    width: 100%; padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem; font-weight: 500;
+    letter-spacing: 0.5px; outline: none;
+    transition: border-color 0.2s, opacity 0.2s;
+  }
+  #cobrand-input::placeholder { color: #444; font-weight: 300; }
+  #cobrand-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(0,212,255,0.1);
+  }
+  #cobrand-input:disabled { opacity: 0.3; cursor: not-allowed; }
+  #cobrand-preview {
+    font-size: 0.55rem; color: #555; margin-top: 5px;
+    letter-spacing: 0.5px; min-height: 1.2em;
+  }
+  #cobrand-preview span { color: var(--accent); font-weight: 600; }
+
+  /* ── Action section ── */
+  #action-section {
+    padding: 12px 16px 20px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.2);
+  }
 
   #transform-btn {
-    width: 100%; padding: 16px;
-    background: linear-gradient(135deg, var(--red), #cc1520);
-    color: #fff; border: none; border-radius: 10px;
-    font-size: 1rem; font-weight: 800; letter-spacing: 2px;
+    width: 100%; padding: 18px;
+    background: linear-gradient(135deg, var(--red) 0%, #b8101a 50%, var(--red) 100%);
+    background-size: 200% 100%;
+    color: #fff; border: none; border-radius: 12px;
+    font-size: 0.95rem; font-weight: 800; letter-spacing: 3px;
     cursor: pointer; text-transform: uppercase;
-    transition: opacity 0.15s;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 24px rgba(237,28,36,0.2);
+    position: relative; overflow: hidden;
   }
-  #transform-btn:hover { opacity: 0.9; }
-  #transform-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #transform-btn::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 200% 0; }
+    50% { background-position: -200% 0; }
+  }
+  #transform-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 32px rgba(237,28,36,0.35);
+  }
+  #transform-btn:active { transform: translateY(0); }
+  #transform-btn:disabled {
+    opacity: 0.25; cursor: not-allowed;
+    transform: none; box-shadow: none;
+  }
+  #transform-btn:disabled::before { animation: none; }
 
-  /* Name modal */
-  #name-modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
-    display: none; align-items: center; justify-content: center; z-index: 50;
+  #mode-label {
+    font-size: 0.55rem; color: #333; text-align: center;
+    padding: 10px 0 0; letter-spacing: 1.5px; font-weight: 300;
   }
-  #name-modal.on { display: flex; }
-  #name-dialog {
-    background: var(--card); border: 1px solid var(--accent);
-    border-radius: 12px; padding: 22px 24px; width: 300px;
-    display: flex; flex-direction: column; gap: 14px;
-    box-shadow: 0 8px 40px rgba(0,212,255,0.2);
-  }
-  #name-dialog h4 { font-size: 0.85rem; color: var(--accent); letter-spacing: 1px; }
-  #name-dialog p { font-size: 0.72rem; color: #888; line-height: 1.5; }
-  #name-input {
-    background: #1a1a1a; border: 1px solid #444; border-radius: 6px;
-    color: #fff; padding: 10px 12px; font-size: 0.95rem; outline: none; width: 100%;
-  }
-  #name-input:focus { border-color: var(--accent); }
-  .gender-row {
-    display: flex; gap: 10px; align-items: center;
-    font-size: 0.75rem; color: #888;
-  }
-  .gender-row label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-  .dialog-btns { display: flex; gap: 8px; }
-  .dialog-btns button {
-    flex: 1; padding: 10px; border: none; border-radius: 6px;
-    cursor: pointer; font-size: 0.82rem; font-weight: 700;
-  }
-  #nd-save { background: var(--accent); color: #000; }
-  #nd-cancel { background: #2a2a2a; color: #ccc; }
+  #mode-label span { color: var(--accent); font-weight: 600; }
 
-  /* Toast */
+  /* ── Countdown overlay ── */
+  #countdown-overlay {
+    position: absolute; inset: 0; z-index: 8;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  #countdown-overlay.on { display: flex; }
+  #countdown-number {
+    font-size: 12rem; font-weight: 900; color: #fff;
+    text-shadow: 0 0 60px rgba(0,212,255,0.5), 0 0 120px rgba(0,212,255,0.2);
+    animation: countPulse 1s ease-in-out infinite;
+    line-height: 1;
+  }
+  @keyframes countPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.08); opacity: 0.85; }
+  }
+  #countdown-label {
+    font-size: 0.85rem; color: var(--accent); letter-spacing: 4px;
+    font-weight: 600; text-transform: uppercase; margin-top: 8px;
+  }
+  /* Stability indicator bar */
+  #stability-bar-wrap {
+    position: absolute; bottom: 16px; left: 50%;
+    transform: translateX(-50%); z-index: 7;
+    width: 200px; height: 4px; border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden; display: none;
+  }
+  #stability-bar-wrap.on { display: block; }
+  #stability-bar {
+    height: 100%; width: 0%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), #0088ff);
+    transition: width 0.3s ease;
+  }
+  #stability-hint {
+    position: absolute; bottom: 26px; left: 50%;
+    transform: translateX(-50%); z-index: 7;
+    font-size: 0.55rem; color: var(--dim); letter-spacing: 1.5px;
+    white-space: nowrap; display: none;
+  }
+  #stability-hint.on { display: block; }
+
+  /* ── Toast ── */
   #toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    color: #fff; padding: 10px 24px; border-radius: 8px;
-    font-size: 0.82rem; display: none; z-index: 99;
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    color: #fff; padding: 12px 28px; border-radius: 10px;
+    font-size: 0.8rem; display: none; z-index: 99;
     white-space: nowrap; pointer-events: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    font-weight: 500; letter-spacing: 0.5px;
   }
-  #toast.on { display: block; }
+  #toast.on { display: block; animation: slideUp 0.3s ease; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -299,9 +453,15 @@
 <header>
   <div class="logo">
     <span class="logo-badge">AMD</span>
-    <span class="logo-text">ADAPT</span>
+    <span class="logo-text">Adapt</span>
+    <span class="logo-sep"></span>
+    <span class="logo-tagline">ROCm-Accelerated AI Photo Booth</span>
   </div>
-  <div id="ai-badge">AI ENGINE</div>
+  <div class="header-right">
+    <div id="run-counter">RUNS: <span id="run-count">0</span></div>
+    <button id="about-btn" onclick="toggleAbout()">HOW IT WORKS</button>
+    <div id="ai-badge">AI ENGINE</div>
+  </div>
 </header>
 
 <!-- Main -->
@@ -310,9 +470,14 @@
   <!-- Camera -->
   <div id="cam-panel">
     <img id="feed" src="/video_feed" alt="Live Feed">
-    <div id="sel-badge"></div>
-    <button id="clear-btn" onclick="clearSel()">Clear</button>
-    <div id="known-tags"></div>
+
+    <!-- Countdown overlay -->
+    <div id="countdown-overlay">
+      <div id="countdown-number"></div>
+      <div id="countdown-label">Hold still!</div>
+    </div>
+    <div id="stability-hint">Hold your pose to auto-capture</div>
+    <div id="stability-bar-wrap"><div id="stability-bar"></div></div>
 
     <!-- Generating overlay -->
     <div id="gen-overlay" class="overlay">
@@ -328,56 +493,95 @@
       <img id="result-img" src="" alt="Result">
       <div class="result-btns">
         <button id="save-btn" onclick="savePhoto()">Save Photo</button>
-        <button id="close-btn" onclick="closeResult()">Back to Camera</button>
+        <button id="close-btn" onclick="closeResult()">Try Another</button>
       </div>
     </div>
   </div>
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <!-- Known Hosts -->
-    <div id="hosts-section">
-      <div class="sec-title">Known Hosts</div>
-      <div id="hosts-list">
-        <div style="font-size:0.68rem;color:#444;padding:6px 2px;">
-          No hosts yet. Click your face, then "Register Face".
-        </div>
-      </div>
-      <button id="add-host-btn" onclick="nameSelected()">+ Register Your Face</button>
+    <div class="sidebar-header">
+      <h2>Choose Your Style</h2>
+      <p>Select a style, then hit transform</p>
     </div>
-
-    <!-- Style selector -->
-    <div class="sec-title styles">Choose Your Style</div>
     <div id="style-grid"></div>
-
-    <!-- Actions -->
-    <div id="action-section">
-      <div id="sel-status">Choose a style and transform</div>
-      <button id="name-btn" onclick="nameSelected()">Name Selected Person</button>
-      <div id="gender-row">
-        <button class="g-btn" onclick="setGender('male',this)">Male</button>
-        <button class="g-btn" onclick="setGender('female',this)">Female</button>
+    <div id="cobrand-section">
+      <div class="cobrand-header">
+        <label for="cobrand-input">Personalize Label</label>
+        <label class="cobrand-toggle">
+          <input type="checkbox" id="cobrand-toggle" checked onchange="toggleCobrand()">
+          <span>Show</span>
+        </label>
       </div>
-      <button id="transform-btn" onclick="doTransform()">TRANSFORM SCENE</button>
+      <input id="cobrand-input" type="text" placeholder="Company or name"
+             maxlength="30" autocomplete="off" spellcheck="false"
+             oninput="updateCobrandPreview()">
+      <div id="cobrand-preview"></div>
+    </div>
+    <div id="action-section">
+      <button id="transform-btn" onclick="doTransform()">Transform Scene</button>
+      <div id="mode-label"></div>
     </div>
   </div>
 </div>
 
-<!-- Name dialog -->
-<div id="name-modal">
-  <div id="name-dialog">
-    <h4>REGISTER YOUR FACE</h4>
-    <p>Enter your name and the kiosk will recognize you automatically.</p>
-    <input id="name-input" type="text" placeholder="Enter your name..." maxlength="30"
-           onkeydown="if(event.key==='Enter') saveName()">
-    <div class="gender-row">
-      <span>I am:</span>
-      <label><input type="radio" name="nd-gender" value="male"> Male</label>
-      <label><input type="radio" name="nd-gender" value="female"> Female</label>
-    </div>
-    <div class="dialog-btns">
-      <button id="nd-save" onclick="saveName()">Save</button>
-      <button id="nd-cancel" onclick="closeName()">Cancel</button>
+<!-- About modal -->
+<div id="about-overlay">
+  <div id="about-box">
+    <button id="about-close" onclick="toggleAbout()">CLOSE</button>
+    <h2>How This Photo Booth Works</h2>
+
+    <h3>The Pipeline — Step by Step</h3>
+    <ol>
+      <li>
+        <span class="step-num">Camera Capture</span> — A live webcam feed streams to your browser.
+        When you hold still for 3 seconds, a 5-second countdown begins and the current frame is captured.
+      </li>
+      <li>
+        <span class="step-num">Depth Estimation</span> — The captured frame is sent through
+        <span class="tech">Depth-Anything-V2</span>, a neural network that creates a depth map of the scene.
+        This preserves your pose, body position, and spatial layout.
+      </li>
+      <li>
+        <span class="step-num">Face Embedding</span> — <span class="tech">InsightFace</span> detects your face
+        and extracts a 512-dimensional embedding that encodes your unique facial features. This is fed to
+        <span class="tech">IP-Adapter FaceID</span> so the AI knows what you look like.
+      </li>
+      <li>
+        <span class="step-num">Style Transfer (Diffusion)</span> — Your photo, depth map, and face embedding
+        are combined with the style prompt and sent to <span class="tech">Juggernaut XL v9</span>,
+        a Stable Diffusion XL model. A <span class="tech">ControlNet</span> module uses the depth map to
+        preserve your structure while the diffusion process transforms the image into the chosen art style
+        over 35-40 denoising steps.
+      </li>
+      <li>
+        <span class="step-num">Upscaling</span> — The 1024x1024 result is upscaled to 2048x2048 using
+        <span class="tech">Real-ESRGAN</span>, a neural upscaler that adds sharp detail without artifacts.
+      </li>
+      <li>
+        <span class="step-num">Display &amp; Save</span> — The final image is displayed on screen.
+        You can save it as a JPEG to take home.
+      </li>
+    </ol>
+
+    <h3>Key Technologies</h3>
+    <p>
+      <span class="tech">AMD Radeon GPU</span> accelerated via <span class="tech">ROCm</span> &mdash;
+      all AI inference runs locally on the GPU, no cloud APIs needed. The scheduler uses
+      <span class="tech">DPM++ 2M Karras</span> for sharper, more coherent outputs.
+      The entire pipeline runs in ~25-40 seconds per image.
+    </p>
+
+    <h3>Credits</h3>
+    <p>
+      This ROCm AI photo booth was designed and developed by <strong style="color:var(--text)">Lucas Bergman</strong>
+      with support from <strong style="color:var(--text)">Nathan Pisik</strong> and
+      <strong style="color:var(--text)">Renae Hurst</strong> for the
+      <strong style="color:var(--accent)">CEC in Austin, TX</strong>.
+    </p>
+
+    <div class="about-footer">
+      Built with AMD ROCm &middot; ControlNet &middot; IP-Adapter &middot; Real-ESRGAN &middot; Stable Diffusion XL
     </div>
   </div>
 </div>
@@ -385,29 +589,54 @@
 <div id="toast"></div>
 
 <script>
-// ── Styles ───────────────────────────────────────────────────────────────────
 const STYLES = [
-  { key: "avatar",      emoji: "\uD83D\uDD35", name: "Avatar",      sub: "Blue Alien \u00B7 Pandora" },
-  { key: "anime",       emoji: "\u2728",       name: "Anime",       sub: "Cel Shaded \u00B7 Manga" },
-  { key: "cyberpunk",   emoji: "\uD83E\uDD16", name: "Cyberpunk",   sub: "Neon \u00B7 Chrome \u00B7 Future" },
+  { key: "ghibli",      emoji: "\uD83C\uDF3F", name: "Ghibli",      sub: "Miyazaki \u00B7 Watercolor" },
+  { key: "anime_op",    emoji: "\u2728",       name: "Anime-OP",    sub: "One Piece \u00B7 Oda" },
+  { key: "anime_db",    emoji: "\uD83D\uDD25", name: "Anime-DB",    sub: "Dragon Ball \u00B7 Toriyama" },
+  { key: "pixar",       emoji: "\uD83C\uDFAC", name: "Pixar 3D",    sub: "Animated \u00B7 Disney" },
+  { key: "disney",      emoji: "\uD83D\uDC51", name: "Disney 2D",   sub: "Renaissance \u00B7 Classic" },
+  { key: "simpsons",    emoji: "\uD83D\uDFE1", name: "Simpsons",    sub: "Springfield \u00B7 Yellow" },
+  { key: "southpark",   emoji: "\u2702\uFE0F", name: "South Park",  sub: "Cutout \u00B7 Comedy" },
+  { key: "gta",         emoji: "\uD83D\uDD2B", name: "GTA",         sub: "Loading Screen \u00B7 Vice" },
+  { key: "minecraft",   emoji: "\u26CF\uFE0F", name: "Minecraft",   sub: "Voxel \u00B7 Blocky" },
+  { key: "timburton",   emoji: "\uD83D\uDD78\uFE0F", name: "Tim Burton",  sub: "Gothic \u00B7 Whimsical" },
+  { key: "cyberpunk",   emoji: "\uD83E\uDD16", name: "Cyberpunk",   sub: "Neon Noir \u00B7 Chrome" },
   { key: "claymation",  emoji: "\uD83C\uDFA8", name: "Claymation",  sub: "Clay \u00B7 Stop Motion" },
-  { key: "oilpainting", emoji: "\uD83D\uDDBC\uFE0F", name: "Oil Painting", sub: "Renaissance \u00B7 Brushstrokes" },
-  { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Bold Ink \u00B7 Halftone" },
-  { key: "pixelart",    emoji: "\uD83D\uDC7E", name: "Pixel Art",   sub: "Retro \u00B7 16-Bit" },
-  { key: "steampunk",   emoji: "\u2699\uFE0F", name: "Steampunk",   sub: "Brass \u00B7 Gears \u00B7 Victorian" },
+  { key: "comicbook",   emoji: "\uD83D\uDCA5", name: "Comic Book",  sub: "Ink \u00B7 Halftone" },
+  { key: "darksouls",  emoji: "\u2694\uFE0F", name: "Dark Souls",  sub: "Medieval \u00B7 Dark Fantasy" },
+  { key: "popart",     emoji: "\uD83C\uDF08", name: "Pop Art",     sub: "Warhol \u00B7 Halftone" },
+  { key: "artdeco",    emoji: "\uD83C\uDFDB\uFE0F", name: "Art Deco",    sub: "Gatsby \u00B7 1920s Gold" },
+  { key: "baroque",    emoji: "\uD83D\uDDBC\uFE0F", name: "Baroque",     sub: "Oil \u00B7 Old Masters" },
+  { key: "synthwave",  emoji: "\uD83C\uDF05", name: "Synthwave",   sub: "Neon \u00B7 Retrowave" },
 ];
 
-let selectedStyle = "avatar";
-let selectedGender = "unknown";
-let selCount = 0;
-let faceCount = 0;
-let pendingNameIdx = null;
+let selectedStyle = "ghibli";
 let pollTimer = null;
-let lastFaces = [];
 let currentResultDataUrl = null;
-let recognizedNow = new Set();
 
-// ── Build style grid ─────────────────────────────────────────────────────────
+function updateCobrandPreview() {
+  const val = document.getElementById("cobrand-input").value.trim();
+  const preview = document.getElementById("cobrand-preview");
+  const on = document.getElementById("cobrand-toggle").checked;
+  if (val && on) {
+    preview.innerHTML = "Label: <span>AMD X " + val.replace(/</g, "&lt;") + "</span>";
+  } else {
+    preview.textContent = "";
+  }
+}
+
+function toggleCobrand() {
+  const on = document.getElementById("cobrand-toggle").checked;
+  document.getElementById("cobrand-input").disabled = !on;
+  updateCobrandPreview();
+}
+
+function updateRunCounter() {
+  fetch("/run_count").then(r => r.json()).then(d => {
+    document.getElementById("run-count").textContent = d.count;
+  }).catch(() => {});
+}
+
 function buildStyleGrid(aiReady) {
   const grid = document.getElementById("style-grid");
   grid.innerHTML = STYLES.map(s => `
@@ -425,223 +654,23 @@ function selectStyle(key, el) {
   el.classList.add("active");
 }
 
-function setGender(g, el) {
-  if (selectedGender === g) {
-    selectedGender = "unknown";
-    el.classList.remove("active");
-  } else {
-    selectedGender = g;
-    document.querySelectorAll("#gender-row .g-btn").forEach(b => b.classList.remove("active"));
-    el.classList.add("active");
-  }
-}
-
-// ── AI status ────────────────────────────────────────────────────────────────
 async function checkAI() {
   try {
     const r = await fetch("/comfy_status");
     const d = await r.json();
     const b = document.getElementById("ai-badge");
-    b.textContent = d.available ? "AI ENGINE READY" : "AI ENGINE LOADING...";
+    b.textContent = d.available ? "AI READY" : "AI LOADING\u2026";
     b.classList.toggle("online", !!d.available);
+    const ml = document.getElementById("mode-label");
+    if (d.mode) ml.innerHTML = "Pipeline: <span>" + d.mode + "</span>";
     return d.available;
   } catch { return false; }
 }
 
-// ── Click to select person ───────────────────────────────────────────────────
-function getImageCoords(e) {
-  const feed = document.getElementById("feed");
-  const rect = feed.getBoundingClientRect();
-  const natW = feed.naturalWidth || 1280;
-  const natH = feed.naturalHeight || 720;
-  const imgAR = natW / natH;
-  const boxAR = rect.width / rect.height;
-  let imgW, imgH, offX, offY;
-  if (imgAR > boxAR) {
-    imgW = rect.width; imgH = rect.width / imgAR;
-    offX = 0; offY = (rect.height - imgH) / 2;
-  } else {
-    imgH = rect.height; imgW = rect.height * imgAR;
-    offX = (rect.width - imgW) / 2; offY = 0;
-  }
-  const cx = e.clientX - rect.left - offX;
-  const cy = e.clientY - rect.top - offY;
-  if (cx < 0 || cy < 0 || cx > imgW || cy > imgH) return null;
-  return { clickX: cx, clickY: cy, frameW: imgW, frameH: imgH };
-}
-
-document.getElementById("cam-panel").addEventListener("click", async function(e) {
-  if (e.target.closest("button")) return;
-  if (e.target.id === "result-img") return;
-  if (document.getElementById("result-overlay").classList.contains("on")) return;
-  if (document.getElementById("gen-overlay").classList.contains("on")) return;
-  if (document.getElementById("name-modal").classList.contains("on")) { closeName(); return; }
-
-  const coords = getImageCoords(e);
-  if (!coords) return;
-
-  const fd = new FormData();
-  fd.append("click_x", coords.clickX);
-  fd.append("click_y", coords.clickY);
-  fd.append("frame_w", coords.frameW);
-  fd.append("frame_h", coords.frameH);
-
-  try {
-    const r = await fetch("/select_person", { method: "POST", body: fd });
-    const data = await r.json();
-    updateSelUI(data.faces);
-  } catch {}
-});
-
-// ── Selection UI ─────────────────────────────────────────────────────────────
-function updateSelUI(faces) {
-  lastFaces = faces || [];
-  faceCount = lastFaces.length;
-  selCount = lastFaces.filter(f => f.selected).length;
-
-  const badge = document.getElementById("sel-badge");
-  const clrBtn = document.getElementById("clear-btn");
-  const status = document.getElementById("sel-status");
-  const nameBtn = document.getElementById("name-btn");
-
-  if (selCount > 0) {
-    badge.textContent = selCount + " selected";
-    badge.classList.add("on");
-    clrBtn.classList.add("on");
-    status.textContent = "Ready to transform scene";
-    status.className = "has";
-    nameBtn.style.display = "block";
-  } else {
-    badge.classList.remove("on");
-    clrBtn.classList.remove("on");
-    status.textContent = "Choose a style and transform";
-    status.className = "";
-    nameBtn.style.display = "none";
-  }
-}
-
-async function clearSel() {
-  await fetch("/clear_selection", { method: "POST" });
-  updateSelUI([]);
-}
-
-// ── Name dialog ──────────────────────────────────────────────────────────────
-function nameSelected() {
-  const face = lastFaces.find(f => f.selected);
-  if (face) {
-    pendingNameIdx = face.index;
-    document.getElementById("name-input").value = face.name || "";
-    document.getElementById("name-modal").classList.add("on");
-    setTimeout(() => document.getElementById("name-input").focus(), 80);
-  } else {
-    toast("Click your face on the camera first");
-  }
-}
-
-function closeName() {
-  document.getElementById("name-modal").classList.remove("on");
-  pendingNameIdx = null;
-}
-
-async function saveName() {
-  const name = document.getElementById("name-input").value.trim();
-  if (!name) { toast("Please enter a name"); return; }
-  if (pendingNameIdx === null) { closeName(); return; }
-
-  const genderEl = document.querySelector('input[name="nd-gender"]:checked');
-  const gender = genderEl ? genderEl.value : "unknown";
-
-  const fd = new FormData();
-  fd.append("index", pendingNameIdx);
-  fd.append("name", name);
-  fd.append("gender", gender);
-
-  try {
-    const r = await fetch("/name_face", { method: "POST", body: fd });
-    const data = await r.json();
-    if (data.status === "ok") {
-      toast("Saved! " + name + " will be recognized automatically", "ok");
-      refreshHosts();
-      closeName();
-    } else {
-      toast("Could not save - click your face first");
-    }
-  } catch (e) {
-    toast("Connection error");
-  }
-}
-
-document.getElementById("name-modal").addEventListener("click", function(e) {
-  if (e.target === this) closeName();
-});
-
-// ── Known Hosts ──────────────────────────────────────────────────────────────
-async function refreshHosts() {
-  try {
-    const r = await fetch("/known_names");
-    const data = await r.json();
-    const names = Object.values(data.names);
-    const list = document.getElementById("hosts-list");
-    const tags = document.getElementById("known-tags");
-
-    if (names.length === 0) {
-      list.innerHTML = '<div style="font-size:0.68rem;color:#444;padding:6px 2px;">No hosts yet.</div>';
-      tags.innerHTML = "";
-      return;
-    }
-
-    list.innerHTML = names.map(n => {
-      const initials = n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-      const here = recognizedNow.has(n);
-      return `
-        <div class="host-row${here ? " here" : ""}">
-          <div class="host-info">
-            <div class="host-avatar">${initials}</div>
-            <div>
-              <div class="host-name">${n}</div>
-              <div class="host-status">${here ? "In frame" : "Not detected"}</div>
-            </div>
-          </div>
-          <button class="host-del" onclick="forgetHost('${n}',event)">x</button>
-        </div>`;
-    }).join("");
-
-    tags.innerHTML = names.filter(n => recognizedNow.has(n)).map(n =>
-      `<div class="known-tag">${n}</div>`
-    ).join("");
-  } catch {}
-}
-
-async function forgetHost(name, e) {
-  e.stopPropagation();
-  if (!confirm("Remove " + name + "?")) return;
-  const fd = new FormData();
-  fd.append("name", name);
-  await fetch("/forget_face", { method: "POST", body: fd });
-  recognizedNow.delete(name);
-  toast("Removed " + name);
-  refreshHosts();
-}
-
-async function pollRecognized() {
-  try {
-    const r = await fetch("/faces");
-    const data = await r.json();
-    const prev = new Set(recognizedNow);
-    recognizedNow.clear();
-    (data.faces || []).forEach(f => { if (f.name) recognizedNow.add(f.name); });
-
-    let changed = recognizedNow.size !== prev.size;
-    if (!changed) for (const n of recognizedNow) if (!prev.has(n)) { changed = true; break; }
-    if (changed) refreshHosts();
-  } catch {}
-}
-
-// ── Save photo ───────────────────────────────────────────────────────────────
 function savePhoto() {
   if (!currentResultDataUrl) return;
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const name = "avatar_" + selectedStyle + "_" + ts + ".jpg";
+  const name = "scene_" + selectedStyle + "_" + ts + ".jpg";
   const a = document.createElement("a");
   a.href = currentResultDataUrl;
   a.download = name;
@@ -651,21 +680,19 @@ function savePhoto() {
   toast("Photo saved!", "ok");
 }
 
-// ── Transform + progress ─────────────────────────────────────────────────────
-let genStart = 0;
-let progressTmr = null;
-let elapsedTmr = null;
-let stageIdx = 0;
+let genStart = 0, progressTmr = null, elapsedTmr = null, stageIdx = 0;
 
 const STAGES = [
-  { pct: 5,  label: "Capturing scene..." },
-  { pct: 20, label: "Transforming scene..." },
-  { pct: 45, label: "Applying style..." },
-  { pct: 65, label: "Refining details..." },
-  { pct: 82, label: "Almost there..." },
-  { pct: 95, label: "Final touches..." },
+  { pct: 5,  label: "Capturing scene\u2026" },
+  { pct: 12, label: "Analyzing depth\u2026" },
+  { pct: 25, label: "Transforming scene\u2026" },
+  { pct: 45, label: "Applying style\u2026" },
+  { pct: 60, label: "Rendering details\u2026" },
+  { pct: 75, label: "Refining composition\u2026" },
+  { pct: 88, label: "Almost there\u2026" },
+  { pct: 95, label: "Final touches\u2026" },
 ];
-const STAGE_TIMES = [1500, 3000, 4000, 4000, 3000, 3000];
+const STAGE_TIMES = [1500, 2500, 4000, 4000, 4000, 4000, 3000, 3000];
 
 function setProgress(pct, label) {
   document.getElementById("progress-bar").style.width = pct + "%";
@@ -673,23 +700,19 @@ function setProgress(pct, label) {
 }
 
 function startProgress() {
-  stageIdx = 0;
-  genStart = Date.now();
-  setProgress(0, "Starting AI engine...");
-
+  stageIdx = 0; genStart = Date.now();
+  setProgress(0, "Starting AI engine\u2026");
   function advance() {
     if (stageIdx >= STAGES.length) return;
-    const s = STAGES[stageIdx];
-    setProgress(s.pct, s.label);
+    setProgress(STAGES[stageIdx].pct, STAGES[stageIdx].label);
     stageIdx++;
     if (stageIdx < STAGES.length)
       progressTmr = setTimeout(advance, STAGE_TIMES[stageIdx - 1] || 3000);
   }
   advance();
-
   elapsedTmr = setInterval(() => {
-    const s = Math.floor((Date.now() - genStart) / 1000);
-    document.getElementById("elapsed").textContent = s + "s";
+    document.getElementById("elapsed").textContent =
+      Math.floor((Date.now() - genStart) / 1000) + "s";
   }, 1000);
 }
 
@@ -699,36 +722,33 @@ function stopProgress() {
 }
 
 async function doTransform() {
+  // Block if result overlay is still showing
+  if (document.getElementById("result-overlay").classList.contains("on")) return;
+  cancelCountdown();
+  fetch("/motion_reset", { method: "POST" }).catch(() => {});
   const btn = document.getElementById("transform-btn");
   btn.disabled = true;
-
-  // Always clear any leaked poll timer from a previous generation
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-
   const online = await checkAI();
-  if (!online) {
-    toast("AI Engine still loading - please wait");
-    btn.disabled = false;
-    return;
-  }
+  if (!online) { toast("AI Engine still loading"); btn.disabled = false; return; }
 
   document.getElementById("gen-overlay").classList.add("on");
   document.getElementById("gen-msg").textContent =
-    "Transforming scene into " + STYLES.find(s => s.key === selectedStyle).name + "...";
+    "Transforming into " + STYLES.find(s => s.key === selectedStyle).name + "\u2026";
   startProgress();
 
   const fd = new FormData();
   fd.append("character", selectedStyle);
-  fd.append("gender", selectedGender);
+  const cobrandOn = document.getElementById("cobrand-toggle").checked;
+  const cobrandVal = document.getElementById("cobrand-input").value.trim();
+  if (cobrandOn && cobrandVal) fd.append("cobrand", cobrandVal);
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
-    if (r.status === 400) {
+    if (r.status >= 400) {
       const d = await r.json();
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
-      toast(d.detail || "Select a person first");
-      btn.disabled = false;
-      return;
+      toast(d.detail || "Error"); btn.disabled = false; return;
     }
     const data = await r.json();
     if (data.status === "generating" || data.status === "busy") {
@@ -736,14 +756,12 @@ async function doTransform() {
     } else {
       stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
-      toast(data.message || "Error");
-      btn.disabled = false;
+      toast(data.message || "Error"); btn.disabled = false;
     }
   } catch {
     stopProgress();
     document.getElementById("gen-overlay").classList.remove("on");
-    toast("Connection error");
-    btn.disabled = false;
+    toast("Connection error"); btn.disabled = false;
   }
 }
 
@@ -753,53 +771,142 @@ async function pollStatus() {
     const data = await r.json();
     if (data.status === "done" && data.image) {
       clearInterval(pollTimer); pollTimer = null;
-      stopProgress();
-      setProgress(100, "Done!");
+      stopProgress(); setProgress(100, "Done!");
       setTimeout(() => {
         document.getElementById("gen-overlay").classList.remove("on");
         currentResultDataUrl = data.image;
         document.getElementById("result-img").src = data.image;
         document.getElementById("result-overlay").classList.add("on");
-        document.getElementById("transform-btn").disabled = false;
+        // Keep transform button disabled while result is showing
+        updateRunCounter();
       }, 300);
     } else if (data.status === "error") {
-      clearInterval(pollTimer); pollTimer = null;
-      stopProgress();
+      clearInterval(pollTimer); pollTimer = null; stopProgress();
       document.getElementById("gen-overlay").classList.remove("on");
       toast("Error: " + (data.message || "unknown"));
       document.getElementById("transform-btn").disabled = false;
     } else if (data.status === "idle") {
-      // No generation in progress — stale poll timer, clean up
       clearInterval(pollTimer); pollTimer = null;
+      stopProgress();
+      document.getElementById("gen-overlay").classList.remove("on");
+      document.getElementById("transform-btn").disabled = false;
     }
   } catch {}
 }
 
 function closeResult() {
-  // Clear any lingering poll timer
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
   currentResultDataUrl = null;
+  document.getElementById("transform-btn").disabled = false;
 }
 
-// ── Toast ────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.style.background = type === "ok" ? "#1a7a3a" : "#c0392b";
+  t.style.background = type === "ok"
+    ? "rgba(26,122,58,0.9)" : "rgba(192,57,43,0.9)";
   t.classList.add("on");
   setTimeout(() => t.classList.remove("on"), 3500);
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Auto-capture: hold pose 3s → 5s countdown → transform ──
+let countdownActive = false;
+let countdownTimer = null;
+let countdownValue = 0;
+let motionPollTimer = null;
+let wasStable = false;
+const STABLE_TRIGGER = 3.0;   // seconds of stillness before countdown
+const COUNTDOWN_FROM = 5;
+
+function startMotionPolling() {
+  if (motionPollTimer) return;
+  motionPollTimer = setInterval(pollMotion, 400);
+}
+
+function stopMotionPolling() {
+  if (motionPollTimer) { clearInterval(motionPollTimer); motionPollTimer = null; }
+}
+
+async function pollMotion() {
+  // Don't trigger if generating or showing result
+  if (document.getElementById("gen-overlay").classList.contains("on")) return;
+  if (document.getElementById("result-overlay").classList.contains("on")) return;
+  if (!countdownActive && document.getElementById("transform-btn").disabled) return;
+
+  try {
+    const r = await fetch("/motion_status");
+    const d = await r.json();
+    const stableS = d.stable_seconds || 0;
+
+    const barWrap = document.getElementById("stability-bar-wrap");
+    const bar = document.getElementById("stability-bar");
+    const hint = document.getElementById("stability-hint");
+
+    if (stableS > 0.5 && stableS < STABLE_TRIGGER) {
+      // Show progress toward trigger
+      if (countdownActive) cancelCountdown();
+      barWrap.classList.add("on");
+      hint.classList.add("on");
+      bar.style.width = Math.min(100, (stableS / STABLE_TRIGGER) * 100) + "%";
+    } else if (stableS >= STABLE_TRIGGER && !countdownActive) {
+      barWrap.classList.remove("on");
+      hint.classList.remove("on");
+      bar.style.width = "0%";
+      beginCountdown();
+    } else if (stableS < 0.5) {
+      if (countdownActive) cancelCountdown();
+      barWrap.classList.remove("on");
+      hint.classList.remove("on");
+      bar.style.width = "0%";
+    }
+  } catch {}
+}
+
+function beginCountdown() {
+  if (countdownActive) return;
+  countdownActive = true;
+  countdownValue = COUNTDOWN_FROM;
+
+  const overlay = document.getElementById("countdown-overlay");
+  const numEl = document.getElementById("countdown-number");
+
+  overlay.classList.add("on");
+  numEl.textContent = countdownValue;
+
+  countdownTimer = setInterval(() => {
+    countdownValue--;
+    if (countdownValue > 0) {
+      numEl.textContent = countdownValue;
+    } else {
+      // Fire!
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      overlay.classList.remove("on");
+      countdownActive = false;
+      doTransform();
+    }
+  }, 1000);
+}
+
+function cancelCountdown() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  countdownActive = false;
+  document.getElementById("countdown-overlay").classList.remove("on");
+}
+
+function toggleAbout() {
+  document.getElementById("about-overlay").classList.toggle("on");
+}
+
 async function init() {
   buildStyleGrid(false);
   const online = await checkAI();
   buildStyleGrid(online);
   setInterval(checkAI, 8000);
-  setInterval(pollRecognized, 2000);
-  refreshHosts();
+  startMotionPolling();
+  updateRunCounter();
 }
 init();
 </script>

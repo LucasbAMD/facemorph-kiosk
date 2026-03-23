@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-start.py — AI Avatar Kiosk Launcher
+start.py — AI Scene Style Kiosk Launcher
 Run with: python start.py
 """
 
@@ -15,7 +15,7 @@ os.chdir(ROOT)
 
 def main():
     print("\n" + "="*55)
-    print("  AMD-ADAPT")
+    print("  AMD-ADAPT  |  Scene Style Transfer Kiosk")
     print("  http://localhost:8000")
     print("="*55 + "\n")
 
@@ -48,23 +48,29 @@ def main():
         print("      Run: pip install -r requirements.txt")
         sys.exit(1)
 
-    # Check model
-    sdxl = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
-            "sd_xl_turbo_1.0_fp16.safetensors")
-    if not sdxl.exists():
-        print(f"[ERR] SDXL model not found at {sdxl}")
-        sys.exit(1)
+    # Check models
+    sdxl_turbo = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
+                  "sd_xl_turbo_1.0_fp16.safetensors")
 
-    # Check IP-Adapter
-    ip_bin = Path.home() / "kiosk_models" / "ip_adapter" / "sdxl_models" / "ip-adapter_sdxl.bin"
-    ip_enc = Path.home() / "kiosk_models" / "ip_adapter" / "models" / "image_encoder"
-    if ip_bin.exists() and ip_enc.exists():
-        print("[OK] IP-Adapter found — identity preservation active")
-    else:
-        print("[WARN] IP-Adapter not found — avatars won't preserve your face")
-        print("       Run: python setup_models.py")
+    # Check for ControlNet (HF cache)
+    try:
+        from diffusers import ControlNetModel
+        ControlNetModel.from_pretrained(
+            "diffusers/controlnet-depth-sdxl-1.0",
+            local_files_only=True,
+        )
+        print("[OK] ControlNet Depth SDXL — found in cache")
+        print("[OK] Mode: ControlNet + SDXL Base (best quality)")
+    except Exception:
+        if sdxl_turbo.exists():
+            print("[OK] SDXL Turbo found — using fast mode")
+            print("[INFO] For best quality, run: python setup_models.py")
+        else:
+            print("[ERR] No AI models found!")
+            print("      Run: python setup_models.py")
+            sys.exit(1)
 
-    print("\n[OK] Starting kiosk at http://localhost:8000")
+    print(f"\n[OK] Starting kiosk at http://localhost:8000")
     print("     AI pipeline loading in background...\n")
 
     import uvicorn

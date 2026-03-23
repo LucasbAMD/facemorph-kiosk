@@ -1,6 +1,6 @@
 """
-main.py — AI Avatar Kiosk Backend
-Live webcam feed + person selection + AI avatar generation.
+main.py — AI Scene Style Kiosk Backend
+Live webcam feed + AI scene style transfer.
 """
 
 import cv2
@@ -11,6 +11,7 @@ import base64
 import numpy as np
 from pathlib import Path
 from typing import Optional
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
@@ -18,7 +19,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from face_processor import FaceProcessor
+import logging
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
 from generator import ComfyBridge
 
 app = FastAPI(title="AMD-Adapt")
@@ -27,7 +30,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
 if Path("static").exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-processor = FaceProcessor(faces_dir="faces")
 comfy = ComfyBridge()
 
 cap: Optional[cv2.VideoCapture] = None
@@ -35,6 +37,98 @@ cap_lock = threading.Lock()
 latest_frame = None
 frame_lock = threading.Lock()
 capture_running = False
+
+# ── Motion detection state ────────────────────────────────────────────────────
+prev_gray = None
+motion_lock = threading.Lock()
+stable_since: float = 0.0        # timestamp when scene became stable
+motion_score: float = 999.0      # current frame-diff score (lower = more stable)
+MOTION_THRESHOLD = 3.0           # below this = "holding still"
+
+
+# ── Run counter ───────────────────────────────────────────────────────────────
+_run_count: int = 0
+_run_lock = threading.Lock()
+
+# ── Co-brand overlay state ────────────────────────────────────────────────────
+_cobrand_name: Optional[str] = None
+_cobrand_lock = threading.Lock()
+
+
+_FONT_PATH = str(Path(__file__).parent / "assets" / "fonts" / "Nunito-Variable.ttf")
+
+
+def _get_font(size: int, variation: str = None) -> ImageFont.FreeTypeFont:
+    """Load Nunito at the requested pixel size, fall back to default."""
+    try:
+        font = ImageFont.truetype(_FONT_PATH, size)
+        if variation:
+            font.set_variation_by_name(variation)
+        return font
+    except OSError:
+        return ImageFont.load_default()
+
+
+def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
+    """Render 'AMD X <name>' on the top-left using Nunito (rounded sans-serif)."""
+    label = f"AMD X {name}"
+    h, w = img.shape[:2]
+
+    font_size = max(16, int(w / 28))  # ~73px at 2048, ~37px at 1024
+    font = _get_font(font_size)
+
+    # Convert BGR -> RGBA for compositing
+    pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGBA))
+    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    margin = int(w * 0.02)
+    x, y = margin, margin
+
+    # Soft dark shadow for readability (semi-transparent, offset 2px)
+    draw.text((x + 2, y + 2), label, font=font, fill=(0, 0, 0, 120))
+    # White text on top, slightly transparent so it's not harsh
+    draw.text((x, y), label, font=font, fill=(255, 255, 255, 210))
+
+    result = Image.alpha_composite(pil_img, overlay)
+    return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
+
+
+def _apply_watermark(img: np.ndarray) -> np.ndarray:
+    """Render a polaroid-style bottom banner with centered label."""
+    label = "AMD Customer Engagement Program"
+    h, w = img.shape[:2]
+
+    font_size = max(12, int(w / 45))
+    font = _get_font(font_size, variation="SemiBold")
+
+    pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGBA))
+    overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    # Measure text height for banner sizing
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    padding = int(text_h * 0.8)
+    banner_h = text_h + padding * 2
+
+    # Semi-transparent black banner across full width at bottom (~80% opaque)
+    banner_y = h - banner_h
+    draw.rectangle([(0, banner_y), (w, h)], fill=(0, 0, 0, 204))
+
+    # Centered white text on a separate layer so we can blur edges
+    text_layer = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    text_draw = ImageDraw.Draw(text_layer)
+    text_x = (w - text_w) // 2
+    text_y = banner_y + (banner_h - text_h) // 2
+    text_draw.text((text_x, text_y), label, font=font, fill=(255, 255, 255, 230))
+    text_layer = text_layer.filter(ImageFilter.GaussianBlur(radius=0.8))
+
+    overlay = Image.alpha_composite(overlay, text_layer)
+
+    result = Image.alpha_composite(pil_img, overlay)
+    return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
 
 
 # ── Camera ────────────────────────────────────────────────────────────────────
@@ -54,12 +148,12 @@ def start_capture(camera_index: int = 0):
                     print(f"[OK] Camera opened at index {alt}")
                     break
         if cap.isOpened():
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-            cap.set(cv2.CAP_PROP_FPS, 60)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            cap.set(cv2.CAP_PROP_FPS, 30)
 
     def loop():
-        global latest_frame
+        global latest_frame, prev_gray, stable_since, motion_score
         while capture_running:
             with cap_lock:
                 ok = cap and cap.isOpened()
@@ -71,6 +165,23 @@ def start_capture(camera_index: int = 0):
             if ret:
                 with frame_lock:
                     latest_frame = frame
+                # Motion detection: compare grayscale frames
+                small = cv2.resize(frame, (320, 180))
+                gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+                gray = cv2.GaussianBlur(gray, (21, 21), 0)
+                with motion_lock:
+                    if prev_gray is not None:
+                        diff = cv2.absdiff(prev_gray, gray)
+                        score = float(np.mean(diff))
+                        motion_score = score
+                        if score < MOTION_THRESHOLD:
+                            if stable_since == 0.0:
+                                stable_since = time.time()
+                        else:
+                            stable_since = 0.0
+                    else:
+                        stable_since = 0.0
+                    prev_gray = gray
             else:
                 time.sleep(0.033)
 
@@ -93,11 +204,17 @@ def generate_frames():
         if frame is None:
             processed = _placeholder()
         else:
-            processed = processor.process_frame(frame)
-        _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 82])
+            processed = frame
+        # Downscale for streaming to reduce JPEG encoding cost
+        h, w = processed.shape[:2]
+        if w > 1280:
+            scale = 1280 / w
+            processed = cv2.resize(processed, (1280, int(h * scale)),
+                                   interpolation=cv2.INTER_AREA)
+        _, buf = cv2.imencode(".jpg", processed, [cv2.IMWRITE_JPEG_QUALITY, 75])
         yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
                + buf.tobytes() + b"\r\n")
-        time.sleep(1/60)
+        time.sleep(1/30)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -114,40 +231,11 @@ async def video_feed():
         media_type="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.get("/characters")
-async def get_characters():
-    chars = processor.get_characters()
-    for c in chars:
-        c["ai_ready"] = comfy.available
-    return JSONResponse({"characters": chars})
-
-
-# ── Person selection ──────────────────────────────────────────────────────────
-@app.get("/faces")
-async def get_faces():
-    return JSONResponse({"faces": processor.get_detected_faces()})
-
-
-@app.post("/select_person")
-async def select_person(click_x: float = Form(...), click_y: float = Form(...),
-                        frame_w: float = Form(...), frame_h: float = Form(...)):
-    with frame_lock:
-        frame = latest_frame.copy() if latest_frame is not None else None
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(
-        None, processor.toggle_person, click_x, click_y, frame_w, frame_h, frame)
-    return JSONResponse({"faces": processor.get_detected_faces()})
-
-
-@app.post("/clear_selection")
-async def clear_selection():
-    processor.clear_selection()
-    return JSONResponse({"status": "ok"})
-
-
 # ── AI Generation ─────────────────────────────────────────────────────────────
 @app.post("/generate")
-async def generate(character: str = Form(...), gender: str = Form("unknown")):
+async def generate(character: str = Form(...),
+                   cobrand: Optional[str] = Form(None)):
+    global _cobrand_name
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
@@ -155,19 +243,10 @@ async def generate(character: str = Form(...), gender: str = Form("unknown")):
     if not comfy.check_available():
         raise HTTPException(503, "AI engine not ready - loading model...")
 
-    # Use UI gender selection; fallback to stored gender from face recognition
-    gender = gender.strip().lower()
-    if gender not in ("male", "female"):
-        gender = "unknown"
-        detected = processor.get_detected_faces()
-        for f in detected:
-            if f.get("name"):
-                stored = processor.get_gender_for_name(f["name"])
-                if stored in ("male", "female"):
-                    gender = stored
-                    break
+    with _cobrand_lock:
+        _cobrand_name = cobrand.strip() if cobrand else None
 
-    started = comfy.generate(frame, character, gender=gender)
+    started = comfy.generate(frame, character)
     if not started:
         return JSONResponse({"status": "busy", "message": "Already generating"})
     return JSONResponse({"status": "generating", "message": "Transforming scene..."})
@@ -179,53 +258,71 @@ async def generate_status():
     if status["status"] == "done":
         result = comfy.get_result()
         if result is not None:
-            _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 97])
-            b64 = base64.b64encode(buf.tobytes()).decode()
-            return JSONResponse({"status": "done",
-                                 "image": f"data:image/jpeg;base64,{b64}"})
+            try:
+                # Bump run counter
+                global _run_count
+                with _run_lock:
+                    _run_count += 1
+                # Apply co-brand overlay if a name was provided
+                with _cobrand_lock:
+                    cobrand = _cobrand_name
+                if cobrand:
+                    result = _apply_cobrand_overlay(result, cobrand)
+                # Always apply the AMD CEC watermark (bottom-left, subtle)
+                result = _apply_watermark(result)
+                _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                b64 = base64.b64encode(buf.tobytes()).decode()
+                print(f"[Status] Result ready: {result.shape}, JPEG size: {len(buf)}bytes")
+                return JSONResponse({"status": "done",
+                                     "image": f"data:image/jpeg;base64,{b64}"})
+            except Exception as e:
+                print(f"[Status] Error encoding result: {e}")
+                return JSONResponse({"status": "error", "message": f"Encoding failed: {e}"})
+        else:
+            # Result was already consumed or missing
+            print("[Status] Done but result is None (already consumed?)")
+            return JSONResponse({"status": "idle", "message": ""})
     return JSONResponse(status)
 
 
 @app.get("/comfy_status")
 async def comfy_status():
-    return JSONResponse({"available": comfy.check_available()})
+    return JSONResponse({
+        "available": comfy.check_available(),
+        "mode": comfy.get_mode(),
+    })
 
 
-# ── Face naming ───────────────────────────────────────────────────────────────
-@app.post("/name_face")
-async def name_face(index: int = Form(...), name: str = Form(...),
-                    gender: str = Form("unknown")):
-    with frame_lock:
-        frame = latest_frame.copy() if latest_frame is not None else None
-    if frame is None:
-        raise HTTPException(400, "No camera frame")
-    name = name.strip()
-    if not name:
-        raise HTTPException(400, "Name cannot be empty")
-    gender = gender.strip().lower()
-    if gender not in ("male", "female", "unknown"):
-        gender = "unknown"
-    success = processor.name_selected_face(index, name, frame, gender)
-    return JSONResponse({"status": "ok" if success else "error",
-                         "name": name, "index": index})
+@app.get("/motion_status")
+async def motion_status_endpoint():
+    with motion_lock:
+        dur = (time.time() - stable_since) if stable_since > 0 else 0.0
+        score = motion_score
+    return JSONResponse({"stable_seconds": round(dur, 2), "motion_score": round(score, 2)})
 
 
-@app.get("/known_names")
-async def known_names():
-    return JSONResponse({"names": processor.get_known_names()})
+@app.post("/motion_reset")
+async def motion_reset():
+    """Reset stable timer (called when generation starts to prevent re-trigger)."""
+    global stable_since
+    with motion_lock:
+        stable_since = 0.0
+    return JSONResponse({"ok": True})
 
 
-@app.post("/forget_face")
-async def forget_face(name: str = Form(...)):
-    processor.forget_face(name)
-    return JSONResponse({"status": "ok"})
+@app.get("/run_count")
+async def run_count():
+    with _run_lock:
+        count = _run_count
+    return JSONResponse({"count": count})
 
 
 @app.get("/status")
 async def status():
     with frame_lock:
         has_frame = latest_frame is not None
-    return {"camera": has_frame, "ai_ready": comfy.available}
+    return {"camera": has_frame, "ai_ready": comfy.available,
+            "mode": comfy.get_mode()}
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
