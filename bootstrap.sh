@@ -7,7 +7,7 @@
 #
 #  What it does:
 #    1. Detects Linux distro and installs system packages
-#    2. Checks for ROCm drivers (required, not installed by this script)
+#    2. Checks for ROCm drivers — installs them if missing (Ubuntu)
 #    3. Detects AMD GPU architecture automatically
 #    4. Creates a Python venv (kiosk_venv)
 #    5. Installs PyTorch with the correct ROCm version
@@ -16,8 +16,8 @@
 #    8. Sets GPU device permissions
 #
 #  Requirements:
-#    - Linux (Ubuntu/Debian, Fedora/RHEL, Arch, or openSUSE)
-#    - AMD GPU/APU with ROCm drivers pre-installed
+#    - Linux (Ubuntu 22.04/24.04 for auto ROCm install, others manual)
+#    - AMD GPU/APU (RDNA 1-4, CDNA 1-4, or APU with ROCm support)
 #    - ~20 GB free disk space for models
 #    - Internet connection for downloads
 # ──────────────────────────────────────────────────────────────────────
@@ -104,6 +104,63 @@ detect_rocm_version() {
     echo ""
 }
 
+# ── Helper: detect Ubuntu codename ────────────────────────────────────
+detect_ubuntu_codename() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "${VERSION_CODENAME:-}"
+    else
+        echo ""
+    fi
+}
+
+# ── Helper: install ROCm on Ubuntu ───────────────────────────────────
+install_rocm_ubuntu() {
+    local codename
+    codename=$(detect_ubuntu_codename)
+
+    # Map codename to ROCm package URL
+    local rocm_url=""
+    case "$codename" in
+        jammy)
+            rocm_url="https://repo.radeon.com/amdgpu-install/7.2/ubuntu/jammy/amdgpu-install_7.2.70200-1_all.deb"
+            ;;
+        noble)
+            rocm_url="https://repo.radeon.com/amdgpu-install/7.2/ubuntu/noble/amdgpu-install_7.2.70200-1_all.deb"
+            ;;
+        *)
+            echo "  [ERR] Unsupported Ubuntu version: $codename"
+            echo "         ROCm auto-install supports Ubuntu 22.04 (jammy) and 24.04 (noble)"
+            echo "         Install ROCm manually: https://rocm.docs.amd.com/en/latest/deploy/linux/install.html"
+            return 1
+            ;;
+    esac
+
+    echo ""
+    echo "  Installing ROCm 7.2 for Ubuntu $codename..."
+    echo "  This will install the AMD GPU kernel driver and ROCm runtime."
+    echo "  (A reboot will be required after installation)"
+    echo ""
+
+    # Download and install the amdgpu-install package
+    local tmp_deb="/tmp/amdgpu-install.deb"
+    echo "  [..] Downloading ROCm installer..."
+    wget -q -O "$tmp_deb" "$rocm_url"
+    sudo apt-get install -y -qq "$tmp_deb" 2>/dev/null
+    rm -f "$tmp_deb"
+
+    # Install AMDGPU driver + ROCm
+    echo "  [..] Installing AMD GPU driver and ROCm (this takes several minutes)..."
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    sudo DEBIAN_FRONTEND=noninteractive amdgpu-install -y --usecase=rocm --no-32
+
+    # Add user to required groups
+    sudo usermod -a -G video,render ${SUDO_USER:-$USER} 2>/dev/null || true
+
+    echo "  [OK] ROCm installed successfully"
+    return 0
+}
+
 # ── Helper: map ROCm version to PyTorch wheel URL ────────────────────
 get_pytorch_rocm_url() {
     local rocm_ver="$1"
@@ -174,23 +231,42 @@ case "$DISTRO" in
 esac
 echo "  [OK] System packages installed"
 
-# ── 2. Check ROCm drivers ────────────────────────────────────────────
+# ── 2. Check / Install ROCm drivers ──────────────────────────────────
 echo ""
 echo "[2/7] Checking ROCm drivers..."
 ROCM_VER=$(detect_rocm_version)
+NEEDS_REBOOT=false
 if [ -z "$ROCM_VER" ]; then
-    echo "  [ERR] ROCm drivers not found!"
-    echo ""
-    echo "  ROCm must be installed before running this script."
-    echo "  Install ROCm from: https://rocm.docs.amd.com/en/latest/deploy/linux/install.html"
-    echo ""
-    echo "  Or use the automated installer:"
-    echo "  https://github.com/JoergR75/rocm-7.2.0-pytorch-docker-cdna-rdna-automated-deployment"
-    echo ""
-    echo "  After installing ROCm, reboot and re-run this script."
-    exit 1
+    echo "  [WARN] ROCm drivers not found"
+    case "$DISTRO" in
+        ubuntu|linuxmint|pop)
+            echo "  [..] Attempting automatic ROCm installation..."
+            if install_rocm_ubuntu; then
+                ROCM_VER=$(detect_rocm_version)
+                if [ -z "$ROCM_VER" ]; then
+                    ROCM_VER="7.2.0"  # Just installed it
+                fi
+                NEEDS_REBOOT=true
+                echo "  [OK] ROCm $ROCM_VER installed"
+            else
+                echo "  [ERR] ROCm auto-install failed"
+                echo "         Install manually: https://rocm.docs.amd.com/en/latest/deploy/linux/install.html"
+                exit 1
+            fi
+            ;;
+        *)
+            echo "  [ERR] ROCm auto-install is only supported on Ubuntu"
+            echo ""
+            echo "  Install ROCm manually for your distro:"
+            echo "    https://rocm.docs.amd.com/en/latest/deploy/linux/install.html"
+            echo ""
+            echo "  After installing ROCm, reboot and re-run this script."
+            exit 1
+            ;;
+    esac
+else
+    echo "  [OK] ROCm $ROCM_VER detected"
 fi
-echo "  [OK] ROCm $ROCM_VER detected"
 
 # ── 3. Detect GPU ────────────────────────────────────────────────────
 echo ""
@@ -283,13 +359,24 @@ echo ""
 echo "======================================================="
 echo "  Setup complete!"
 if [ -n "$GFX_VER" ]; then
-echo "  GPU: $GFX_VER | ROCm: $ROCM_VER"
+    echo "  GPU: $GFX_VER | ROCm: $ROCM_VER"
 fi
-echo ""
-echo "  To start the kiosk:"
-echo ""
-echo "    source kiosk_venv/bin/activate"
-echo "    python start.py"
+if [ "$NEEDS_REBOOT" = true ]; then
+    echo ""
+    echo "  ** REBOOT REQUIRED **"
+    echo "  ROCm was just installed. You must reboot before starting."
+    echo ""
+    echo "  After reboot:"
+    echo "    cd $(pwd)"
+    echo "    source kiosk_venv/bin/activate"
+    echo "    python start.py"
+else
+    echo ""
+    echo "  To start the kiosk:"
+    echo ""
+    echo "    source kiosk_venv/bin/activate"
+    echo "    python start.py"
+fi
 echo ""
 echo "  Then open http://localhost:8000 in a browser."
 echo "======================================================="
