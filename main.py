@@ -92,25 +92,32 @@ def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
 
 
 def _apply_watermark(img: np.ndarray) -> np.ndarray:
-    """Render a subtle 'AMD Austin CEC' watermark in the bottom-left."""
+    """Render a polaroid-style bottom banner with centered label."""
     label = "Customer Engagement Center"
     h, w = img.shape[:2]
 
-    font_size = max(12, int(w / 50))  # ~41px at 2048, ~20px at 1024
+    font_size = max(12, int(w / 45))
     font = _get_font(font_size)
 
     pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGBA))
     overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
-    margin = int(w * 0.02)
+    # Measure text height for banner sizing
     bbox = draw.textbbox((0, 0), label, font=font)
-    th = bbox[3] - bbox[1]
-    x = margin
-    y = h - margin - th
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    padding = int(text_h * 0.8)
+    banner_h = text_h + padding * 2
 
-    # 80% opacity black text
-    draw.text((x, y), label, font=font, fill=(0, 0, 0, 204))
+    # Semi-transparent white banner across full width at bottom
+    banner_y = h - banner_h
+    draw.rectangle([(0, banner_y), (w, h)], fill=(255, 255, 255, 180))
+
+    # Centered text
+    text_x = (w - text_w) // 2
+    text_y = banner_y + (banner_h - text_h) // 2
+    draw.text((text_x, text_y), label, font=font, fill=(0, 0, 0, 220))
 
     result = Image.alpha_composite(pil_img, overlay)
     return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
