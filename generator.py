@@ -406,8 +406,9 @@ STYLES = {
             "same male person drawn in Grand Theft Auto game loading screen art style, "
             "bold stylized illustration with heavy ink outlines, "
             "saturated colors, slightly exaggerated features, "
+            "confident attitude pose, "
             "same face same identity same skin tone same gender same ethnicity, "
-            "same hairstyle, light skin caucasian man, keep original appearance exactly, "
+            "same hairstyle, keep original appearance exactly, "
             "GTA V character portrait"
         ),
         "prompt_2": (
@@ -429,10 +430,10 @@ STYLES = {
             "dark, muted colors, desaturated"
         ),
         "use_ip_adapter": True,
-        "ip_adapter_scale": 0.75,
-        "controlnet": {"strength": 0.68, "guidance": 9.0, "steps": 35,
-                        "controlnet_scale": 0.55},
-        "turbo":      {"strength": 0.78, "guidance": 0.0, "steps": 7},
+        "ip_adapter_scale": 0.55,
+        "controlnet": {"strength": 0.78, "guidance": 11.0, "steps": 35,
+                        "controlnet_scale": 0.42},
+        "turbo":      {"strength": 0.86, "guidance": 0.0, "steps": 7},
     },
     # ── MINECRAFT ────────────────────────────────────────────────────
     "minecraft": {
