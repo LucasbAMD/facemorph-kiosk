@@ -13,7 +13,7 @@ AI-powered photo booth that transforms live camera feeds into stylized artwork u
 ## Quick Setup (2 commands)
 
 ```bash
-git clone <repo-url> && cd facemorph-kiosk
+git clone https://github.com/LucasbAMD/facemorph-kiosk.git && cd facemorph-kiosk
 bash bootstrap.sh
 ```
 
@@ -43,7 +43,7 @@ Then open **http://localhost:8000** in a browser.
 > 2. Plug in a USB webcam
 > 3. Open a terminal and run:
 >    ```
->    git clone <repo-url>
+>    git clone https://github.com/LucasbAMD/facemorph-kiosk.git
 >    cd facemorph-kiosk
 >    bash bootstrap.sh
 >    ```
