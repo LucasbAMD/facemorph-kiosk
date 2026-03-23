@@ -113,16 +113,16 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
     padding = int(text_h * 0.8)
     banner_h = text_h + padding * 2
 
-    # Semi-transparent white banner across full width at bottom (~80% opaque)
+    # Semi-transparent black banner across full width at bottom (~80% opaque)
     banner_y = h - banner_h
-    draw.rectangle([(0, banner_y), (w, h)], fill=(255, 255, 255, 204))
+    draw.rectangle([(0, banner_y), (w, h)], fill=(0, 0, 0, 204))
 
-    # Centered text on a separate layer so we can blur edges
+    # Centered white text on a separate layer so we can blur edges
     text_layer = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
     text_draw = ImageDraw.Draw(text_layer)
     text_x = (w - text_w) // 2
     text_y = banner_y + (banner_h - text_h) // 2
-    text_draw.text((text_x, text_y), label, font=font, fill=(60, 60, 60, 230))
+    text_draw.text((text_x, text_y), label, font=font, fill=(255, 255, 255, 230))
     text_layer = text_layer.filter(ImageFilter.GaussianBlur(radius=0.8))
 
     overlay = Image.alpha_composite(overlay, text_layer)
