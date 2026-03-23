@@ -93,7 +93,7 @@ def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
 
 def _apply_watermark(img: np.ndarray) -> np.ndarray:
     """Render a polaroid-style bottom banner with centered label."""
-    label = "Customer Engagement Center"
+    label = "Customer Engagement Program"
     h, w = img.shape[:2]
 
     font_size = max(12, int(w / 45))
@@ -110,14 +110,14 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
     padding = int(text_h * 0.8)
     banner_h = text_h + padding * 2
 
-    # Semi-transparent white banner across full width at bottom
+    # Semi-transparent white banner across full width at bottom (~80% opaque)
     banner_y = h - banner_h
-    draw.rectangle([(0, banner_y), (w, h)], fill=(255, 255, 255, 180))
+    draw.rectangle([(0, banner_y), (w, h)], fill=(255, 255, 255, 204))
 
-    # Centered text
+    # Centered dark gray text for a softer look
     text_x = (w - text_w) // 2
     text_y = banner_y + (banner_h - text_h) // 2
-    draw.text((text_x, text_y), label, font=font, fill=(0, 0, 0, 220))
+    draw.text((text_x, text_y), label, font=font, fill=(60, 60, 60, 230))
 
     result = Image.alpha_composite(pil_img, overlay)
     return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
