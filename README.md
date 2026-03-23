@@ -5,7 +5,7 @@ AI-powered photo booth that transforms live camera feeds into stylized artwork u
 ## Requirements
 
 - **OS:** Ubuntu 22.04+
-- **GPU:** AMD GPU with ROCm support (RX 7000 series tested)
+- **GPU:** AMD GPU (RX 7000 series tested) — ROCm drivers are installed automatically by the setup script
 - **Disk:** ~20 GB free (for AI models)
 - **Camera:** USB webcam
 - **Internet:** Required for first-time model downloads
@@ -19,11 +19,14 @@ bash bootstrap.sh
 
 That's it. The bootstrap script handles everything:
 1. Installs system packages (build tools, OpenCV deps)
-2. Creates a Python virtual environment (`kiosk_venv/`)
-3. Installs PyTorch with ROCm support
-4. Installs all Python dependencies
-5. Downloads all AI models (~15 GB)
-6. Sets GPU device permissions
+2. **Installs ROCm drivers** if not already present (Ubuntu 22.04/24.04)
+3. Creates a Python virtual environment (`kiosk_venv/`)
+4. Installs PyTorch with ROCm support
+5. Installs all Python dependencies
+6. Downloads all AI models (~15 GB)
+7. Sets GPU device permissions
+
+> **First-time ROCm install?** If the script installs ROCm drivers for the first time, you'll need to **reboot** before starting the kiosk. After rebooting, you do NOT need to re-run `bootstrap.sh` — just start the kiosk (see below).
 
 ## Starting the Kiosk
 
@@ -39,17 +42,18 @@ Then open **http://localhost:8000** in a browser.
 
 > **Give these instructions to anyone setting up the kiosk on a fresh Ubuntu machine:**
 >
-> 1. Make sure you have an AMD GPU with ROCm drivers installed
-> 2. Plug in a USB webcam
-> 3. Open a terminal and run:
+> 1. Plug in a USB webcam
+> 2. Open a terminal and run:
 >    ```
 >    git clone https://github.com/LucasbAMD/facemorph-kiosk.git
 >    cd facemorph-kiosk
 >    bash bootstrap.sh
 >    ```
-> 4. Wait for the setup to finish (~15-30 min depending on internet speed — it downloads ~15 GB of AI models)
-> 5. When it says "Setup complete!", start the kiosk:
+> 3. Wait for the setup to finish (~15-30 min depending on internet speed — it downloads ~15 GB of AI models)
+> 4. **If ROCm was just installed for the first time**, the script will tell you to reboot. Reboot, then skip to step 5.
+> 5. Start the kiosk:
 >    ```
+>    cd facemorph-kiosk
 >    source kiosk_venv/bin/activate
 >    python start.py
 >    ```
@@ -82,7 +86,7 @@ facemorph-kiosk/
 
 | Problem | Fix |
 |---------|-----|
-| `GPU not detected` | Install ROCm drivers: `sudo apt install rocm-dev` then reboot |
+| `GPU not detected` | Reboot if ROCm was just installed. Otherwise install manually: `sudo amdgpu-install --usecase=rocm` then reboot |
 | `No camera found` | Check `ls /dev/video*` — plug in a USB webcam |
 | `Missing packages` | Re-run `source kiosk_venv/bin/activate && pip install -r requirements.txt` |
 | `Models not found` | Run `python setup_models.py` to re-download |
