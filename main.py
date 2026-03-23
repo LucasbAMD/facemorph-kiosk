@@ -11,7 +11,7 @@ import base64
 import numpy as np
 from pathlib import Path
 from typing import Optional
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
@@ -55,13 +55,16 @@ _cobrand_name: Optional[str] = None
 _cobrand_lock = threading.Lock()
 
 
-_FONT_PATH = str(Path(__file__).parent / "assets" / "fonts" / "Nunito.ttf")
+_FONT_PATH = str(Path(__file__).parent / "assets" / "fonts" / "Nunito-Variable.ttf")
 
 
-def _get_font(size: int) -> ImageFont.FreeTypeFont:
+def _get_font(size: int, variation: str = None) -> ImageFont.FreeTypeFont:
     """Load Nunito at the requested pixel size, fall back to default."""
     try:
-        return ImageFont.truetype(_FONT_PATH, size)
+        font = ImageFont.truetype(_FONT_PATH, size)
+        if variation:
+            font.set_variation_by_name(variation)
+        return font
     except OSError:
         return ImageFont.load_default()
 
@@ -97,7 +100,7 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
     h, w = img.shape[:2]
 
     font_size = max(12, int(w / 45))
-    font = _get_font(font_size)
+    font = _get_font(font_size, variation="SemiBold")
 
     pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGBA))
     overlay = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
@@ -114,10 +117,15 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
     banner_y = h - banner_h
     draw.rectangle([(0, banner_y), (w, h)], fill=(255, 255, 255, 204))
 
-    # Centered dark gray text for a softer look
+    # Centered text on a separate layer so we can blur edges
+    text_layer = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+    text_draw = ImageDraw.Draw(text_layer)
     text_x = (w - text_w) // 2
     text_y = banner_y + (banner_h - text_h) // 2
-    draw.text((text_x, text_y), label, font=font, fill=(60, 60, 60, 230))
+    text_draw.text((text_x, text_y), label, font=font, fill=(60, 60, 60, 230))
+    text_layer = text_layer.filter(ImageFilter.GaussianBlur(radius=0.8))
+
+    overlay = Image.alpha_composite(overlay, text_layer)
 
     result = Image.alpha_composite(pil_img, overlay)
     return cv2.cvtColor(np.array(result), cv2.COLOR_RGBA2BGR)
