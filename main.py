@@ -70,8 +70,8 @@ def _get_font(size: int, variation: str = None) -> ImageFont.FreeTypeFont:
 
 
 def _apply_cobrand_overlay(img: np.ndarray, name: str) -> np.ndarray:
-    """Render 'AMD X <name>' on the top-left using Nunito (rounded sans-serif)."""
-    label = f"AMD X {name}"
+    """Render 'AMD x <name>' on the top-left using Nunito (rounded sans-serif)."""
+    label = f"AMD x {name}"
     h, w = img.shape[:2]
 
     font_size = max(16, int(w / 28))  # ~73px at 2048, ~37px at 1024

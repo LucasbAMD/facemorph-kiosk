@@ -1033,14 +1033,17 @@ def generate_scene(frame, style_key):
                 if face_embeds is not None:
                     pipe_kwargs["ip_adapter_image_embeds"] = [face_embeds]
 
-                result = pipe(**pipe_kwargs).images[0]
+                output = pipe(**pipe_kwargs)
+                if not output.images:
+                    return None, "Pipeline returned no images"
+                result = output.images[0]
 
                 # Reset IP-Adapter scale so next style isn't affected
                 if use_ip:
                     pipe.set_ip_adapter_scale(0.0)
             else:
                 # Turbo fallback
-                result = pipe(
+                output = pipe(
                     prompt=prompt,
                     prompt_2=prompt_2,
                     negative_prompt=neg_prompt,
@@ -1050,7 +1053,10 @@ def generate_scene(frame, style_key):
                     num_inference_steps=params["steps"],
                     guidance_scale=params["guidance"],
                     generator=generator,
-                ).images[0]
+                )
+                if not output.images:
+                    return None, "Pipeline returned no images"
+                result = output.images[0]
 
         gen_elapsed = time.time() - start
         print(f"[Generator] Generated in {gen_elapsed:.1f}s")
@@ -1058,7 +1064,9 @@ def generate_scene(frame, style_key):
         result_cv = cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR)
 
         # ── Upscale with Real-ESRGAN for sharper output ──────────────
-        if _upscaler is not None:
+        with _pipe_lock:
+            has_upscaler = _upscaler is not None
+        if has_upscaler:
             print("[Generator]   Upscaling 2x with Real-ESRGAN...")
             up_start = time.time()
             result_cv = _upscale_image(result_cv)
