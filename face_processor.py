@@ -254,7 +254,7 @@ class FaceRecognizer:
                 pass
         if RECOGNIZER_FILE.exists() and self._names:
             try:
-                with open(RECOGNIZER_FILE, "rb") as f:
+                with open(RECOGNIZER_FILE.resolve(), "rb") as f:
                     loaded = pickle.load(f)
                 if hasattr(loaded, "predict") and hasattr(loaded, "trained"):
                     self._recognizer = loaded

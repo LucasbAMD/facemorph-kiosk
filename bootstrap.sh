@@ -339,7 +339,7 @@ else
 fi
 
 # Activate venv for the rest of the script
-source "$VENV_DIR/bin/activate"
+source "$VENV_DIR/bin/activate" || fail "Failed to activate virtual environment at $VENV_DIR"
 pip install --upgrade pip setuptools wheel -q || fail "Failed to upgrade pip/setuptools. Check your internet connection."
 
 # ── 5. PyTorch with ROCm ─────────────────────────────────────────────
