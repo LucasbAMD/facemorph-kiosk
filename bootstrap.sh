@@ -21,7 +21,7 @@
 #    - ~20 GB free disk space for models
 #    - Internet connection for downloads
 # ──────────────────────────────────────────────────────────────────────
-set -uo pipefail
+set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -160,7 +160,7 @@ install_rocm_ubuntu() {
 
     # Install AMDGPU driver + ROCm
     echo "  [..] Installing AMD GPU driver and ROCm (this takes several minutes)..."
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq || fail "apt-get update failed"
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update || fail "apt-get update failed during ROCm install"
     sudo DEBIAN_FRONTEND=noninteractive amdgpu-install -y --usecase=rocm --no-32 || fail "amdgpu-install failed"
 
     # Add user to required groups
