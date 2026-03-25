@@ -186,10 +186,15 @@ echo "[1/7] Installing system packages..."
 case "$DISTRO" in
     ubuntu|debian|linuxmint|pop)
         sudo apt-get update -qq
+        # libgl1-mesa-glx was renamed to libgl1-mesa-dri in Ubuntu 24.04+
+        GL_PKG="libgl1-mesa-glx"
+        if ! apt-cache show libgl1-mesa-glx &>/dev/null; then
+            GL_PKG="libgl1-mesa-dri"
+        fi
         sudo apt-get install -y -qq \
             python3 python3-venv python3-dev python3-pip \
             build-essential cmake \
-            libgl1-mesa-glx libglib2.0-0 libsm6 libxrender1 libxext6 \
+            "$GL_PKG" libglib2.0-0 libsm6 libxrender1 libxext6 \
             libopencv-dev \
             wget curl git \
             2>/dev/null
