@@ -171,10 +171,20 @@ def main():
 
     try:
         from diffusers import ControlNetModel
-        ControlNetModel.from_pretrained(
-            "diffusers/controlnet-depth-sdxl-1.0",
-            local_files_only=True,
-        )
+        import torch
+        # Try local cache first, then download if missing/incomplete
+        try:
+            ControlNetModel.from_pretrained(
+                "diffusers/controlnet-depth-sdxl-1.0",
+                local_files_only=True,
+            )
+        except Exception:
+            print("[INFO] ControlNet not in cache — downloading...")
+            ControlNetModel.from_pretrained(
+                "diffusers/controlnet-depth-sdxl-1.0",
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )
         print("[OK] ControlNet Depth SDXL — found in cache")
         print("[OK] Mode: ControlNet + SDXL Base (best quality)")
     except Exception:
