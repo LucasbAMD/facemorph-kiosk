@@ -57,9 +57,12 @@ def main():
     print(f"\n  PyTorch: {torch.__version__}")
     print(f"  CUDA/ROCm available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
-        print(f"  GPU: {torch.cuda.get_device_name(0)}")
-        vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
-        print(f"  VRAM: {vram:.1f} GB")
+        try:
+            print(f"  GPU: {torch.cuda.get_device_name(0)}")
+            vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"  VRAM: {vram:.1f} GB")
+        except Exception as e:
+            print(f"  [WARN] Could not query GPU details: {e}")
 
     # ── Check/download SDXL Turbo (existing) ──────────────────────────────
     print("\n[2/10] Checking SDXL Turbo model...")
