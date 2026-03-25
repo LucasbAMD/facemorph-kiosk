@@ -21,12 +21,21 @@
 #    - ~20 GB free disk space for models
 #    - Internet connection for downloads
 # ──────────────────────────────────────────────────────────────────────
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 VENV_DIR="$SCRIPT_DIR/kiosk_venv"
+
+# ── Error handler ────────────────────────────────────────────────────
+fail() {
+    echo ""
+    echo "  [ERROR] $1"
+    echo "  Bootstrap failed. Fix the issue above and re-run: bash bootstrap.sh"
+    echo ""
+    exit 1
+}
 
 echo ""
 echo "======================================================="
@@ -145,14 +154,14 @@ install_rocm_ubuntu() {
     # Download and install the amdgpu-install package
     local tmp_deb="/tmp/amdgpu-install.deb"
     echo "  [..] Downloading ROCm installer..."
-    wget -q -O "$tmp_deb" "$rocm_url"
-    sudo apt-get install -y -qq "$tmp_deb" 2>/dev/null
+    wget -q -O "$tmp_deb" "$rocm_url" || fail "Failed to download ROCm installer from $rocm_url"
+    sudo apt-get install -y "$tmp_deb" || fail "Failed to install amdgpu-install package"
     rm -f "$tmp_deb"
 
     # Install AMDGPU driver + ROCm
     echo "  [..] Installing AMD GPU driver and ROCm (this takes several minutes)..."
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    sudo DEBIAN_FRONTEND=noninteractive amdgpu-install -y --usecase=rocm --no-32
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq || fail "apt-get update failed"
+    sudo DEBIAN_FRONTEND=noninteractive amdgpu-install -y --usecase=rocm --no-32 || fail "amdgpu-install failed"
 
     # Add user to required groups
     sudo usermod -a -G video,render ${SUDO_USER:-$USER} 2>/dev/null || true
@@ -183,30 +192,50 @@ get_pytorch_rocm_url() {
 
 # ── 1. System packages ──────────────────────────────────────────────
 echo "[1/7] Installing system packages..."
+
+# Check for apt lock (e.g. unattended-upgrades running)
+if command -v fuser &>/dev/null; then
+    if fuser /var/lib/apt/lists/lock &>/dev/null || fuser /var/lib/dpkg/lock-frontend &>/dev/null; then
+        echo "  [WAIT] Another package manager is running. Waiting up to 120s..."
+        for i in $(seq 1 24); do
+            sleep 5
+            if ! fuser /var/lib/apt/lists/lock &>/dev/null && ! fuser /var/lib/dpkg/lock-frontend &>/dev/null; then
+                echo "  [OK] Package manager lock released"
+                break
+            fi
+            if [ "$i" -eq 24 ]; then
+                fail "Package manager is still locked after 120s. Try: sudo kill \$(fuser /var/lib/apt/lists/lock 2>/dev/null) then re-run bootstrap.sh"
+            fi
+        done
+    fi
+fi
+
 case "$DISTRO" in
     ubuntu|debian|linuxmint|pop)
-        sudo apt-get update -qq
+        sudo apt-get update -qq || fail "apt-get update failed. Check your internet connection."
+
         # libgl1-mesa-glx was renamed to libgl1-mesa-dri in Ubuntu 24.04+
         GL_PKG="libgl1-mesa-glx"
         if ! apt-cache show libgl1-mesa-glx &>/dev/null; then
             GL_PKG="libgl1-mesa-dri"
         fi
-        sudo apt-get install -y -qq \
+
+        sudo apt-get install -y \
             python3 python3-venv python3-dev python3-pip \
             build-essential cmake \
             "$GL_PKG" libglib2.0-0 libsm6 libxrender1 libxext6 \
             libopencv-dev \
             wget curl git \
-            2>/dev/null
+            || fail "apt-get install failed. See errors above."
         ;;
     fedora|rhel|centos|rocky|almalinux)
-        sudo dnf install -y -q \
+        sudo dnf install -y \
             python3 python3-devel python3-pip \
             gcc gcc-c++ cmake make \
             mesa-libGL glib2 libSM libXrender libXext \
             opencv-devel \
             wget curl git \
-            2>/dev/null
+            || fail "dnf install failed. See errors above."
         ;;
     arch|manjaro|endeavouros)
         sudo pacman -Syu --noconfirm --needed \
@@ -215,16 +244,16 @@ case "$DISTRO" in
             mesa glib2 libsm libxrender libxext \
             opencv \
             wget curl git \
-            2>/dev/null
+            || fail "pacman install failed. See errors above."
         ;;
     opensuse*|sles)
-        sudo zypper install -y -n \
+        sudo zypper install -y \
             python3 python3-devel python3-pip \
             gcc gcc-c++ cmake make \
             Mesa-libGL1 glib2-devel libSM6 libXrender1 libXext6 \
             opencv-devel \
             wget curl git \
-            2>/dev/null
+            || fail "zypper install failed. See errors above."
         ;;
     *)
         echo "  [WARN] Unknown distro: $DISTRO"
@@ -297,7 +326,7 @@ if ! python3 -m venv --help &>/dev/null; then
     echo "  [INFO] Installing python3-venv..."
     case "$DISTRO" in
         ubuntu|debian|linuxmint|pop)
-            sudo apt-get install -y -qq python3-venv 2>/dev/null
+            sudo apt-get install -y python3-venv || fail "Failed to install python3-venv"
             ;;
     esac
 fi
@@ -305,7 +334,7 @@ fi
 if [ -d "$VENV_DIR" ]; then
     echo "  [OK] venv already exists at $VENV_DIR"
 else
-    python3 -m venv "$VENV_DIR"
+    python3 -m venv "$VENV_DIR" || fail "Failed to create Python virtual environment"
     echo "  [OK] Created venv at $VENV_DIR"
 fi
 
@@ -321,7 +350,7 @@ if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
     echo "  [OK] PyTorch with GPU support already installed"
     python -c "import torch; print(f'  PyTorch {torch.__version__} — GPU: {torch.cuda.get_device_name(0)}')"
 else
-    pip install torch torchvision torchaudio --index-url "$ROCM_TORCH_URL" -q
+    pip install torch torchvision torchaudio --index-url "$ROCM_TORCH_URL" -q || fail "Failed to install PyTorch. Check your internet connection."
     echo "  [OK] PyTorch installed"
     python -c "import torch; print(f'  PyTorch {torch.__version__}')"
     if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
@@ -335,9 +364,9 @@ fi
 # ── 6. Python dependencies ───────────────────────────────────────────
 echo ""
 echo "[6/7] Installing Python dependencies..."
-pip install -r "$SCRIPT_DIR/requirements.txt" -q
+pip install -r "$SCRIPT_DIR/requirements.txt" -q || fail "Failed to install Python dependencies"
 # huggingface-hub is needed by setup_models.py but not in requirements.txt
-pip install huggingface-hub -q
+pip install huggingface-hub -q || fail "Failed to install huggingface-hub"
 echo "  [OK] All Python packages installed"
 
 # ── 7. Download AI models ────────────────────────────────────────────
@@ -345,7 +374,7 @@ echo ""
 echo "[7/7] Downloading AI models (~15 GB, may take a while)..."
 echo "       Models are cached in ~/.cache/huggingface/ and ~/kiosk_models/"
 echo ""
-python "$SCRIPT_DIR/setup_models.py"
+python "$SCRIPT_DIR/setup_models.py" || fail "Model download failed. Check your internet connection and disk space."
 
 # ── GPU permissions ──────────────────────────────────────────────────
 echo ""
