@@ -32,7 +32,7 @@ def main():
     print("=" * 55)
 
     # ── Check required packages ────────────────────────────────────────────
-    print("\n[1/8] Checking Python packages...")
+    print("\n[1/10] Checking Python packages...")
     required = {
         "torch": "torch (with ROCm)",
         "diffusers": "diffusers>=0.27.0",
@@ -57,12 +57,15 @@ def main():
     print(f"\n  PyTorch: {torch.__version__}")
     print(f"  CUDA/ROCm available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
-        print(f"  GPU: {torch.cuda.get_device_name(0)}")
-        vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
-        print(f"  VRAM: {vram:.1f} GB")
+        try:
+            print(f"  GPU: {torch.cuda.get_device_name(0)}")
+            vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"  VRAM: {vram:.1f} GB")
+        except Exception as e:
+            print(f"  [WARN] Could not query GPU details: {e}")
 
     # ── Check/download SDXL Turbo (existing) ──────────────────────────────
-    print("\n[2/8] Checking SDXL Turbo model...")
+    print("\n[2/10] Checking SDXL Turbo model...")
     sdxl_turbo = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
                   "sd_xl_turbo_1.0_fp16.safetensors")
     if sdxl_turbo.exists():
@@ -73,7 +76,7 @@ def main():
         print("         Turbo fallback mode will not be available.")
 
     # ── Download ControlNet Depth SDXL ────────────────────────────────────
-    print("\n[3/8] Downloading ControlNet Depth for SDXL...")
+    print("\n[3/10] Downloading ControlNet Depth for SDXL...")
     print("       (This preserves your pose and scene structure)")
     print("       Model: diffusers/controlnet-depth-sdxl-1.0")
     try:
@@ -91,7 +94,7 @@ def main():
         print("         Will fall back to Turbo-only mode.")
 
     # ── Download Depth-Anything-V2 depth estimator ─────────────────────────
-    print("\n[4/8] Downloading depth estimator (Depth-Anything-V2)...")
+    print("\n[4/10] Downloading depth estimator (Depth-Anything-V2)...")
     print("       Model: depth-anything/Depth-Anything-V2-Small-hf")
     try:
         from transformers import AutoImageProcessor, AutoModelForDepthEstimation
@@ -106,7 +109,7 @@ def main():
 
     # ── Download IP-Adapter FaceID for SDXL ─────────────────────────────
     # ── Download Real-ESRGAN 2x upscaler ─────────────────────────────
-    print("\n[5/8] Downloading Real-ESRGAN 2x upscaler...")
+    print("\n[5/10] Downloading Real-ESRGAN 2x upscaler...")
     print("       (Upscales output from 1024 to 2048 for sharper results)")
     models_dir = Path.home() / "kiosk_models"
     models_dir.mkdir(exist_ok=True)
@@ -200,7 +203,7 @@ def main():
     print("        (Much higher quality than vanilla SDXL Base)")
     print("        This may take a while on first run (~6.5 GB).")
     try:
-        from diffusers import StableDiffusionXLControlNetImg2ImgPipeline
+        from diffusers import StableDiffusionXLControlNetImg2ImgPipeline, ControlNetModel as CN
         base_id = "RunDiffusion/Juggernaut-XL-v9"
         print(f"  [..] Downloading {base_id}...")
         try:
@@ -208,7 +211,7 @@ def main():
                 base_id,
                 torch_dtype=torch.float16,
                 variant="fp16",
-                controlnet=ControlNetModel.from_pretrained(
+                controlnet=CN.from_pretrained(
                     "diffusers/controlnet-depth-sdxl-1.0",
                     torch_dtype=torch.float16,
                     variant="fp16",
@@ -218,7 +221,7 @@ def main():
             StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
                 base_id,
                 torch_dtype=torch.float16,
-                controlnet=ControlNetModel.from_pretrained(
+                controlnet=CN.from_pretrained(
                     "diffusers/controlnet-depth-sdxl-1.0",
                     torch_dtype=torch.float16,
                     variant="fp16",

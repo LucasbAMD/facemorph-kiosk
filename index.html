@@ -619,7 +619,7 @@ function updateCobrandPreview() {
   const preview = document.getElementById("cobrand-preview");
   const on = document.getElementById("cobrand-toggle").checked;
   if (val && on) {
-    preview.innerHTML = "Label: <span>AMD X " + val.replace(/</g, "&lt;") + "</span>";
+    preview.innerHTML = "Label: <span>AMD x " + val.replace(/</g, "&lt;") + "</span>";
   } else {
     preview.textContent = "";
   }
