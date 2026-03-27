@@ -429,6 +429,30 @@ if [ "$GFX_VER" = "gfx1151" ] || [ "$GFX_VER" = "gfx1150" ]; then
         echo "  [WARN] gfx1151 firmware not found — update linux-firmware:"
         echo "         sudo apt install linux-firmware"
     fi
+
+    # Check for broken amdgpu-dkms-firmware (contains MES 0x83 which causes hangs)
+    if dpkg -l amdgpu-dkms-firmware 2>/dev/null | grep -q '^ii'; then
+        echo "  [WARN] amdgpu-dkms-firmware is installed — this can override"
+        echo "         working firmware with a broken MES version (0x83)."
+        echo "  [..] Removing amdgpu-dkms-firmware..."
+        sudo apt-get autoremove --purge -y amdgpu-dkms-firmware 2>/dev/null
+        sudo update-initramfs -u 2>/dev/null
+        NEEDS_REBOOT=true
+        echo "  [OK] Removed — reboot required"
+    fi
+
+    # Check MES firmware version if debugfs is available
+    if [ -r /sys/kernel/debug/dri/1/amdgpu_firmware_info ]; then
+        MES_VER=$(grep "MES feature" /sys/kernel/debug/dri/1/amdgpu_firmware_info 2>/dev/null | head -1 | grep -oP '0x[0-9a-f]+' | tail -1)
+        if [ "$MES_VER" = "0x00000083" ]; then
+            echo "  [ERR] MES firmware 0x83 detected — this version is BROKEN"
+            echo "        and causes GPU compute hangs. Fix:"
+            echo "        sudo apt install --reinstall linux-firmware"
+            echo "        sudo update-initramfs -u && sudo reboot"
+        elif [ -n "$MES_VER" ]; then
+            echo "  [OK] MES firmware: $MES_VER"
+        fi
+    fi
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────
