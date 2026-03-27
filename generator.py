@@ -1000,10 +1000,10 @@ def generate_scene(frame, style_key):
         neg_prompt += _NEG_SUFFIX
         neg_prompt_2 += _NEG_SUFFIX
 
-        # Prepare source image at 1024x1024 for SDXL
+        # Prepare source image for SDXL (768x768 for APU compatibility)
         h, w = frame.shape[:2]
         source_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
+        source_pil = source_pil.resize((768, 768), Image.LANCZOS)
 
         with _pipe_lock:
             pipe = _pipe
@@ -1083,14 +1083,15 @@ def generate_scene(frame, style_key):
         result_cv = cv2.cvtColor(np.array(result), cv2.COLOR_RGB2BGR)
 
         # ── Upscale with Real-ESRGAN for sharper output ──────────────
-        with _pipe_lock:
-            has_upscaler = _upscaler is not None
-        if has_upscaler:
-            print("[Generator]   Upscaling 2x with Real-ESRGAN...")
-            up_start = time.time()
-            result_cv = _upscale_image(result_cv)
-            print(f"[Generator]   Upscaled to {result_cv.shape[1]}x"
-                  f"{result_cv.shape[0]} in {time.time()-up_start:.1f}s")
+        # Disabled on APU — Real-ESRGAN GPU ops hang on gfx1151 unified memory
+        # with _pipe_lock:
+        #     has_upscaler = _upscaler is not None
+        # if has_upscaler:
+        #     print("[Generator]   Upscaling 2x with Real-ESRGAN...")
+        #     up_start = time.time()
+        #     result_cv = _upscale_image(result_cv)
+        #     print(f"[Generator]   Upscaled to {result_cv.shape[1]}x"
+        #           f"{result_cv.shape[0]} in {time.time()-up_start:.1f}s")
 
         # Resize back to original aspect ratio
         result_cv = cv2.resize(result_cv, (w, h),
