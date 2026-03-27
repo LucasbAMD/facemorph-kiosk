@@ -131,10 +131,12 @@ def _setup_gpu_env():
             print(f"[WARN] Unknown GFX version: {gfx}")
             print(f"       You may need to set HSA_OVERRIDE_GFX_VERSION manually")
 
-        # APU-specific fixes: disable buggy SDMA engine on unified memory APUs
+        # APU-specific fixes for unified memory
         if gfx in _APU_GFX_VERSIONS:
             os.environ["HSA_ENABLE_SDMA"] = "0"
+            os.environ["HSA_XNACK"] = "1"
             print(f"     HSA_ENABLE_SDMA=0 (APU unified memory fix)")
+            print(f"     HSA_XNACK=1 (required for unified memory APUs)")
     else:
         print("[WARN] Could not detect AMD GPU from sysfs")
         print("       Falling back to HSA_OVERRIDE_GFX_VERSION=11.0.0")
