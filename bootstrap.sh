@@ -396,63 +396,77 @@ for dev in /dev/dri/renderD*; do
     fi
 done
 
-# ── Strix Halo / Strix Point specific guidance ──────────────────────
+# ── Strix Halo / Strix Point specific fixes ─────────────────────────
 if [ "$GFX_VER" = "gfx1151" ] || [ "$GFX_VER" = "gfx1150" ]; then
     echo ""
-    echo "[*] Strix Halo/Point APU detected — checking kernel parameters..."
+    echo "[*] Strix Halo/Point APU detected — applying required fixes..."
 
-    # Check for cwsr_enable=0
-    NEEDS_GRUB=false
-    if ! grep -q "amdgpu.cwsr_enable=0" /proc/cmdline 2>/dev/null; then
-        echo "  [WARN] Missing kernel parameter: amdgpu.cwsr_enable=0"
-        NEEDS_GRUB=true
+    # ── Fix 1: Remove broken amdgpu-dkms-firmware (MES 0x83 causes hangs) ──
+    if dpkg -l amdgpu-dkms-firmware 2>/dev/null | grep -q '^ii'; then
+        echo "  [..] Removing broken amdgpu-dkms-firmware package..."
+        sudo apt-get autoremove --purge -y amdgpu-dkms-firmware 2>/dev/null
+        echo "  [OK] Removed amdgpu-dkms-firmware"
     fi
 
-    if [ "$NEEDS_GRUB" = true ]; then
-        echo ""
-        echo "  ┌─────────────────────────────────────────────────────┐"
-        echo "  │  REQUIRED: Add kernel boot parameter               │"
-        echo "  │                                                     │"
-        echo "  │  1. sudo nano /etc/default/grub                    │"
-        echo "  │  2. Add to GRUB_CMDLINE_LINUX_DEFAULT:             │"
-        echo "  │     amdgpu.cwsr_enable=0                           │"
-        echo "  │  3. sudo update-grub && sudo reboot                │"
-        echo "  └─────────────────────────────────────────────────────┘"
+    # ── Fix 2: Download latest gfx1151 firmware from kernel.org ──
+    # Always update firmware on Strix Halo to ensure we have non-broken MES
+    FW_NEEDS_UPDATE=false
+    if [ ! -f /usr/lib/firmware/amdgpu/gc_11_5_1_me.bin ]; then
+        FW_NEEDS_UPDATE=true
+    fi
+    if [ "$FW_NEEDS_UPDATE" = true ]; then
+        echo "  [..] Downloading latest gfx1151 firmware from kernel.org..."
+        fw_dir="/tmp/linux-firmware-$$"
+        if git clone --depth 1 --filter=blob:none --sparse \
+               https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git \
+               "$fw_dir" 2>/dev/null; then
+            cd "$fw_dir" && git sparse-checkout set amdgpu 2>/dev/null && cd "$SCRIPT_DIR"
+            sudo cp "$fw_dir"/amdgpu/gc_11_5_1_* /usr/lib/firmware/amdgpu/ 2>/dev/null
+            sudo cp "$fw_dir"/amdgpu/mes_11_5_1_* /usr/lib/firmware/amdgpu/ 2>/dev/null
+            sudo cp "$fw_dir"/amdgpu/sdma_6_1_1_* /usr/lib/firmware/amdgpu/ 2>/dev/null
+            sudo cp "$fw_dir"/amdgpu/vcn_5_0_1_* /usr/lib/firmware/amdgpu/ 2>/dev/null
+            rm -rf "$fw_dir"
+            echo "  [OK] Firmware updated"
+        else
+            echo "  [WARN] Could not download firmware — run bash fix_firmware.sh after bootstrap"
+        fi
+    else
+        echo "  [OK] gfx1151 firmware files present"
+    fi
+
+    # ── Fix 3: Add amdgpu.cwsr_enable=0 to GRUB ──
+    if ! grep -q "amdgpu.cwsr_enable=0" /proc/cmdline 2>/dev/null; then
+        echo "  [..] Adding amdgpu.cwsr_enable=0 to GRUB..."
+        if [ -f /etc/default/grub ]; then
+            # Only add if not already in the GRUB config file
+            if ! grep -q "cwsr_enable=0" /etc/default/grub 2>/dev/null; then
+                sudo sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 amdgpu.cwsr_enable=0"/' /etc/default/grub
+                sudo update-grub 2>/dev/null || sudo grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null
+                echo "  [OK] GRUB updated — reboot required"
+            fi
+        fi
+        NEEDS_REBOOT=true
     else
         echo "  [OK] amdgpu.cwsr_enable=0 is set"
     fi
 
-    # Check firmware is recent enough
-    if [ -f /usr/lib/firmware/amdgpu/gc_11_5_1_me.bin ]; then
-        echo "  [OK] gfx1151 firmware files present"
-    else
-        echo "  [WARN] gfx1151 firmware not found — update linux-firmware:"
-        echo "         sudo apt install linux-firmware"
-    fi
+    # ── Fix 4: Rebuild initramfs with correct firmware ──
+    echo "  [..] Rebuilding initramfs..."
+    sudo update-initramfs -u 2>/dev/null
+    echo "  [OK] initramfs updated"
 
-    # Check for broken amdgpu-dkms-firmware (contains MES 0x83 which causes hangs)
-    if dpkg -l amdgpu-dkms-firmware 2>/dev/null | grep -q '^ii'; then
-        echo "  [WARN] amdgpu-dkms-firmware is installed — this can override"
-        echo "         working firmware with a broken MES version (0x83)."
-        echo "  [..] Removing amdgpu-dkms-firmware..."
-        sudo apt-get autoremove --purge -y amdgpu-dkms-firmware 2>/dev/null
-        sudo update-initramfs -u 2>/dev/null
-        NEEDS_REBOOT=true
-        echo "  [OK] Removed — reboot required"
-    fi
-
-    # Check MES firmware version if debugfs is available
+    # ── Check MES firmware version if debugfs is available ──
     if [ -r /sys/kernel/debug/dri/1/amdgpu_firmware_info ]; then
         MES_VER=$(grep "MES feature" /sys/kernel/debug/dri/1/amdgpu_firmware_info 2>/dev/null | head -1 | grep -oP '0x[0-9a-f]+' | tail -1)
         if [ "$MES_VER" = "0x00000083" ]; then
-            echo "  [ERR] MES firmware 0x83 detected — this version is BROKEN"
-            echo "        and causes GPU compute hangs. Fix:"
-            echo "        sudo apt install --reinstall linux-firmware"
-            echo "        sudo update-initramfs -u && sudo reboot"
+            echo "  [WARN] MES firmware 0x83 still active — reboot required to load new firmware"
+            NEEDS_REBOOT=true
         elif [ -n "$MES_VER" ]; then
             echo "  [OK] MES firmware: $MES_VER"
         fi
     fi
+
+    echo "  [OK] Strix Halo fixes applied"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────

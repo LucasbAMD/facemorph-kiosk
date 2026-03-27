@@ -879,7 +879,11 @@ def _load_pipeline():
             print("[Generator] Ready! mode=ControlNet+SDXL_Base (best quality)")
 
             # ── Try loading optional enhancements ───
-            _try_load_upscaler()
+            # Skip upscaler on APU — Real-ESRGAN hangs on unified memory
+            if not os.environ.get("HSA_ENABLE_SDMA") == "0":
+                _try_load_upscaler()
+            else:
+                print("[Generator]   Skipping Real-ESRGAN upscaler (APU mode)")
             _try_load_ip_adapter(pipe)
             return
 
