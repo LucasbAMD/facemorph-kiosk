@@ -161,7 +161,7 @@ install_rocm_ubuntu() {
     # Install AMDGPU driver + ROCm
     echo "  [..] Installing AMD GPU driver and ROCm (this takes several minutes)..."
     sudo DEBIAN_FRONTEND=noninteractive apt-get update || fail "apt-get update failed during ROCm install"
-    sudo DEBIAN_FRONTEND=noninteractive amdgpu-install -y --usecase=rocm --no-32 || fail "amdgpu-install failed"
+    sudo DEBIAN_FRONTEND=noninteractive amdgpu-install -y --usecase=rocm --no-32 --no-dkms || fail "amdgpu-install failed"
 
     # Add user to required groups
     sudo usermod -a -G video,render ${SUDO_USER:-$USER} 2>/dev/null || true
@@ -173,9 +173,17 @@ install_rocm_ubuntu() {
 # ── Helper: map ROCm version to PyTorch wheel URL ────────────────────
 get_pytorch_rocm_url() {
     local rocm_ver="$1"
+    local gfx_ver="$2"
     local major minor
     major=$(echo "$rocm_ver" | cut -d'.' -f1)
     minor=$(echo "$rocm_ver" | cut -d'.' -f2)
+
+    # gfx1150/gfx1151 (Strix Point/Halo) need TheRock wheels with native support.
+    # Standard PyTorch nightly does NOT support these architectures and causes hangs.
+    if [ "$gfx_ver" = "gfx1150" ] || [ "$gfx_ver" = "gfx1151" ]; then
+        echo "https://rocm.nightlies.amd.com/v2/$gfx_ver/"
+        return
+    fi
 
     if [ "$major" -ge 7 ]; then
         # ROCm 7.x — use nightly with rocm7.1 wheels
@@ -313,8 +321,8 @@ else
     echo "         /dev/kfd may need permissions — continuing anyway"
 fi
 
-# Determine PyTorch wheel URL based on ROCm version
-ROCM_TORCH_URL=$(get_pytorch_rocm_url "$ROCM_VER")
+# Determine PyTorch wheel URL based on ROCm version and GPU architecture
+ROCM_TORCH_URL=$(get_pytorch_rocm_url "$ROCM_VER" "$GFX_VER")
 echo "  [OK] PyTorch ROCm URL: $ROCM_TORCH_URL"
 
 # ── 4. Python venv ───────────────────────────────────────────────────
@@ -350,7 +358,7 @@ if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
     echo "  [OK] PyTorch with GPU support already installed"
     python -c "import torch; print(f'  PyTorch {torch.__version__} — GPU: {torch.cuda.get_device_name(0)}')"
 else
-    pip install torch torchvision torchaudio --index-url "$ROCM_TORCH_URL" -q || fail "Failed to install PyTorch. Check your internet connection."
+    pip install --pre torch torchvision torchaudio --index-url "$ROCM_TORCH_URL" -q || fail "Failed to install PyTorch. Check your internet connection."
     echo "  [OK] PyTorch installed"
     python -c "import torch; print(f'  PyTorch {torch.__version__}')"
     if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
@@ -387,6 +395,41 @@ for dev in /dev/dri/renderD*; do
         sudo chmod 666 "$dev" 2>/dev/null && echo "  [OK] $dev" || echo "  [WARN] Could not set $dev permissions"
     fi
 done
+
+# ── Strix Halo / Strix Point specific guidance ──────────────────────
+if [ "$GFX_VER" = "gfx1151" ] || [ "$GFX_VER" = "gfx1150" ]; then
+    echo ""
+    echo "[*] Strix Halo/Point APU detected — checking kernel parameters..."
+
+    # Check for cwsr_enable=0
+    NEEDS_GRUB=false
+    if ! grep -q "amdgpu.cwsr_enable=0" /proc/cmdline 2>/dev/null; then
+        echo "  [WARN] Missing kernel parameter: amdgpu.cwsr_enable=0"
+        NEEDS_GRUB=true
+    fi
+
+    if [ "$NEEDS_GRUB" = true ]; then
+        echo ""
+        echo "  ┌─────────────────────────────────────────────────────┐"
+        echo "  │  REQUIRED: Add kernel boot parameter               │"
+        echo "  │                                                     │"
+        echo "  │  1. sudo nano /etc/default/grub                    │"
+        echo "  │  2. Add to GRUB_CMDLINE_LINUX_DEFAULT:             │"
+        echo "  │     amdgpu.cwsr_enable=0                           │"
+        echo "  │  3. sudo update-grub && sudo reboot                │"
+        echo "  └─────────────────────────────────────────────────────┘"
+    else
+        echo "  [OK] amdgpu.cwsr_enable=0 is set"
+    fi
+
+    # Check firmware is recent enough
+    if [ -f /usr/lib/firmware/amdgpu/gc_11_5_1_me.bin ]; then
+        echo "  [OK] gfx1151 firmware files present"
+    else
+        echo "  [WARN] gfx1151 firmware not found — update linux-firmware:"
+        echo "         sudo apt install linux-firmware"
+    fi
+fi
 
 # ── Done ─────────────────────────────────────────────────────────────
 echo ""

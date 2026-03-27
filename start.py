@@ -50,12 +50,25 @@ _GFX_OVERRIDE_MAP = {
     "gfx1101": "11.0.0",
     "gfx1102": "11.0.0",
     "gfx1103": "11.0.0",   # Phoenix/Hawk Point APU
-    # GFX11.5 — RDNA 3.5 (Strix Point APU)
-    "gfx1150": "11.0.0",
-    "gfx1151": "11.0.0",
+    # GFX11.5 — RDNA 3.5 (Strix Point / Strix Halo APU)
+    # No override needed — use TheRock gfx1151 wheels which have native support.
+    # Setting HSA_OVERRIDE_GFX_VERSION=11.0.0 causes hangs on these APUs.
+    "gfx1150": None,
+    "gfx1151": None,
     # GFX12 — RDNA 4 (Navi 4x)
     "gfx1200": None,        # Officially supported in ROCm 7+
     "gfx1201": None,
+}
+
+# APU architectures that need HSA_ENABLE_SDMA=0 to prevent compute hangs
+# and checkerboard artifacts. The SDMA engine is buggy on APUs with unified memory.
+_APU_GFX_VERSIONS = {
+    "gfx90c",   # Renoir/Cezanne
+    "gfx1035",  # Rembrandt
+    "gfx1036",  # Raphael/Phoenix iGPU
+    "gfx1103",  # Phoenix/Hawk Point
+    "gfx1150",  # Strix Point
+    "gfx1151",  # Strix Halo
 }
 
 
@@ -108,8 +121,8 @@ def _setup_gpu_env():
         print(f"[OK] Detected AMD GPU: {gfx}")
         override = _GFX_OVERRIDE_MAP.get(gfx)
         if override is None and gfx in _GFX_OVERRIDE_MAP:
-            # Officially supported — no override needed
-            print(f"     Officially supported by ROCm — no override needed")
+            # Officially supported or uses native wheels — no override needed
+            print(f"     Native ROCm support — no GFX override needed")
         elif override:
             os.environ["HSA_OVERRIDE_GFX_VERSION"] = override
             print(f"     HSA_OVERRIDE_GFX_VERSION={override}")
@@ -117,6 +130,11 @@ def _setup_gpu_env():
             # Unknown GFX — try to guess nearest supported version
             print(f"[WARN] Unknown GFX version: {gfx}")
             print(f"       You may need to set HSA_OVERRIDE_GFX_VERSION manually")
+
+        # APU-specific fixes: disable buggy SDMA engine on unified memory APUs
+        if gfx in _APU_GFX_VERSIONS:
+            os.environ["HSA_ENABLE_SDMA"] = "0"
+            print(f"     HSA_ENABLE_SDMA=0 (APU unified memory fix)")
     else:
         print("[WARN] Could not detect AMD GPU from sysfs")
         print("       Falling back to HSA_OVERRIDE_GFX_VERSION=11.0.0")
@@ -125,7 +143,11 @@ def _setup_gpu_env():
     # Common ROCm environment
     os.environ.update({
         "AMD_LOG_LEVEL": "0",
-        "PYTORCH_HIP_ALLOC_CONF": "expandable_segments:True",
+        "PYTORCH_HIP_ALLOC_CONF":
+            "backend:native,expandable_segments:True,"
+            "garbage_collection_threshold:0.9",
+        "GPU_MAX_HEAP_SIZE": "100",
+        "GPU_MAX_ALLOC_PERCENT": "100",
     })
 
     # Auto-detect render devices
