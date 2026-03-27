@@ -859,6 +859,16 @@ def _load_pipeline():
                 pipe.enable_vae_slicing()
             except Exception:
                 pass
+            try:
+                pipe.enable_vae_tiling()
+            except Exception:
+                pass
+            # Upcast VAE to fp32 — fp16 VAE hangs on gfx1151 APUs
+            try:
+                pipe.vae = pipe.vae.to(dtype=torch.float32)
+                pipe.vae.config.force_upcast = True
+            except Exception:
+                pass
 
             with _pipe_lock:
                 _pipe = pipe
@@ -895,6 +905,15 @@ def _load_pipeline():
 
         try:
             pipe.enable_vae_slicing()
+        except Exception:
+            pass
+        try:
+            pipe.enable_vae_tiling()
+        except Exception:
+            pass
+        try:
+            pipe.vae = pipe.vae.to(dtype=torch.float32)
+            pipe.vae.config.force_upcast = True
         except Exception:
             pass
 

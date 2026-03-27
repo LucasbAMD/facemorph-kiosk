@@ -150,6 +150,7 @@ def _setup_gpu_env():
             "garbage_collection_threshold:0.9",
         "GPU_MAX_HEAP_SIZE": "100",
         "GPU_MAX_ALLOC_PERCENT": "100",
+        "TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL": "1",
     })
 
     # Auto-detect render devices
