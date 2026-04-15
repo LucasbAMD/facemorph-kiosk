@@ -12,11 +12,10 @@ AI-powered photo booth that transforms live camera feeds into stylized artwork u
 
 > **For discrete AMD GPUs** (RX 7000 series etc), use the `main` branch instead.
 
-## Quick Setup (2 commands)
+## Quick Setup
 
 ```bash
-git clone https://github.com/LucasbAMD/facemorph-kiosk.git && cd facemorph-kiosk
-git checkout claude/strix-halo-apu-yZRkP
+git clone -b claude/strix-halo-apu-yZRkP https://github.com/LucasbAMD/facemorph-kiosk.git && cd facemorph-kiosk
 bash bootstrap.sh
 ```
 
@@ -64,9 +63,8 @@ Then open **http://localhost:8000** in a browser.
 > 1. Plug in a USB webcam
 > 2. Open a terminal and run:
 >    ```
->    git clone https://github.com/LucasbAMD/facemorph-kiosk.git
+>    git clone -b claude/strix-halo-apu-yZRkP https://github.com/LucasbAMD/facemorph-kiosk.git
 >    cd facemorph-kiosk
->    git checkout claude/strix-halo-apu-yZRkP
 >    bash bootstrap.sh
 >    ```
 > 3. Wait for setup (~15-30 min depending on internet speed)
