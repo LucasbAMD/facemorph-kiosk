@@ -5,10 +5,12 @@ AI-powered photo booth that transforms live camera feeds into stylized artwork u
 ## Requirements
 
 - **OS:** Ubuntu 22.04+
-- **GPU:** AMD GPU (RX 7000 series tested) — ROCm drivers are installed automatically by the setup script
+- **GPU:** AMD discrete GPU (RX 7000 series tested) — ROCm drivers are installed automatically by the setup script
 - **Disk:** ~20 GB free (for AI models)
 - **Camera:** USB webcam
 - **Internet:** Required for first-time model downloads
+
+> **Using a Strix Halo APU?** Use the dedicated APU branch instead: `git clone -b claude/strix-halo-apu-yZRkP`
 
 ## Quick Setup (2 commands)
 
@@ -77,6 +79,7 @@ facemorph-kiosk/
 ├── generator.py        # AI generation pipeline
 ├── face_processor.py   # Face detection & recognition
 ├── setup_models.py     # Model downloader
+├── check_gpu.py        # GPU diagnostic script
 ├── requirements.txt    # Python dependencies
 ├── index.html          # Web UI
 └── assets/fonts/       # Nunito font files
