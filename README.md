@@ -4,11 +4,13 @@ AI-powered photo booth that transforms live camera feeds into stylized artwork u
 
 ## Requirements
 
-- **OS:** Ubuntu 24.04
-- **Hardware:** AMD Strix Halo APU (Ryzen AI Max+ / Radeon 8060S / gfx1151)
+- **OS:** Ubuntu 24.04 or Linux Mint 22.x
+- **Hardware:** AMD Strix Halo APU (gfx1150 or gfx1151)
+  - Tested: GMKtec box (Radeon 8060S, 96 GB), HP ZBook Ultra G1a (Radeon 8050S, 48 GB)
 - **Disk:** ~20 GB free (for AI models)
 - **Camera:** USB webcam
 - **Internet:** Required for first-time setup
+- **Power:** Keep plugged in during generation (battery mode throttles the GPU)
 
 > **For discrete AMD GPUs** (RX 7000 series etc), use the `main` branch instead.
 
@@ -22,13 +24,13 @@ bash bootstrap.sh
 The bootstrap script handles everything automatically:
 1. Installs system packages
 2. Installs ROCm drivers with `--no-dkms` (required for APU)
-3. Detects gfx1151 and applies Strix Halo fixes:
+3. Detects gfx1150/gfx1151 and applies Strix Halo fixes:
    - Removes broken `amdgpu-dkms-firmware` package (MES 0x83 bug)
    - Downloads latest GPU firmware from kernel.org
    - Adds `amdgpu.cwsr_enable=0` kernel parameter to GRUB
    - Rebuilds initramfs
 4. Creates Python virtual environment
-5. Installs TheRock PyTorch wheel (gfx1151-specific build)
+5. Installs TheRock PyTorch wheel (gfx1150/gfx1151-specific build)
 6. Installs all Python dependencies
 7. Downloads AI models (~15 GB)
 8. Sets GPU device permissions
@@ -45,11 +47,13 @@ python start.py
 
 Then open **http://localhost:8000** in a browser.
 
-> **First generation is slow** (~3-5 min) because GPU kernels are being compiled and cached. Subsequent generations are much faster.
+> **First generation is slow** (~3-5 min) because GPU kernels are being compiled and cached. Subsequent generations take ~45-90 sec depending on your hardware.
+
+> **Laptop users:** Keep the charger plugged in and set power mode to Performance. Close unused apps. Don't close the lid during generation.
 
 ## What start.py Does Automatically
 
-- Detects gfx1151 APU architecture
+- Detects gfx1150/gfx1151 APU architecture
 - Sets `HSA_ENABLE_SDMA=0` (fixes compute hangs on unified memory)
 - Sets `HSA_XNACK=1` (required for unified memory APUs)
 - Sets `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1` (enables attention kernels)
@@ -116,16 +120,19 @@ sudo bash check_system.sh
 | `No HIP GPUs found` | Reboot if ROCm was just installed. Check permissions: `sudo chmod 666 /dev/kfd /dev/dri/renderD*` |
 | Wrong PyTorch wheel | Run `bash fix_torch.sh` to reinstall TheRock gfx1151 wheel |
 | Generation stuck at 0% | Make sure `HSA_XNACK=1` is set (start.py does this automatically) |
-| Generation stuck at 100% | VAE issue — should be fixed in this branch (fp32 VAE + tiling) |
+| Generation stuck at 100% | VAE decode step is slow on first run (kernel compilation). Wait 2-3 min. Fixed in this branch (fp32 VAE + tiling) |
 | PC freezes during generation | Normal on APU — CPU/GPU share resources. Freezes are brief |
+| Slow generation on laptop | Plug in power + set to performance mode. Laptops thermal-throttle under sustained GPU load |
+| Model downloads fail with DNS error | Firefox uses its own DNS. Fix terminal DNS: `echo "nameserver 8.8.8.8" \| sudo tee /etc/resolv.conf` |
+| System freezes / suspend won't wake | Disable suspend: `sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target` |
 | `No camera found` | Check `ls /dev/video*` — plug in a USB webcam |
 | `Missing packages` | `source kiosk_venv/bin/activate && pip install -r requirements.txt` |
 | `Models not found` | Run `python setup_models.py` to re-download |
 
 ## Strix Halo Technical Notes
 
-- **PyTorch source:** TheRock gfx1151 wheels from `rocm.nightlies.amd.com/v2/gfx1151/` — standard PyTorch wheels do NOT work
-- **No HSA_OVERRIDE_GFX_VERSION:** TheRock wheels have native gfx1151 support, overriding to 11.0.0 causes hangs
+- **PyTorch source:** TheRock wheels from `rocm.nightlies.amd.com/v2/gfx1150/` or `/gfx1151/` (auto-detected) — standard PyTorch wheels do NOT work
+- **No HSA_OVERRIDE_GFX_VERSION:** TheRock wheels have native gfx1150/1151 support, overriding to 11.0.0 causes hangs
 - **HSA_ENABLE_SDMA=0:** Critical for APUs — the SDMA engine is buggy on unified memory
 - **HSA_XNACK=1:** Required for unified memory architecture
 - **VAE in fp32:** The fp16 VAE decoder hangs on gfx1151, so it's upcast to float32 with tiling
