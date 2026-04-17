@@ -364,7 +364,10 @@ if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
     echo "  [OK] PyTorch with GPU support already installed"
     python -c "import torch; print(f'  PyTorch {torch.__version__} — GPU: {torch.cuda.get_device_name(0)}')"
 else
-    pip install --pre torch torchvision torchaudio --index-url "$ROCM_TORCH_URL" -q || fail "Failed to install PyTorch. Check your internet connection."
+    # Remove any existing torch that lacks GPU support before installing the correct one.
+    # Without this, pip may skip the install if it sees an existing (wrong) torch version.
+    pip uninstall -y torch torchvision torchaudio 2>/dev/null
+    pip install --pre torch torchvision torchaudio --index-url "$ROCM_TORCH_URL" || fail "Failed to install PyTorch. Check your internet connection."
     echo "  [OK] PyTorch installed"
     python -c "import torch; print(f'  PyTorch {torch.__version__}')"
     if python -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
