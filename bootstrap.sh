@@ -114,10 +114,12 @@ detect_rocm_version() {
 }
 
 # ── Helper: detect Ubuntu codename ────────────────────────────────────
+# On Linux Mint, VERSION_CODENAME is the Mint codename (e.g. "xia");
+# UBUNTU_CODENAME holds the actual Ubuntu base (e.g. "noble"). Prefer that.
 detect_ubuntu_codename() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
-        echo "${VERSION_CODENAME:-}"
+        echo "${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}"
     else
         echo ""
     fi
