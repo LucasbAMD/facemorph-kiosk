@@ -80,7 +80,7 @@ detect_gfx() {
             elif [ "$major" -eq 9 ] && [ "$minor" -eq 0 ] && [ "$patch" -ge 10 ]; then
                 printf "gfx%d0%x\n" "$major" "$patch"
             else
-                printf "gfx%d%d%02d\n" "$major" "$minor" "$patch"
+                printf "gfx%d%d%d\n" "$major" "$minor" "$patch"
             fi
             return
         fi

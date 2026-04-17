@@ -100,7 +100,7 @@ def _detect_gfx_version():
                         elif major == 9 and minor == 0 and patch >= 10:
                             gfx = f"gfx{major:d}0{patch:x}"
                         else:
-                            gfx = f"gfx{major}{minor:01d}{patch:02d}"
+                            gfx = f"gfx{major}{minor}{patch}"
                         return gfx, node_dir
         except (IOError, ValueError):
             continue
