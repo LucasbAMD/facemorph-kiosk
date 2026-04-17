@@ -517,6 +517,13 @@
              maxlength="30" autocomplete="off" spellcheck="false"
              oninput="updateCobrandPreview()">
       <div id="cobrand-preview"></div>
+      <div class="cobrand-header" style="margin-top: 10px;">
+        <label>CEC Banner</label>
+        <label class="cobrand-toggle">
+          <input type="checkbox" id="watermark-toggle" checked>
+          <span>Show</span>
+        </label>
+      </div>
     </div>
     <div id="action-section">
       <button id="transform-btn" onclick="doTransform()">Transform Scene</button>
@@ -742,6 +749,8 @@ async function doTransform() {
   const cobrandOn = document.getElementById("cobrand-toggle").checked;
   const cobrandVal = document.getElementById("cobrand-input").value.trim();
   if (cobrandOn && cobrandVal) fd.append("cobrand", cobrandVal);
+  const watermarkOn = document.getElementById("watermark-toggle").checked;
+  fd.append("watermark", watermarkOn ? "1" : "0");
   try {
     const r = await fetch("/generate", { method: "POST", body: fd });
     if (r.status >= 400) {

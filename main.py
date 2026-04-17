@@ -53,6 +53,8 @@ _run_lock = threading.Lock()
 # ── Co-brand overlay state ────────────────────────────────────────────────────
 _cobrand_name: Optional[str] = None
 _cobrand_lock = threading.Lock()
+_watermark_enabled: bool = True
+_watermark_lock = threading.Lock()
 
 
 _FONT_PATH = str(Path(__file__).parent / "assets" / "fonts" / "Nunito-Variable.ttf")
@@ -234,8 +236,9 @@ async def video_feed():
 # ── AI Generation ─────────────────────────────────────────────────────────────
 @app.post("/generate")
 async def generate(character: str = Form(...),
-                   cobrand: Optional[str] = Form(None)):
-    global _cobrand_name
+                   cobrand: Optional[str] = Form(None),
+                   watermark: Optional[str] = Form("1")):
+    global _cobrand_name, _watermark_enabled
     with frame_lock:
         frame = latest_frame.copy() if latest_frame is not None else None
     if frame is None:
@@ -245,6 +248,8 @@ async def generate(character: str = Form(...),
 
     with _cobrand_lock:
         _cobrand_name = cobrand.strip() if cobrand else None
+    with _watermark_lock:
+        _watermark_enabled = watermark != "0"
 
     started = comfy.generate(frame, character)
     if not started:
@@ -268,8 +273,10 @@ async def generate_status():
                     cobrand = _cobrand_name
                 if cobrand:
                     result = _apply_cobrand_overlay(result, cobrand)
-                # Always apply the AMD CEC watermark (bottom-left, subtle)
-                result = _apply_watermark(result)
+                with _watermark_lock:
+                    show_watermark = _watermark_enabled
+                if show_watermark:
+                    result = _apply_watermark(result)
                 _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 95])
                 b64 = base64.b64encode(buf.tobytes()).decode()
                 print(f"[Status] Result ready: {result.shape}, JPEG size: {len(buf)}bytes")
