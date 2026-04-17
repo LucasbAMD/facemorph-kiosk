@@ -224,10 +224,14 @@ case "$DISTRO" in
     ubuntu|debian|linuxmint|pop)
         sudo apt-get update -qq || fail "apt-get update failed. Check your internet connection."
 
-        # libgl1-mesa-glx was renamed to libgl1-mesa-dri in Ubuntu 24.04+
-        GL_PKG="libgl1-mesa-glx"
-        if ! apt-cache show libgl1-mesa-glx &>/dev/null; then
-            GL_PKG="libgl1-mesa-dri"
+        # libgl1-mesa-glx was removed in Ubuntu 24.04+. libgl1 exists on
+        # both 22.04 and 24.04 and provides libGL.so.1 (all OpenCV needs).
+        # Use apt-cache policy to check for an actual install candidate,
+        # not just package metadata (transitional dummies confuse apt-cache show).
+        if apt-cache policy libgl1-mesa-glx 2>/dev/null | grep -qE "Candidate: [0-9]"; then
+            GL_PKG="libgl1-mesa-glx"
+        else
+            GL_PKG="libgl1"
         fi
 
         sudo apt-get install -y \
