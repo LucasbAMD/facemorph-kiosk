@@ -381,6 +381,54 @@
   }
   #mode-label span { color: var(--accent); font-weight: 600; }
 
+  /* ── Style manager modal ── */
+  #style-mgr-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--dim);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.65rem;
+    letter-spacing: 1px; transition: all 0.2s;
+  }
+  #style-mgr-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #style-mgr-overlay {
+    position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.85);
+    display: none; align-items: center; justify-content: center;
+  }
+  #style-mgr-overlay.on { display: flex; }
+  #style-mgr-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px 32px; max-width: 520px; width: 90%; max-height: 80vh;
+    overflow-y: auto; position: relative;
+  }
+  #style-mgr-box h2 { font-size: 1rem; margin: 0 0 6px; color: var(--text); }
+  #style-mgr-box p { font-size: 0.6rem; color: var(--dim); margin: 0 0 16px; }
+  .style-mgr-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  }
+  .style-mgr-item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border-radius: 8px; border: 1px solid var(--border); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .style-mgr-item:hover { border-color: rgba(255,255,255,0.12); }
+  .style-mgr-item.checked { border-color: var(--accent); background: rgba(0,212,255,0.05); }
+  .style-mgr-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+  .style-mgr-item .mgr-emoji { font-size: 1rem; }
+  .style-mgr-item .mgr-name { font-size: 0.6rem; font-weight: 600; color: var(--text); }
+  .style-mgr-item .mgr-sub { font-size: 0.45rem; color: var(--dim); }
+  #style-mgr-actions {
+    display: flex; gap: 8px; margin-top: 16px; justify-content: space-between;
+    align-items: center;
+  }
+  #style-mgr-actions button {
+    padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--text); cursor: pointer; font-size: 0.6rem;
+    letter-spacing: 0.5px; transition: all 0.2s;
+  }
+  #style-mgr-actions button:hover { border-color: var(--accent); color: var(--accent); }
+  #style-mgr-actions .mgr-primary {
+    background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700;
+  }
+  #style-mgr-actions .mgr-primary:hover { background: #00bbdd; }
+
   /* ── Countdown overlay ── */
   #countdown-overlay {
     position: absolute; inset: 0; z-index: 8;
@@ -459,6 +507,7 @@
   </div>
   <div class="header-right">
     <div id="run-counter">RUNS: <span id="run-count">0</span></div>
+    <button id="style-mgr-btn" onclick="toggleStyleMgr()">STYLES</button>
     <button id="about-btn" onclick="toggleAbout()">HOW IT WORKS</button>
     <div id="ai-badge">AI ENGINE</div>
   </div>
@@ -593,6 +642,22 @@
   </div>
 </div>
 
+<!-- Style manager modal -->
+<div id="style-mgr-overlay">
+  <div id="style-mgr-box">
+    <h2>Manage Styles</h2>
+    <p>Select which styles are available for users. Changes are saved automatically.</p>
+    <div class="style-mgr-grid" id="style-mgr-grid"></div>
+    <div id="style-mgr-actions">
+      <div>
+        <button onclick="mgrSelectAll()">Select All</button>
+        <button onclick="mgrSelectNone()">Select None</button>
+      </div>
+      <button class="mgr-primary" onclick="toggleStyleMgr()">Done</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -621,6 +686,82 @@ let selectedStyle = "ghibli";
 let pollTimer = null;
 let currentResultDataUrl = null;
 
+// ── Style manager ──
+const STORAGE_KEY = "kiosk_enabled_styles";
+let enabledStyles = new Set(STYLES.map(s => s.key));
+
+function loadEnabledStyles() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr) && arr.length > 0) {
+        enabledStyles = new Set(arr);
+      }
+    }
+  } catch(e) {}
+}
+
+function saveEnabledStyles() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...enabledStyles]));
+}
+
+function getVisibleStyles() {
+  return STYLES.filter(s => enabledStyles.has(s.key));
+}
+
+function toggleStyleMgr() {
+  const overlay = document.getElementById("style-mgr-overlay");
+  const isOpen = overlay.classList.toggle("on");
+  if (isOpen) buildStyleMgrGrid();
+}
+
+function buildStyleMgrGrid() {
+  const grid = document.getElementById("style-mgr-grid");
+  grid.innerHTML = STYLES.map(s => {
+    const checked = enabledStyles.has(s.key);
+    return `<label class="style-mgr-item${checked ? " checked" : ""}" data-key="${s.key}">
+      <input type="checkbox" ${checked ? "checked" : ""} onchange="mgrToggle('${s.key}', this)">
+      <span class="mgr-emoji">${s.emoji}</span>
+      <span><span class="mgr-name">${s.name}</span><br><span class="mgr-sub">${s.sub}</span></span>
+    </label>`;
+  }).join("");
+}
+
+function mgrToggle(key, cb) {
+  if (cb.checked) {
+    enabledStyles.add(key);
+  } else {
+    enabledStyles.delete(key);
+  }
+  cb.closest(".style-mgr-item").classList.toggle("checked", cb.checked);
+  saveEnabledStyles();
+  refreshStyleGrid();
+}
+
+function mgrSelectAll() {
+  STYLES.forEach(s => enabledStyles.add(s.key));
+  saveEnabledStyles();
+  buildStyleMgrGrid();
+  refreshStyleGrid();
+}
+
+function mgrSelectNone() {
+  enabledStyles.clear();
+  saveEnabledStyles();
+  buildStyleMgrGrid();
+  refreshStyleGrid();
+}
+
+function refreshStyleGrid() {
+  const visible = getVisibleStyles();
+  if (visible.length > 0 && !enabledStyles.has(selectedStyle)) {
+    selectedStyle = visible[0].key;
+  }
+  const aiReady = document.getElementById("ai-badge").classList.contains("online");
+  buildStyleGrid(aiReady);
+}
+
 function updateCobrandPreview() {
   const val = document.getElementById("cobrand-input").value.trim();
   const preview = document.getElementById("cobrand-preview");
@@ -646,13 +787,17 @@ function updateRunCounter() {
 
 function buildStyleGrid(aiReady) {
   const grid = document.getElementById("style-grid");
-  grid.innerHTML = STYLES.map(s => `
+  const visible = getVisibleStyles();
+  grid.innerHTML = visible.map(s => `
     <div class="style-card${s.key === selectedStyle ? " active" : ""}${aiReady ? " ready" : ""}"
          onclick="selectStyle('${s.key}', this)" data-key="${s.key}">
       <div class="style-emoji">${s.emoji}</div>
       <div class="style-name">${s.name}</div>
       <div class="style-sub">${s.sub}</div>
     </div>`).join("");
+  if (visible.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--dim);padding:20px;font-size:0.6rem;">No styles enabled. Click STYLES in the header to configure.</div>';
+  }
 }
 
 function selectStyle(key, el) {
@@ -910,6 +1055,7 @@ function toggleAbout() {
 }
 
 async function init() {
+  loadEnabledStyles();
   buildStyleGrid(false);
   const online = await checkAI();
   buildStyleGrid(online);
