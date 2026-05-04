@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
-start.py — AI Scene Style Kiosk Launcher
-Run with: python start.py
+start.py — AI Scene Style Kiosk Launcher (cross-platform)
 
-Auto-detects AMD GPU architecture and sets the correct ROCm environment
-variables. Works on any AMD dGPU or APU with ROCm-compatible Linux drivers.
+Run with:
+    python start.py
+
+Linux: auto-detects AMD GPU architecture and sets the correct ROCm env vars.
+Windows: relies on the ROCm-on-Windows (HIP SDK) PyTorch build to find the
+GPU directly. The Radeon AI PRO R9700 (gfx1201) is officially supported in
+ROCm 6.4+, so no HSA override is needed.
 """
 
 import glob
 import os
+import platform
 import sys
 import subprocess
 from pathlib import Path
@@ -16,9 +21,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 os.chdir(ROOT)
 
+IS_WINDOWS = platform.system() == "Windows"
+IS_LINUX = platform.system() == "Linux"
+
 
 # ── GFX version → HSA_OVERRIDE_GFX_VERSION mapping ──────────────────────────
-# Maps detected gfx_target_version (from sysfs) to the nearest ROCm-supported
+# Maps detected gfx_target_version (Linux sysfs) to the nearest ROCm-supported
 # architecture. Format in sysfs is numeric MMMNNRR (e.g. 110000 = gfx1100).
 _GFX_OVERRIDE_MAP = {
     # GFX9 — Vega (GCN 5)
@@ -53,14 +61,14 @@ _GFX_OVERRIDE_MAP = {
     # GFX11.5 — RDNA 3.5 (Strix Point APU)
     "gfx1150": "11.0.0",
     "gfx1151": "11.0.0",
-    # GFX12 — RDNA 4 (Navi 4x)
-    "gfx1200": None,        # Officially supported in ROCm 7+
+    # GFX12 — RDNA 4 (Navi 4x) — Radeon AI PRO R9700 = gfx1201
+    "gfx1200": None,        # Officially supported in ROCm 6.4+/7+
     "gfx1201": None,
 }
 
 
-def _detect_gfx_version():
-    """Detect AMD GPU GFX version from KFD sysfs topology.
+def _detect_gfx_version_linux():
+    """Detect AMD GPU GFX version from KFD sysfs topology (Linux only).
     Returns (gfx_string, node_path) or (None, None) if no GPU found."""
     kfd_nodes = "/sys/class/kfd/kfd/topology/nodes"
     if not os.path.isdir(kfd_nodes):
@@ -81,7 +89,6 @@ def _detect_gfx_version():
                         major = val // 10000
                         minor = (val % 10000) // 100
                         patch = val % 100
-                        # gfx9 series uses hex for minor (e.g. 90a = 9.0.10)
                         if major == 9 and minor == 0 and patch == 10:
                             gfx = "gfx90a"
                         elif major == 9 and minor == 0 and patch >= 10:
@@ -94,27 +101,25 @@ def _detect_gfx_version():
     return None, None
 
 
-def _detect_render_devices():
+def _detect_render_devices_linux():
     """Find all /dev/dri/renderD* devices."""
     devices = sorted(glob.glob("/dev/dri/renderD*"))
     return devices if devices else ["/dev/dri/renderD128"]
 
 
-def _setup_gpu_env():
-    """Auto-detect GPU and set ROCm environment variables."""
-    gfx, node_path = _detect_gfx_version()
+def _setup_gpu_env_linux():
+    """Auto-detect GPU and set ROCm environment variables (Linux)."""
+    gfx, _ = _detect_gfx_version_linux()
 
     if gfx:
         print(f"[OK] Detected AMD GPU: {gfx}")
         override = _GFX_OVERRIDE_MAP.get(gfx)
         if override is None and gfx in _GFX_OVERRIDE_MAP:
-            # Officially supported — no override needed
             print(f"     Officially supported by ROCm — no override needed")
         elif override:
             os.environ["HSA_OVERRIDE_GFX_VERSION"] = override
             print(f"     HSA_OVERRIDE_GFX_VERSION={override}")
         else:
-            # Unknown GFX — try to guess nearest supported version
             print(f"[WARN] Unknown GFX version: {gfx}")
             print(f"       You may need to set HSA_OVERRIDE_GFX_VERSION manually")
     else:
@@ -122,19 +127,15 @@ def _setup_gpu_env():
         print("       Falling back to HSA_OVERRIDE_GFX_VERSION=11.0.0")
         os.environ["HSA_OVERRIDE_GFX_VERSION"] = "11.0.0"
 
-    # Common ROCm environment
     os.environ.update({
         "AMD_LOG_LEVEL": "0",
         "PYTORCH_HIP_ALLOC_CONF": "expandable_segments:True",
     })
 
-    # Auto-detect render devices
-    render_devs = _detect_render_devices()
     os.environ["HIP_VISIBLE_DEVICES"] = "0"
     os.environ["ROCR_VISIBLE_DEVICES"] = "0"
 
-    # Set permissions on all detected render devices + kfd
-    perm_devices = ["/dev/kfd"] + render_devs
+    perm_devices = ["/dev/kfd"] + _detect_render_devices_linux()
     for dev in perm_devices:
         if os.path.exists(dev):
             try:
@@ -144,16 +145,53 @@ def _setup_gpu_env():
                 pass
 
 
+def _setup_gpu_env_windows():
+    """Configure GPU env on Windows (ROCm HIP SDK / DirectML)."""
+    # The R9700 (gfx1201) is officially supported in ROCm 6.4+ on Windows,
+    # so HSA_OVERRIDE_GFX_VERSION should NOT be set — let the runtime use
+    # the real arch. We only set logging/allocator hints.
+    os.environ.setdefault("AMD_LOG_LEVEL", "0")
+    os.environ.setdefault("PYTORCH_HIP_ALLOC_CONF", "expandable_segments:True")
+    os.environ.setdefault("HIP_VISIBLE_DEVICES", "0")
+
+    # Try to print what PyTorch sees so we surface GPU detection issues early.
+    try:
+        import torch
+        if torch.cuda.is_available():
+            name = torch.cuda.get_device_name(0)
+            vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"[OK] GPU detected: {name} ({vram:.1f} GB)")
+        else:
+            # DirectML fallback path
+            try:
+                import torch_directml  # noqa: F401
+                print("[OK] torch_directml backend available (DirectML fallback)")
+            except ImportError:
+                print("[WARN] No GPU backend detected by PyTorch")
+                print("       Install the AMD HIP SDK from https://www.amd.com/en/developer/resources/rocm-hub.html")
+                print("       or run bootstrap.ps1 again to install torch-directml.")
+    except ImportError:
+        # PyTorch not installed yet; the package check below will catch it.
+        pass
+
+
+def _setup_gpu_env():
+    if IS_LINUX:
+        _setup_gpu_env_linux()
+    elif IS_WINDOWS:
+        _setup_gpu_env_windows()
+    else:
+        print(f"[WARN] Unsupported platform: {platform.system()}")
+
+
 def main():
     print("\n" + "="*55)
     print("  AMD-ADAPT  |  Scene Style Transfer Kiosk")
     print("  http://localhost:8000")
     print("="*55 + "\n")
 
-    # ── GPU auto-detection ────────────────────────────────────────────
     _setup_gpu_env()
 
-    # ── Check required packages ───────────────────────────────────────
     missing = []
     for pkg in ("uvicorn", "fastapi", "cv2", "diffusers", "torch"):
         try:
@@ -162,17 +200,18 @@ def main():
             missing.append(pkg)
     if missing:
         print(f"[ERR] Missing packages: {', '.join(missing)}")
-        print("      Run: pip install -r requirements.txt")
+        if IS_WINDOWS:
+            print("      Run: .\\bootstrap.ps1")
+        else:
+            print("      Run: pip install -r requirements.txt")
         sys.exit(1)
 
-    # ── Check models ──────────────────────────────────────────────────
     sdxl_turbo = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
                   "sd_xl_turbo_1.0_fp16.safetensors")
 
     try:
         from diffusers import ControlNetModel
         import torch
-        # Try local cache first, then download if missing/incomplete
         try:
             ControlNetModel.from_pretrained(
                 "diffusers/controlnet-depth-sdxl-1.0",
