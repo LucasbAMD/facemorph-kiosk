@@ -27,9 +27,13 @@ Open **PowerShell** in the repo directory and run:
 # One-time only — allow local scripts:
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
-# Bootstrap:
-.\bootstrap.ps1
+# Preflight check + bootstrap:
+.\preflight.ps1
 ```
+
+`preflight.ps1` verifies Python, the HIP SDK, GPU detection, and disk
+space, then offers to run `bootstrap.ps1` for you. If you'd rather skip
+the prereq check and go straight in, just run `.\bootstrap.ps1`.
 
 The bootstrap script will:
 1. Verify Python is installed
