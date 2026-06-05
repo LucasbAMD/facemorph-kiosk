@@ -8,13 +8,19 @@ import asyncio
 import threading
 import time
 import base64
+import io
+import os
+import socket
+import uuid
+from collections import OrderedDict
 import numpy as np
 from pathlib import Path
 from typing import Optional
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
+from fastapi.responses import (StreamingResponse, HTMLResponse, JSONResponse,
+                               Response)
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -31,6 +37,104 @@ if Path("static").exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 comfy = ComfyBridge()
+
+# ── Result store + QR-to-phone delivery ───────────────────────────────────────
+# After a transform, the result image is kept in memory under a short random id.
+# The result overlay shows a QR code that encodes  http://<kiosk-lan-ip>:<port>/r/<id>
+# A visitor on the same Wi-Fi scans it, opens that page on their phone, and
+# downloads the image. No internet, accounts, or cloud storage required.
+#
+# Tuning via env:
+#   KIOSK_PUBLIC_HOST  — override the host/IP put in the QR URL (e.g. a DNS name
+#                        or a tunnel). If unset, the LAN IP is auto-detected.
+#   KIOSK_PORT         — port advertised in the QR URL (default 8000).
+#   KIOSK_RESULT_TTL   — seconds to keep a result in memory (default 1800 = 30m).
+#   KIOSK_MAX_RESULTS  — max results kept before evicting oldest (default 50).
+
+KIOSK_PORT = int(os.environ.get("KIOSK_PORT", "8000"))
+RESULT_TTL = int(os.environ.get("KIOSK_RESULT_TTL", "1800"))
+MAX_RESULTS = int(os.environ.get("KIOSK_MAX_RESULTS", "50"))
+
+# id -> {"jpg": bytes, "ts": float}
+_results = OrderedDict()
+_results_lock = threading.Lock()
+
+
+def _detect_lan_ip():
+    """Best-effort detection of this machine's primary LAN IPv4 address."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+
+def _public_base_url():
+    """Base URL phones should use to reach this kiosk."""
+    host = os.environ.get("KIOSK_PUBLIC_HOST", "").strip()
+    if not host:
+        host = _detect_lan_ip()
+    return f"http://{host}:{KIOSK_PORT}"
+
+
+def _store_result(jpg_bytes):
+    """Save a JPEG result, return its short id. Evicts old/expired entries."""
+    rid = uuid.uuid4().hex[:10]
+    now = time.time()
+    with _results_lock:
+        expired = [k for k, v in _results.items() if now - v["ts"] > RESULT_TTL]
+        for k in expired:
+            _results.pop(k, None)
+        while len(_results) >= MAX_RESULTS:
+            _results.popitem(last=False)
+        _results[rid] = {"jpg": jpg_bytes, "ts": now}
+    return rid
+
+
+def _get_result(rid):
+    with _results_lock:
+        entry = _results.get(rid)
+        if entry is None:
+            return None
+        if time.time() - entry["ts"] > RESULT_TTL:
+            _results.pop(rid, None)
+            return None
+        return entry["jpg"]
+
+
+def _make_qr_data_url(url):
+    """Return a base64 PNG data URL of a QR code for `url`, or None if the
+    qrcode library isn't installed (feature degrades gracefully)."""
+    try:
+        import qrcode
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=2,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"data:image/png;base64,{b64}"
+    except ImportError:
+        print("[QR] qrcode library not installed — QR disabled. "
+              "Install with: pip install qrcode[pil]")
+        return None
+    except Exception as e:
+        print(f"[QR] Failed to render QR: {e}")
+        return None
+
 
 cap: Optional[cv2.VideoCapture] = None
 cap_lock = threading.Lock()
@@ -271,10 +375,20 @@ async def generate_status():
                 # Always apply the AMD CEC watermark (bottom-left, subtle)
                 result = _apply_watermark(result)
                 _, buf = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                b64 = base64.b64encode(buf.tobytes()).decode()
-                print(f"[Status] Result ready: {result.shape}, JPEG size: {len(buf)}bytes")
+                jpg_bytes = buf.tobytes()
+                b64 = base64.b64encode(jpg_bytes).decode()
+                # Store result + build a QR pointing to the phone-download page.
+                rid = _store_result(jpg_bytes)
+                share_url = f"{_public_base_url()}/r/{rid}"
+                qr_data_url = _make_qr_data_url(share_url)
+                print(f"[Status] Result ready: {result.shape}, "
+                      f"JPEG size: {len(jpg_bytes)}bytes, id={rid}, "
+                      f"share={share_url}")
                 return JSONResponse({"status": "done",
-                                     "image": f"data:image/jpeg;base64,{b64}"})
+                                     "image": f"data:image/jpeg;base64,{b64}",
+                                     "result_id": rid,
+                                     "share_url": share_url,
+                                     "qr": qr_data_url})
             except Exception as e:
                 print(f"[Status] Error encoding result: {e}")
                 return JSONResponse({"status": "error", "message": f"Encoding failed: {e}"})
@@ -325,6 +439,90 @@ async def status():
             "mode": comfy.get_mode()}
 
 
+@app.get("/health")
+async def health():
+    """Diagnostics: which backend/profile is active and how phones reach us."""
+    info = {"ai_ready": comfy.check_available(), "mode": comfy.get_mode(),
+            "share_base_url": _public_base_url()}
+    try:
+        import generator
+        dev, kind, _ = generator.get_device()
+        pname, prof = generator.get_profile()
+        info.update({"device": str(dev), "device_kind": kind,
+                     "profile": pname, "profile_detail": prof})
+    except Exception as e:
+        info["device_error"] = str(e)
+    return JSONResponse(info)
+
+
+# ── QR result delivery (phone download) ───────────────────────────────────────
+@app.get("/r/{rid}", response_class=HTMLResponse)
+async def result_page(rid: str):
+    """Mobile-friendly page shown when a visitor scans the QR with their phone."""
+    jpg = _get_result(rid)
+    if jpg is None:
+        return HTMLResponse(
+            "<!doctype html><meta name='viewport' content='width=device-width,"
+            "initial-scale=1'><body style='font-family:system-ui;background:#111;"
+            "color:#eee;text-align:center;padding:3rem 1.5rem'>"
+            "<h2>Link expired</h2><p>This photo is no longer available. "
+            "Please take a new one at the kiosk.</p></body>",
+            status_code=404)
+    img_src = f"/r/{rid}/image"
+    dl_name = f"amd-facemorph-{rid}.jpg"
+    html = f"""<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your AMD FaceMorph</title>
+<style>
+  :root {{ color-scheme: dark; }}
+  body {{ font-family: system-ui, -apple-system, sans-serif; margin:0;
+         background:#0b0b0d; color:#f4f4f5; text-align:center; }}
+  header {{ padding:1.1rem 1rem .4rem; font-weight:700; letter-spacing:.02em; }}
+  .sub {{ color:#a1a1aa; font-size:.85rem; margin:.1rem 0 1rem; }}
+  .wrap {{ max-width:560px; margin:0 auto; padding:0 1rem 2.5rem; }}
+  img.result {{ width:100%; height:auto; border-radius:14px;
+               box-shadow:0 8px 30px rgba(0,0,0,.5); }}
+  a.btn {{ display:block; margin:1.25rem auto 0; padding:1rem 1.25rem;
+          background:#e2231a; color:#fff; text-decoration:none; font-weight:700;
+          border-radius:12px; font-size:1.05rem; }}
+  a.btn:active {{ filter:brightness(.9); }}
+  .hint {{ color:#a1a1aa; font-size:.8rem; margin-top:1rem; line-height:1.4; }}
+</style></head>
+<body>
+  <header>Your AMD FaceMorph is ready</header>
+  <div class="sub">AMD Customer Engagement Program</div>
+  <div class="wrap">
+    <img class="result" src="{img_src}" alt="Your generated image">
+    <a class="btn" href="{img_src}" download="{dl_name}">Save to my phone</a>
+    <p class="hint">If the button doesn't save it, press and hold the image
+       above and choose &ldquo;Save Image&rdquo;.</p>
+  </div>
+</body></html>"""
+    return HTMLResponse(html)
+
+
+@app.get("/r/{rid}/image")
+async def result_image(rid: str):
+    """Raw JPEG, shown inline on the phone page."""
+    jpg = _get_result(rid)
+    if jpg is None:
+        raise HTTPException(404, "Result expired")
+    return Response(content=jpg, media_type="image/jpeg")
+
+
+@app.get("/r/{rid}/download")
+async def result_download(rid: str):
+    """JPEG with an attachment header to force a download."""
+    jpg = _get_result(rid)
+    if jpg is None:
+        raise HTTPException(404, "Result expired")
+    return Response(content=jpg, media_type="image/jpeg",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="amd-facemorph-{rid}.jpg"'})
+
+
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def on_startup():
@@ -344,6 +542,8 @@ async def on_shutdown():
 if __name__ == "__main__":
     print("\n" + "="*55)
     print("  AMD-ADAPT")
-    print("  http://localhost:8000")
+    print(f"  Local:  http://localhost:{KIOSK_PORT}")
+    print(f"  Phones: {_public_base_url()}  (QR target)")
     print("="*55 + "\n")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, workers=1)
+    uvicorn.run("main:app", host="0.0.0.0", port=KIOSK_PORT,
+                reload=False, workers=1)

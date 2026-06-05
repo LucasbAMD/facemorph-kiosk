@@ -40,6 +40,188 @@ logging.getLogger("diffusers").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 logging.getLogger("onnxruntime").setLevel(logging.ERROR)
 
+# ── Device resolution ─────────────────────────────────────────────────────────────
+# The kiosk must run on a range of machines:
+#   - AMD dGPU with ROCm (Linux, or R9700 on Windows)  -> torch "cuda" (ROCm)
+#   - NVIDIA dGPU                                       -> torch "cuda"
+#   - AMD APU / no-dGPU on Windows (Ryzen AI dev box)   -> DirectML
+#   - Anything else                                     -> CPU
+#
+# Historically generator.py hard-coded device="cuda" everywhere, which froze /
+# crashed on machines without a working ROCm/CUDA backend (e.g. the dev box).
+# _resolve_device() picks the best available backend ONCE at import time, and
+# every tensor/model in this module is placed on TORCH_DEVICE instead of "cuda".
+#
+# Override with env KIOSK_DEVICE=cuda|dml|cpu to force a specific backend.
+
+_FORCE_DEVICE = os.environ.get("KIOSK_DEVICE", "").strip().lower()
+_dml_module = None       # cached torch_directml module if used
+_device_kind = "cpu"     # "cuda" | "dml" | "cpu" — coarse backend family
+
+
+def _resolve_device():
+    """Return (torch.device, kind, dtype) for the best available backend.
+
+    kind is one of "cuda", "dml", "cpu". dtype is float16 on cuda/dml-capable
+    paths and float32 on CPU (fp16 on CPU is extremely slow / often unsupported).
+    """
+    global _dml_module, _device_kind
+    import torch
+
+    # 1. Explicit override
+    if _FORCE_DEVICE in ("cpu",):
+        _device_kind = "cpu"
+        return torch.device("cpu"), "cpu", torch.float32
+
+    if _FORCE_DEVICE in ("cuda", "rocm", "hip"):
+        if torch.cuda.is_available():
+            _device_kind = "cuda"
+            return torch.device("cuda"), "cuda", torch.float16
+        print("[Device] KIOSK_DEVICE requested CUDA/ROCm but it is not available.")
+
+    if _FORCE_DEVICE in ("dml", "directml"):
+        dev = _try_directml()
+        if dev is not None:
+            return dev, "dml", torch.float16
+        print("[Device] KIOSK_DEVICE requested DirectML but it is not available.")
+
+    # 2. Auto-detect: ROCm/CUDA first (fastest where it works)
+    if not _FORCE_DEVICE and torch.cuda.is_available():
+        try:
+            name = torch.cuda.get_device_name(0)
+        except Exception:
+            name = "unknown"
+        _device_kind = "cuda"
+        print(f"[Device] Using ROCm/CUDA backend: {name}")
+        return torch.device("cuda"), "cuda", torch.float16
+
+    # 3. DirectML (AMD/Intel iGPU + dGPU on Windows via DirectX 12)
+    if not _FORCE_DEVICE:
+        dev = _try_directml()
+        if dev is not None:
+            return dev, "dml", torch.float16
+
+    # 4. CPU fallback — always works, just slow
+    _device_kind = "cpu"
+    print("[Device] No GPU backend available — falling back to CPU (slow).")
+    return torch.device("cpu"), "cpu", torch.float32
+
+
+def _try_directml():
+    """Return a torch_directml device if the backend imports & has a device."""
+    global _dml_module, _device_kind
+    try:
+        import torch_directml
+        if torch_directml.device_count() < 1:
+            print("[Device] torch_directml imported but reports 0 devices.")
+            return None
+        _dml_module = torch_directml
+        _device_kind = "dml"
+        dev = torch_directml.device()
+        try:
+            dname = torch_directml.device_name(0)
+        except Exception:
+            dname = str(dev)
+        print(f"[Device] Using DirectML backend: {dname}")
+        return dev
+    except ImportError:
+        return None
+    except Exception as e:
+        print(f"[Device] DirectML probe failed: {e}")
+        return None
+
+
+# Resolve once at import. Other modules read these three globals.
+try:
+    import torch as _torch_for_device  # noqa: F401
+    TORCH_DEVICE, DEVICE_KIND, TORCH_DTYPE = _resolve_device()
+except Exception as _e:  # torch missing entirely — leave safe defaults
+    TORCH_DEVICE, DEVICE_KIND, TORCH_DTYPE = "cpu", "cpu", None
+    print(f"[Device] Could not resolve device at import: {_e}")
+
+
+def get_device():
+    """Public accessor used by other modules (e.g. face_processor)."""
+    return TORCH_DEVICE, DEVICE_KIND, TORCH_DTYPE
+
+
+# ── Performance profiles ─────────────────────────────────────────────────────
+# A booth demo needs each transform to land in a predictable window (target
+# 15-45s). The full pipeline (35 steps + Real-ESRGAN upscale + IP-Adapter) is
+# tuned for a strong dGPU; on an APU (DirectML) it is far slower and can OOM.
+# A profile scales the heavy knobs:
+#   steps_cap     — hard ceiling on diffusion steps (per-style steps are clamped)
+#   upscaler      — load/run Real-ESRGAN 2x (biggest single time cost)
+#   ip_adapter    — load IP-Adapter FaceID (extra model + per-frame face embed)
+#   resolution    — SDXL working resolution (768 is ~1.8x faster than 1024)
+#
+# Auto-selected by backend, override with env KIOSK_PROFILE=quality|balanced|fast.
+_PROFILES = {
+    "quality": {
+        "steps_cap": 35, "upscaler": True, "ip_adapter": True,
+        "resolution": 1024,
+    },
+    "balanced": {
+        "steps_cap": 22, "upscaler": False, "ip_adapter": True,
+        "resolution": 1024,
+    },
+    "fast": {
+        "steps_cap": 14, "upscaler": False, "ip_adapter": True,
+        "resolution": 768,
+    },
+}
+
+
+def _select_profile():
+    """Pick a profile name from env override, else by backend family."""
+    forced = os.environ.get("KIOSK_PROFILE", "").strip().lower()
+    if forced in _PROFILES:
+        return forced
+    if forced:
+        print(f"[Profile] Unknown KIOSK_PROFILE={forced!r}; using auto.")
+    if DEVICE_KIND == "cuda":
+        return "quality"
+    if DEVICE_KIND == "dml":
+        return "fast"
+    return "fast"
+
+
+_PROFILE_NAME = _select_profile()
+_PROFILE = _PROFILES[_PROFILE_NAME]
+print(f"[Profile] Active profile: {_PROFILE_NAME} "
+      f"(steps_cap={_PROFILE['steps_cap']}, upscaler={_PROFILE['upscaler']}, "
+      f"ip_adapter={_PROFILE['ip_adapter']}, res={_PROFILE['resolution']})")
+
+
+def get_profile():
+    """Public accessor: (name, dict)."""
+    return _PROFILE_NAME, dict(_PROFILE)
+
+
+def _onnx_providers():
+    """ONNXRuntime execution providers ordered best-first for this machine.
+
+    InsightFace runs on ONNXRuntime, which is separate from torch. We pick
+    providers that match the resolved torch backend where possible.
+    """
+    try:
+        import onnxruntime as ort
+        avail = set(ort.get_available_providers())
+    except Exception:
+        return ["CPUExecutionProvider"]
+
+    ordered = []
+    if DEVICE_KIND == "cuda":
+        for p in ("ROCMExecutionProvider", "CUDAExecutionProvider"):
+            if p in avail:
+                ordered.append(p)
+    if DEVICE_KIND in ("dml", "cuda"):
+        if "DmlExecutionProvider" in avail:
+            ordered.append("DmlExecutionProvider")
+    ordered.append("CPUExecutionProvider")
+    seen = set()
+    return [p for p in ordered if not (p in seen or seen.add(p))]
+
 # ── Model paths ───────────────────────────────────────────────────────────────
 SDXL_TURBO_PATH = (Path.home() / "ComfyUI" / "models" / "checkpoints" /
                    "sd_xl_turbo_1.0_fp16.safetensors")
@@ -703,12 +885,19 @@ def _try_load_upscaler():
             num_in_ch=3, num_out_ch=3, num_feat=64,
             num_block=23, num_grow_ch=32, scale=2,
         )
+        # Real-ESRGAN's RealESRGANer only understands CUDA or CPU torch devices,
+        # not DirectML tensors. Use the GPU path only on a true CUDA/ROCm build;
+        # otherwise run the upscaler on CPU (or let the caller skip it via profile).
+        if DEVICE_KIND == "cuda":
+            up_device, up_half = "cuda", True
+        else:
+            up_device, up_half = "cpu", False
         upsampler = RealESRGANer(
             scale=2,
             model_path=str(REALESRGAN_MODEL_PATH),
             model=model,
-            half=True,
-            device="cuda",
+            half=up_half,
+            device=up_device,
         )
 
         with _pipe_lock:
@@ -744,12 +933,16 @@ def _try_load_ip_adapter(pipe):
     try:
         from insightface.app import FaceAnalysis
 
-        print("[Generator]   Loading InsightFace for face embedding...")
+        providers = _onnx_providers()
+        # ctx_id selects the GPU index for non-CPU providers; -1 forces CPU.
+        ctx_id = -1 if providers[0] == "CPUExecutionProvider" else 0
+        print(f"[Generator]   Loading InsightFace for face embedding "
+              f"(providers={providers})...")
         app = FaceAnalysis(
             name="buffalo_l",
-            providers=["CPUExecutionProvider"],
+            providers=providers,
         )
-        app.prepare(ctx_id=-1, det_thresh=0.5, det_size=(640, 640))
+        app.prepare(ctx_id=ctx_id, det_thresh=0.5, det_size=(640, 640))
 
         print("[Generator]   Loading IP-Adapter FaceID for SDXL...")
         pipe.load_ip_adapter(
@@ -792,7 +985,7 @@ def _extract_face_embedding(frame_bgr):
     # Use the largest face (most prominent in frame)
     face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
     embedding = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
-    embedding = embedding.to(dtype=torch.float16, device="cuda")
+    embedding = embedding.to(dtype=TORCH_DTYPE, device=TORCH_DEVICE)
     # Concatenate with zeros (negative embed) so diffusers can chunk(2)
     neg_embedding = torch.zeros_like(embedding)
     return torch.cat([embedding, neg_embedding], dim=0)
@@ -815,18 +1008,19 @@ def _load_pipeline():
             )
             from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
-            print("[Generator] Loading ControlNet Depth + SDXL Base...")
+            print(f"[Generator] Loading ControlNet Depth + SDXL Base "
+                  f"(device={TORCH_DEVICE}, dtype={TORCH_DTYPE})...")
             print("[Generator]   Loading depth estimator (Depth-Anything-V2)...")
             depth_proc = AutoImageProcessor.from_pretrained(DEPTH_ESTIMATOR_ID)
             depth_model = AutoModelForDepthEstimation.from_pretrained(
                 DEPTH_ESTIMATOR_ID)
-            depth_model = depth_model.to("cuda")
+            depth_model = depth_model.to(TORCH_DEVICE)
             depth_model.eval()
 
             print("[Generator]   Loading ControlNet...")
             controlnet = ControlNetModel.from_pretrained(
                 CONTROLNET_DEPTH_ID,
-                torch_dtype=torch.float16,
+                torch_dtype=TORCH_DTYPE,
                 variant="fp16",
             )
 
@@ -835,7 +1029,7 @@ def _load_pipeline():
                 pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
                     SDXL_BASE_ID,
                     controlnet=controlnet,
-                    torch_dtype=torch.float16,
+                    torch_dtype=TORCH_DTYPE,
                     variant="fp16",
                 )
             except OSError:
@@ -843,7 +1037,7 @@ def _load_pipeline():
                 pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
                     SDXL_BASE_ID,
                     controlnet=controlnet,
-                    torch_dtype=torch.float16,
+                    torch_dtype=TORCH_DTYPE,
                 )
             # ── Swap scheduler to DPM++ 2M Karras (sharper, more coherent) ──
             print("[Generator]   Setting DPM++ 2M Karras scheduler...")
@@ -853,12 +1047,19 @@ def _load_pipeline():
                 use_karras_sigmas=True,
             )
 
-            pipe = pipe.to("cuda")
+            pipe = pipe.to(TORCH_DEVICE)
 
             try:
                 pipe.enable_vae_slicing()
             except Exception:
                 pass
+            # On low-VRAM APUs (DirectML/shared memory), attention slicing keeps
+            # peak memory down and helps avoid OOM hangs.
+            if DEVICE_KIND != "cuda":
+                try:
+                    pipe.enable_attention_slicing()
+                except Exception:
+                    pass
 
             with _pipe_lock:
                 _pipe = pipe
@@ -869,8 +1070,17 @@ def _load_pipeline():
             print("[Generator] Ready! mode=ControlNet+SDXL_Base (best quality)")
 
             # ── Try loading optional enhancements ───
-            _try_load_upscaler()
-            _try_load_ip_adapter(pipe)
+            # The Real-ESRGAN upscaler is heavy; PROFILE decides whether to load it.
+            if _PROFILE.get("upscaler", True):
+                _try_load_upscaler()
+            else:
+                print("[Generator]   Upscaler disabled by profile "
+                      f"({_PROFILE_NAME}) — skipping for speed.")
+            if _PROFILE.get("ip_adapter", True):
+                _try_load_ip_adapter(pipe)
+            else:
+                print("[Generator]   IP-Adapter disabled by profile "
+                      f"({_PROFILE_NAME}) — skipping for speed.")
             return
 
         except Exception as e:
@@ -885,18 +1095,24 @@ def _load_pipeline():
 
         from diffusers import StableDiffusionXLImg2ImgPipeline
 
-        print(f"[Generator] Loading SDXL Turbo from {SDXL_TURBO_PATH}...")
+        print(f"[Generator] Loading SDXL Turbo from {SDXL_TURBO_PATH} "
+              f"(device={TORCH_DEVICE}, dtype={TORCH_DTYPE})...")
         pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
             str(SDXL_TURBO_PATH),
-            torch_dtype=torch.float16,
+            torch_dtype=TORCH_DTYPE,
             use_safetensors=True,
         )
-        pipe = pipe.to("cuda")
+        pipe = pipe.to(TORCH_DEVICE)
 
         try:
             pipe.enable_vae_slicing()
         except Exception:
             pass
+        if DEVICE_KIND != "cuda":
+            try:
+                pipe.enable_attention_slicing()
+            except Exception:
+                pass
 
         with _pipe_lock:
             _pipe = pipe
@@ -928,7 +1144,7 @@ def _estimate_depth(pil_image):
         model = _depth_estimator
 
     inputs = proc(images=pil_image, return_tensors="pt")
-    inputs = {k: v.to("cuda") for k, v in inputs.items()}
+    inputs = {k: v.to(TORCH_DEVICE) for k, v in inputs.items()}
 
     with torch.inference_mode():
         outputs = model(**inputs)
@@ -967,7 +1183,13 @@ def generate_scene(frame, style_key):
         import torch
 
         mode = _pipe_mode
-        params = style.get(mode, style["turbo"])
+        # Copy so per-run profile clamping never mutates the shared STYLES dict.
+        params = dict(style.get(mode, style["turbo"]))
+        # Clamp diffusion steps to the active profile's ceiling for predictable
+        # booth timing. Never raise a style's steps, only cap them.
+        steps_cap = _PROFILE.get("steps_cap")
+        if steps_cap:
+            params["steps"] = min(params.get("steps", steps_cap), steps_cap)
         prompt = style["prompt"]
         prompt_2 = style.get("prompt_2", prompt)
         neg_prompt = style["negative"]
@@ -981,10 +1203,11 @@ def generate_scene(frame, style_key):
         neg_prompt += _NEG_SUFFIX
         neg_prompt_2 += _NEG_SUFFIX
 
-        # Prepare source image at 1024x1024 for SDXL
+        # Prepare source image at the profile's working resolution for SDXL.
+        res = _PROFILE.get("resolution", 1024)
         h, w = frame.shape[:2]
         source_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        source_pil = source_pil.resize((1024, 1024), Image.LANCZOS)
+        source_pil = source_pil.resize((res, res), Image.LANCZOS)
 
         with _pipe_lock:
             pipe = _pipe
@@ -994,7 +1217,10 @@ def generate_scene(frame, style_key):
               f"Frame={w}x{h}")
 
         start = time.time()
-        generator = torch.Generator(device="cuda").manual_seed(
+        # DirectML does not support torch.Generator bound to its device, so we
+        # seed a CPU generator there (diffusers handles the cross-device case).
+        gen_device = "cuda" if DEVICE_KIND == "cuda" else "cpu"
+        generator = torch.Generator(device=gen_device).manual_seed(
             int(time.time()) % 2**32)
 
         # ── IP-Adapter FaceID: extract face embedding if style needs it ──

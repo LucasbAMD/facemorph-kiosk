@@ -34,10 +34,25 @@ $PyExe     = Join-Path $VenvDir "Scripts\python.exe"
 $PipExe    = Join-Path $VenvDir "Scripts\pip.exe"
 $Activate  = Join-Path $VenvDir "Scripts\Activate.ps1"
 
-# Default ROCm-Windows PyTorch wheel index. Override by setting $env:TORCH_INDEX
-# before running this script if AMD publishes a newer index URL.
-$DefaultTorchIndex = "https://download.pytorch.org/whl/nightly/rocm6.4"
-$TorchIndex = if ($env:TORCH_INDEX) { $env:TORCH_INDEX } else { $DefaultTorchIndex }
+# -- PyTorch backend selection -------------------------------------------------
+# This kiosk must run on a range of machines, importantly including AMD APUs
+# with NO discrete GPU (e.g. a Ryzen AI Max "Strix Halo" dev box). Native
+# ROCm-on-Windows wheels only cover specific dGPUs (the R9700/gfx1201 is the
+# main one) and are unreliable on APUs, so the DEFAULT, most-portable backend
+# here is DirectML, which runs the model on any DirectX 12 GPU/iGPU.
+#
+# Choose with $env:KIOSK_BACKEND before running:
+#   directml  (default) -- torch + torch-directml. Works on APUs and any DX12 GPU.
+#   rocm                -- native ROCm-Windows wheels (only for supported dGPUs
+#                          like the R9700). Set $env:TORCH_INDEX to the AMD index,
+#                          e.g. https://repo.radeon.com/rocm/windows/...  or a
+#                          TheRock gfx120X index. The pytorch.org rocm indexes are
+#                          LINUX-ONLY and will not install on Windows.
+$Backend = if ($env:KIOSK_BACKEND) { $env:KIOSK_BACKEND.ToLower() } else { "directml" }
+
+# Only used when $Backend = "rocm". No safe universal Windows default exists,
+# so this must be supplied by the user for their specific GPU.
+$TorchIndex = $env:TORCH_INDEX
 
 function Fail($msg) {
     Write-Host ""
@@ -122,34 +137,57 @@ if (-not (Test-Path $PyExe)) { Fail "venv python not found at $PyExe" }
 if ($LASTEXITCODE -ne 0) { Fail "Failed to upgrade pip/setuptools" }
 
 # ── 4. PyTorch ──────────────────────────────────────────────────────────────
-Step "4/6" "Installing PyTorch..."
+Step "4/6" "Installing PyTorch (backend: $Backend)..."
 
 $TorchOk = $false
 
-# First try: ROCm-Windows wheels
-Write-Host "  Trying ROCm-Windows wheels: $TorchIndex"
-& $PipExe install --pre torch torchvision torchaudio --index-url $TorchIndex
-if ($LASTEXITCODE -eq 0) {
-    & $PyExe -c "import torch; assert torch.cuda.is_available()" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $name = & $PyExe -c "import torch; print(torch.cuda.get_device_name(0))"
-        Ok "PyTorch ROCm-Windows installed — GPU: $name"
-        $TorchOk = $true
-    } else {
-        Warn "PyTorch ROCm wheels installed but GPU not detected. Falling back to DirectML."
-        & $PipExe uninstall -y torch torchvision torchaudio 2>$null | Out-Null
+if ($Backend -eq "rocm") {
+    # Native ROCm-on-Windows path -- only for supported dGPUs (e.g. R9700).
+    if (-not $TorchIndex) {
+        Fail @"
+KIOSK_BACKEND=rocm requires `$env:TORCH_INDEX to point at an AMD Windows wheel index.
+The pytorch.org rocm indexes are Linux-only. For a supported AMD dGPU use either:
+  - AMD official:  https://repo.radeon.com/rocm/windows/  (see AMD's install-pytorch docs)
+  - TheRock gfx120X nightly index for gfx1200/gfx1201
+Then re-run:  `$env:TORCH_INDEX='<index-url>'; .\bootstrap.ps1
+Or just run without KIOSK_BACKEND to use the portable DirectML backend.
+"@
     }
-} else {
-    Warn "ROCm-Windows wheels not available from $TorchIndex"
+    Write-Host "  Installing ROCm-Windows wheels from: $TorchIndex"
+    & $PipExe install --pre torch torchvision torchaudio --index-url $TorchIndex
+    if ($LASTEXITCODE -eq 0) {
+        & $PyExe -c "import torch; assert torch.cuda.is_available()" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $name = & $PyExe -c "import torch; print(torch.cuda.get_device_name(0))"
+            Ok "PyTorch ROCm-Windows installed -- GPU: $name"
+            $TorchOk = $true
+        } else {
+            Warn "ROCm wheels installed but torch.cuda.is_available() is False."
+            Warn "Falling back to DirectML so the kiosk still runs."
+            & $PipExe uninstall -y torch torchvision torchaudio 2>$null | Out-Null
+        }
+    } else {
+        Warn "ROCm-Windows wheels could not be installed from $TorchIndex. Falling back to DirectML."
+    }
 }
 
-# Fallback: torch-directml (works on any DX12 GPU including R9700)
+# Default / fallback: torch-directml (runs on any DX12 GPU or AMD APU iGPU).
 if (-not $TorchOk) {
     Write-Host ""
-    Write-Host "  Falling back to torch-directml (DirectML backend)..."
-    & $PipExe install torch torchvision torch-directml
+    Write-Host "  Installing torch-directml (portable DirectML backend)..."
+    # torch-directml pins compatible torch/torchvision versions itself.
+    & $PipExe install torch-directml
     if ($LASTEXITCODE -ne 0) { Fail "Failed to install torch-directml" }
-    Ok "torch-directml installed"
+    # Verify DirectML actually sees a device before continuing.
+    & $PyExe -c "import torch_directml as d; assert d.device_count() > 0" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $dname = & $PyExe -c "import torch_directml as d; print(d.device_name(0))" 2>$null
+        Ok "torch-directml installed -- device: $dname"
+    } else {
+        Warn "torch-directml installed but reports 0 devices. The kiosk will run on CPU (slow)."
+        Warn "Check that the latest AMD Adrenalin driver is installed."
+    }
+    $TorchOk = $true
 }
 
 # ── 5. Python dependencies ──────────────────────────────────────────────────
@@ -159,6 +197,16 @@ Step "5/6" "Installing Python dependencies..."
 if ($LASTEXITCODE -ne 0) { Fail "Failed to install requirements.txt" }
 & $PipExe install huggingface-hub
 if ($LASTEXITCODE -ne 0) { Fail "Failed to install huggingface-hub" }
+
+# InsightFace (IP-Adapter FaceID) runs on ONNXRuntime, separate from torch.
+# On the DirectML backend, install onnxruntime-directml so face detection can
+# use the GPU too; otherwise it falls back to CPU automatically.
+if (-not ($Backend -eq "rocm" -and $TorchOk)) {
+    Write-Host "  Installing onnxruntime-directml for GPU face detection..."
+    & $PipExe install onnxruntime-directml 2>$null
+    if ($LASTEXITCODE -eq 0) { Ok "onnxruntime-directml installed" }
+    else { Warn "onnxruntime-directml not installed -- InsightFace will use CPU." }
+}
 Ok "All Python packages installed"
 
 # ── 6. Download models ──────────────────────────────────────────────────────

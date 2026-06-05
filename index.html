@@ -197,11 +197,26 @@
   #elapsed { font-size: 0.6rem; color: #333; font-weight: 300; }
 
   /* ── Result ── */
+  .result-stage {
+    display: flex; align-items: center; justify-content: center;
+    gap: 28px; flex-wrap: wrap; max-width: 96%;
+  }
   #result-img {
-    max-height: 74vh; max-width: 90%;
+    max-height: 74vh; max-width: 100%;
     border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
+  #qr-panel {
+    display: none; flex-direction: column; align-items: center;
+    gap: 12px; background: #fff; color: #111;
+    padding: 20px 22px; border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  #qr-panel.on { display: flex; }
+  #qr-title { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #111; max-width: 180px; }
+  #qr-img { width: 180px; height: 180px; image-rendering: pixelated; }
+  #qr-sub { font-size: 0.7rem; color: #555; max-width: 180px; }
   .result-btns { display: flex; gap: 12px; margin-top: 4px; }
   .result-btns button {
     padding: 14px 32px; border: none; border-radius: 8px;
@@ -490,7 +505,14 @@
 
     <!-- Result overlay -->
     <div id="result-overlay" class="overlay">
-      <img id="result-img" src="" alt="Result">
+      <div class="result-stage">
+        <img id="result-img" src="" alt="Result">
+        <div id="qr-panel">
+          <div id="qr-title">Scan to save to your phone</div>
+          <img id="qr-img" src="" alt="QR code">
+          <div id="qr-sub">Open your camera and point it here</div>
+        </div>
+      </div>
       <div class="result-btns">
         <button id="save-btn" onclick="savePhoto()">Save Photo</button>
         <button id="close-btn" onclick="closeResult()">Try Another</button>
@@ -776,6 +798,16 @@ async function pollStatus() {
         document.getElementById("gen-overlay").classList.remove("on");
         currentResultDataUrl = data.image;
         document.getElementById("result-img").src = data.image;
+        // Show the QR code (scan-to-save) if the backend produced one.
+        const qrPanel = document.getElementById("qr-panel");
+        const qrImg = document.getElementById("qr-img");
+        if (data.qr) {
+          qrImg.src = data.qr;
+          qrPanel.classList.add("on");
+        } else {
+          qrImg.src = "";
+          qrPanel.classList.remove("on");
+        }
         document.getElementById("result-overlay").classList.add("on");
         // Keep transform button disabled while result is showing
         updateRunCounter();
@@ -798,6 +830,9 @@ function closeResult() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   document.getElementById("result-overlay").classList.remove("on");
   document.getElementById("result-img").src = "";
+  const qrPanel = document.getElementById("qr-panel");
+  qrPanel.classList.remove("on");
+  document.getElementById("qr-img").src = "";
   currentResultDataUrl = null;
   document.getElementById("transform-btn").disabled = false;
 }
