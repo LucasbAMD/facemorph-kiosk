@@ -156,18 +156,23 @@ def get_device():
 #   resolution    — SDXL working resolution (768 is ~1.8x faster than 1024)
 #
 # Auto-selected by backend, override with env KIOSK_PROFILE=quality|balanced|fast.
+# "controlnet" gates the heavy stack (ControlNet + depth + IP-Adapter + CLIP
+# vision). On a shared-memory APU iGPU, loading all of that at once exhausts
+# DirectML memory and triggers a GPU device-reset ("GPU will not respond to
+# more commands"). The "fast" profile therefore runs a lightweight SDXL
+# img2img pipeline (Juggernaut only) which is far lighter and reliable.
 _PROFILES = {
     "quality": {
         "steps_cap": 35, "upscaler": True, "ip_adapter": True,
-        "resolution": 1024,
+        "controlnet": True, "resolution": 1024,
     },
     "balanced": {
         "steps_cap": 22, "upscaler": False, "ip_adapter": True,
-        "resolution": 1024,
+        "controlnet": True, "resolution": 1024,
     },
     "fast": {
-        "steps_cap": 14, "upscaler": False, "ip_adapter": True,
-        "resolution": 768,
+        "steps_cap": 14, "upscaler": False, "ip_adapter": False,
+        "controlnet": False, "resolution": 768,
     },
 }
 
@@ -999,6 +1004,53 @@ def _load_pipeline():
     try:
         import torch
 
+        # ── Lightweight img2img mode for APUs (profile controlnet=False) ──
+        # Loads ONLY the base SDXL model as a plain img2img pipeline. This
+        # avoids the ControlNet + depth + IP-Adapter + CLIP-vision stack that
+        # exhausts a shared-memory APU iGPU and causes a DirectML device reset.
+        if not _PROFILE.get("controlnet", True):
+            try:
+                from diffusers import (
+                    StableDiffusionXLImg2ImgPipeline,
+                    DPMSolverMultistepScheduler,
+                )
+                print(f"[Generator] Loading lightweight img2img pipeline "
+                      f"({SDXL_BASE_ID}) for profile '{_PROFILE_NAME}' "
+                      f"(device={TORCH_DEVICE}, dtype={TORCH_DTYPE})...")
+                try:
+                    pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                        SDXL_BASE_ID, torch_dtype=TORCH_DTYPE, variant="fp16",
+                    )
+                except OSError:
+                    pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                        SDXL_BASE_ID, torch_dtype=TORCH_DTYPE,
+                    )
+                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                    pipe.scheduler.config, algorithm_type="dpmsolver++",
+                    use_karras_sigmas=True,
+                )
+                pipe = pipe.to(TORCH_DEVICE)
+                try:
+                    pipe.enable_vae_slicing()
+                except Exception:
+                    pass
+                if DEVICE_KIND != "cuda":
+                    try:
+                        pipe.enable_attention_slicing()
+                    except Exception:
+                        pass
+                with _pipe_lock:
+                    _pipe = pipe
+                _pipe_mode = "img2img"
+                _pipe_ready = True
+                print("[Generator] Ready! mode=img2img (lightweight, APU-friendly)")
+                return
+            except Exception as e:
+                print(f"[Generator] Lightweight img2img load failed: {e}")
+                import traceback
+                traceback.print_exc()
+                # fall through to try the heavier paths
+
         # ── Try ControlNet + SDXL Base (best quality) ─────────────────────
         try:
             from diffusers import (
@@ -1183,8 +1235,19 @@ def generate_scene(frame, style_key):
         import torch
 
         mode = _pipe_mode
-        # Copy so per-run profile clamping never mutates the shared STYLES dict.
-        params = dict(style.get(mode, style["turbo"]))
+        if mode == "img2img":
+            # Lightweight Juggernaut img2img: needs real CFG guidance (Turbo's
+            # guidance=0 would ignore the style prompt). Derive from the style's
+            # controlnet settings where available, with safe defaults.
+            cn = style.get("controlnet", {})
+            params = {
+                "strength": cn.get("strength", 0.65),
+                "guidance": cn.get("guidance", 7.0),
+                "steps": cn.get("steps", 28),
+            }
+        else:
+            # Copy so per-run profile clamping never mutates the shared STYLES dict.
+            params = dict(style.get(mode, style["turbo"]))
         # Clamp diffusion steps to the active profile's ceiling for predictable
         # booth timing. Never raise a style's steps, only cap them.
         steps_cap = _PROFILE.get("steps_cap")

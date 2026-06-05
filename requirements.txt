@@ -2,17 +2,16 @@ fastapi
 uvicorn
 python-multipart
 opencv-python
-numpy
+numpy<2
 Pillow
-diffusers>=0.27.0
-transformers>=4.36.0
-accelerate>=0.25.0
+diffusers==0.30.0
+transformers==4.44.2
+accelerate==0.33.0
+huggingface_hub==0.24.6
+peft==0.12.0
 safetensors>=0.4.0
 insightface>=0.7.0
 onnxruntime>=1.16.0
 realesrgan>=0.3.0
 basicsr>=1.4.2
-# QR-to-phone: encodes the result share URL shown on the kiosk after a transform
 qrcode[pil]>=7.4
-# NOTE: on Windows APUs the bootstrap also installs onnxruntime-directml so
-# InsightFace face detection can run on the GPU via DirectML (see bootstrap.ps1).

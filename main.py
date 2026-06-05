@@ -236,25 +236,64 @@ def _apply_watermark(img: np.ndarray) -> np.ndarray:
 
 
 # ── Camera ────────────────────────────────────────────────────────────────────
+def _open_camera(camera_index: int = 0):
+    """Open a working webcam and return (VideoCapture, index) or (None, -1).
+
+    On Windows, OpenCV's default backend often *opens* a laptop webcam but then
+    returns no frames. We therefore try explicit backends (DirectShow, then
+    Media Foundation) across several indices, and only accept a camera that
+    actually yields a frame from cap.read().
+    """
+    import platform
+    is_windows = platform.system() == "Windows"
+
+    # Backends to try, best-first. CAP_ANY lets OpenCV pick (used on Linux/mac).
+    if is_windows:
+        backends = [("DSHOW", cv2.CAP_DSHOW), ("MSMF", cv2.CAP_MSMF),
+                    ("ANY", cv2.CAP_ANY)]
+    else:
+        backends = [("ANY", cv2.CAP_ANY)]
+
+    # Try the requested index first, then common alternates.
+    indices = [camera_index] + [i for i in (0, 1, 2, 3) if i != camera_index]
+
+    for be_name, be in backends:
+        for idx in indices:
+            try:
+                c = cv2.VideoCapture(idx, be)
+            except Exception:
+                continue
+            if not c.isOpened():
+                c.release()
+                continue
+            # Verify it actually delivers a frame (not just "opened").
+            c.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            c.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            c.set(cv2.CAP_PROP_FPS, 30)
+            ok = False
+            for _ in range(10):          # give the camera a moment to warm up
+                ret, frame = c.read()
+                if ret and frame is not None:
+                    ok = True
+                    break
+                time.sleep(0.1)
+            if ok:
+                print(f"[OK] Camera working at index {idx} via {be_name}")
+                return c, idx
+            c.release()
+    return None, -1
+
+
 def start_capture(camera_index: int = 0):
     global cap, latest_frame, capture_running
     capture_running = True
-    opened_index = camera_index
     with cap_lock:
-        cap = cv2.VideoCapture(camera_index)
-        if not cap.isOpened():
-            for alt in [2, 1, 0, 3]:
-                if alt == camera_index:
-                    continue
-                cap = cv2.VideoCapture(alt)
-                if cap.isOpened():
-                    opened_index = alt
-                    print(f"[OK] Camera opened at index {alt}")
-                    break
-        if cap.isOpened():
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-            cap.set(cv2.CAP_PROP_FPS, 30)
+        cap, opened_index = _open_camera(camera_index)
+        if cap is None:
+            print("[WARN] No working camera found. The kiosk will run but show "
+                  "'Waiting for camera...'. Check Windows camera privacy "
+                  "settings and that no other app is using the webcam.")
+            opened_index = -1
 
     def loop():
         global latest_frame, prev_gray, stable_since, motion_score

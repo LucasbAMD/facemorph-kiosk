@@ -1,5 +1,5 @@
-# ──────────────────────────────────────────────────────────────────────
-#  bootstrap.ps1 — One-command Windows setup for AI Scene Style Kiosk
+# ----------------------------------------------------------------------
+#  bootstrap.ps1 -- One-command Windows setup for AI Scene Style Kiosk
 #
 #  Usage (in PowerShell, from the repo directory):
 #      .\bootstrap.ps1
@@ -23,7 +23,7 @@
 #    - AMD HIP SDK 6.4+  (https://www.amd.com/en/developer/resources/rocm-hub.html)
 #    - Python 3.10 or 3.11 (https://www.python.org/downloads/)
 #    - ~20 GB free disk space
-# ──────────────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------------
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -72,11 +72,11 @@ function Warn($msg) { Write-Host "  [WARN] $msg" -ForegroundColor Yellow }
 
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan
-Write-Host "  AI Scene Style Kiosk — Windows Bootstrap" -ForegroundColor Cyan
+Write-Host "  AI Scene Style Kiosk -- Windows Bootstrap" -ForegroundColor Cyan
 Write-Host "  Target GPU: AMD Radeon AI PRO R9700 (RDNA 4 / gfx1201)" -ForegroundColor Cyan
 Write-Host "=======================================================" -ForegroundColor Cyan
 
-# ── 1. Python check ─────────────────────────────────────────────────────────
+# -- 1. Python check ---------------------------------------------------------
 Step "1/6" "Checking Python install..."
 
 $Python = $null
@@ -95,7 +95,7 @@ if (-not $Python) {
     Fail "Python 3.10, 3.11, or 3.12 not found. Install from https://www.python.org/downloads/ and check 'Add to PATH'."
 }
 
-# ── 2. HIP SDK check ────────────────────────────────────────────────────────
+# -- 2. HIP SDK check --------------------------------------------------------
 Step "2/6" "Checking AMD HIP SDK (ROCm for Windows)..."
 
 $HipPath  = $env:HIP_PATH
@@ -116,11 +116,11 @@ if ($RocmRoot) {
     Write-Host "         The R9700 needs the AMD HIP SDK 6.4+ for native PyTorch ROCm acceleration."
     Write-Host "         Download:  https://www.amd.com/en/developer/resources/rocm-hub.html"
     Write-Host ""
-    Write-Host "         Continuing anyway — will fall back to torch-directml if ROCm wheels"
+    Write-Host "         Continuing anyway -- will fall back to torch-directml if ROCm wheels"
     Write-Host "         can't load. This is slower but will still run on the R9700 via DirectX 12."
 }
 
-# ── 3. Create venv ──────────────────────────────────────────────────────────
+# -- 3. Create venv ----------------------------------------------------------
 Step "3/6" "Creating Python virtual environment..."
 
 if (Test-Path $VenvDir) {
@@ -136,7 +136,7 @@ if (-not (Test-Path $PyExe)) { Fail "venv python not found at $PyExe" }
 & $PyExe -m pip install --upgrade pip setuptools wheel -q
 if ($LASTEXITCODE -ne 0) { Fail "Failed to upgrade pip/setuptools" }
 
-# ── 4. PyTorch ──────────────────────────────────────────────────────────────
+# -- 4. PyTorch --------------------------------------------------------------
 Step "4/6" "Installing PyTorch (backend: $Backend)..."
 
 $TorchOk = $false
@@ -144,14 +144,12 @@ $TorchOk = $false
 if ($Backend -eq "rocm") {
     # Native ROCm-on-Windows path -- only for supported dGPUs (e.g. R9700).
     if (-not $TorchIndex) {
-        Fail @"
-KIOSK_BACKEND=rocm requires `$env:TORCH_INDEX to point at an AMD Windows wheel index.
-The pytorch.org rocm indexes are Linux-only. For a supported AMD dGPU use either:
-  - AMD official:  https://repo.radeon.com/rocm/windows/  (see AMD's install-pytorch docs)
-  - TheRock gfx120X nightly index for gfx1200/gfx1201
-Then re-run:  `$env:TORCH_INDEX='<index-url>'; .\bootstrap.ps1
-Or just run without KIOSK_BACKEND to use the portable DirectML backend.
-"@
+        Warn 'KIOSK_BACKEND=rocm requires $env:TORCH_INDEX to point at an AMD Windows wheel index.'
+        Warn 'The pytorch.org rocm indexes are Linux-only. For a supported AMD dGPU use either:'
+        Warn '  - AMD official:  https://repo.radeon.com/rocm/windows/  (see AMD install-pytorch docs)'
+        Warn '  - TheRock gfx120X nightly index for gfx1200/gfx1201'
+        Warn 'Then set $env:TORCH_INDEX and re-run bootstrap.ps1, or run without KIOSK_BACKEND for DirectML.'
+        Fail 'Missing $env:TORCH_INDEX for KIOSK_BACKEND=rocm.'
     }
     Write-Host "  Installing ROCm-Windows wheels from: $TorchIndex"
     & $PipExe install --pre torch torchvision torchaudio --index-url $TorchIndex
@@ -190,7 +188,7 @@ if (-not $TorchOk) {
     $TorchOk = $true
 }
 
-# ── 5. Python dependencies ──────────────────────────────────────────────────
+# -- 5. Python dependencies --------------------------------------------------
 Step "5/6" "Installing Python dependencies..."
 
 & $PipExe install -r (Join-Path $ScriptDir "requirements.txt")
@@ -209,14 +207,14 @@ if (-not ($Backend -eq "rocm" -and $TorchOk)) {
 }
 Ok "All Python packages installed"
 
-# ── 6. Download models ──────────────────────────────────────────────────────
+# -- 6. Download models ------------------------------------------------------
 Step "6/6" "Downloading AI models (~15 GB, may take a while)..."
 Write-Host "       Models cached to %USERPROFILE%\.cache\huggingface\ and %USERPROFILE%\kiosk_models\"
 
 & $PyExe (Join-Path $ScriptDir "setup_models.py")
 if ($LASTEXITCODE -ne 0) { Fail "Model download failed. Check internet and disk space." }
 
-# ── Done ───────────────────────────────────────────────────────────────────
+# -- Done -------------------------------------------------------------------
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Green
 Write-Host "  Setup complete!" -ForegroundColor Green
